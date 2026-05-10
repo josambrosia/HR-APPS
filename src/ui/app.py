@@ -71,6 +71,9 @@ class HRApp(ctk.CTk):
         elif name == "Insights":
             from src.ui.screens.insights import InsightsScreen
             InsightsScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "Export":
+            from src.ui.screens.export import ExportScreen
+            ExportScreen(self.content).grid(row=0, column=0, sticky="nsew")
         else:
             # placeholder for other screens (will be replaced in next tasks)
             frame = ctk.CTkFrame(self.content, fg_color="transparent")
