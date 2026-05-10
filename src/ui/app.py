@@ -20,7 +20,7 @@ class HRApp(ctk.CTk):
         self._build_sidebar()
         self._build_content_area()
         self._screens: Dict[str, ctk.CTkFrame] = {}
-        self._show_placeholder("Dashboard")
+        self._show("Dashboard")
 
     def _build_sidebar(self):
         self.sidebar = ctk.CTkFrame(self, width=200, corner_radius=0)
@@ -42,7 +42,7 @@ class HRApp(ctk.CTk):
         for label, screen in nav_items:
             ctk.CTkButton(
                 self.sidebar, text=label, anchor="w",
-                command=lambda s=screen: self._show_placeholder(s),
+                command=lambda s=screen: self._show(s),
                 fg_color="transparent", hover_color="#334155",
             ).pack(fill="x", padx=8, pady=2)
 
@@ -52,12 +52,17 @@ class HRApp(ctk.CTk):
         self.content.grid_rowconfigure(0, weight=1)
         self.content.grid_columnconfigure(0, weight=1)
 
-    def _show_placeholder(self, name: str):
-        # Clear and show simple placeholder
+    def _show(self, name: str):
+        # Clear current content
         for child in self.content.winfo_children():
             child.destroy()
-        frame = ctk.CTkFrame(self.content, fg_color="transparent")
-        frame.grid(row=0, column=0, sticky="nsew")
-        ctk.CTkLabel(frame, text=name, font=(FONT_FAMILY, 28, "bold")).pack(pady=40)
-        ctk.CTkLabel(frame, text=f"Screen '{name}' — to be implemented in next tasks.",
-                     font=(FONT_FAMILY, 13)).pack()
+        if name == "Dashboard":
+            from src.ui.screens.dashboard import DashboardScreen
+            DashboardScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        else:
+            # placeholder for other screens (will be replaced in next tasks)
+            frame = ctk.CTkFrame(self.content, fg_color="transparent")
+            frame.grid(row=0, column=0, sticky="nsew")
+            ctk.CTkLabel(frame, text=name, font=(FONT_FAMILY, 28, "bold")).pack(pady=40)
+            ctk.CTkLabel(frame, text=f"Screen '{name}' — to be implemented in next tasks.",
+                         font=(FONT_FAMILY, 13)).pack()
