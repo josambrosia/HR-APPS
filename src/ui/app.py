@@ -65,6 +65,9 @@ class HRApp(ctk.CTk):
         elif name == "Issues":
             from src.ui.screens.issues import IssuesScreen
             IssuesScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "Summary":
+            from src.ui.screens.summary import SummaryScreen
+            SummaryScreen(self.content).grid(row=0, column=0, sticky="nsew")
         else:
             # placeholder for other screens (will be replaced in next tasks)
             frame = ctk.CTkFrame(self.content, fg_color="transparent")
