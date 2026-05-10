@@ -6,7 +6,7 @@ from openpyxl import Workbook
 
 @pytest.fixture
 def synthetic_fingerprint_xls(tmp_path: Path) -> Path:
-    """Mini .xls mimicking real fingerprint export structure."""
+    """Mini .xlsx fixture mimicking real fingerprint export structure."""
     rows = [
         # header row
         ["Nama", "No. Staff", "Dept.", "Tanggal", "Hari", "Tipe", "Jadwal",
@@ -36,14 +36,12 @@ def synthetic_fingerprint_xls(tmp_path: Path) -> Path:
          "15,9", "", "0,1", "15", "", "1", "1", "", ""],
     ]
     df = pd.DataFrame(rows[1:], columns=rows[0])
-    out = tmp_path / "fingerprint_w1.xls"
-    # xlrd reads .xls (BIFF) — write via xlwt is heavy; use .xlsx then rename trick?
-    # Simpler: write as actual .xlsx but parser must accept both.
-    # We instead write as .xlsx for fixture but parser code reads via pandas
-    # which auto-detects engine. For .xls-specific tests, use real fixture below.
-    out_xlsx = tmp_path / "fingerprint_w1.xlsx"
-    df.to_excel(out_xlsx, index=False, header=True)
-    return out_xlsx
+    # xlrd reads .xls (BIFF) — writing BIFF needs xlwt which is heavy.
+    # We write .xlsx instead; the parser uses pandas.read_excel which
+    # auto-detects engine, so it handles both .xls and .xlsx in production.
+    out = tmp_path / "fingerprint_w1.xlsx"
+    df.to_excel(out, index=False, header=True)
+    return out
 
 
 @pytest.fixture
