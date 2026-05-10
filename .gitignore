@@ -35,6 +35,7 @@ MANIFEST
 
 # PyInstaller
 *.spec
+!HR-Absensi.spec
 *.manifest
 
 # pytest / testing
