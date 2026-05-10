@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Dashboard {{ period_label }}</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+         max-width: 1100px; margin: 24px auto; padding: 0 20px; color: #1a1a1a; }
+  h1 { font-size: 22px; border-bottom: 2px solid #1e293b; padding-bottom: 8px; }
+  h2 { font-size: 16px; margin-top: 28px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+              margin: 16px 0; }
+  .kpi { padding: 14px; background: #f1f5f9; border-radius: 6px; }
+  .kpi .label { font-size: 11px; color: #64748b; text-transform: uppercase; }
+  .kpi .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+  th { background: #f8fafc; font-weight: 600; }
+  .flag { background: #fef3c7; padding: 8px 12px; border-left: 3px solid #f59e0b;
+          margin: 6px 0; font-size: 13px; border-radius: 4px; }
+  .badge { display: inline-block; padding: 2px 6px; border-radius: 3px;
+           font-size: 11px; font-weight: 600; }
+  .badge.late { background: #fee2e2; color: #991b1b; }
+  @media print { body { margin: 0; } h1 { page-break-after: avoid; } }
+</style>
+</head>
+<body>
+  <h1>📊 Dashboard Insights — {{ period_label }}</h1>
+  <p style="color:#64748b;font-size:13px">Generated {{ generated_at }}</p>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="label">Total Terlambat</div>
+      <div class="value">{{ kpi.total_terlambat }} <small>mnt</small></div></div>
+    <div class="kpi"><div class="label">Hari Absen</div>
+      <div class="value">{{ kpi.total_absen }}</div></div>
+    <div class="kpi"><div class="label">Coaching Flag</div>
+      <div class="value">{{ kpi.coaching_count }}</div></div>
+    <div class="kpi"><div class="label">Teladan</div>
+      <div class="value" style="font-size:15px">{{ kpi.teladan_nama or '-' }}</div></div>
+  </div>
+
+  <h2>🔥 Top 5 Paling Terlambat</h2>
+  {% if top5 %}
+  <table>
+    <thead><tr><th>#</th><th>Nama</th><th>Dept</th><th>Total Terlambat</th><th>Hari Telat</th></tr></thead>
+    <tbody>
+    {% for r in top5 %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td><b>{{ r.nama }}</b></td>
+        <td>{{ r.dept }}</td>
+        <td><span class="badge late">{{ r.total_terlambat }} mnt</span></td>
+        <td>{{ r.hari_telat }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p>Tidak ada keterlambatan minggu ini. 👍</p>{% endif %}
+
+  <h2>⚠ Butuh Coaching (&gt;{{ coaching_threshold }} mnt/minggu)</h2>
+  {% for r in coaching %}
+    <div class="flag"><b>{{ r.nama }}</b> · {{ r.total_terlambat }} mnt · {{ r.hari_telat }} hari telat</div>
+  {% else %}
+    <p>Tidak ada yang perlu coaching periode ini. ✓</p>
+  {% endfor %}
+
+  <h2>📋 Ranking Lengkap</h2>
+  <table>
+    <thead><tr><th>Nama</th><th>Dept</th><th>Terlambat</th><th>Hari Telat</th><th>Issue</th></tr></thead>
+    <tbody>
+    {% for r in ranking %}
+      <tr>
+        <td>{{ r.nama }}</td>
+        <td>{{ r.dept }}</td>
+        <td>{{ r.total_terlambat }} mnt</td>
+        <td>{{ r.hari_telat }}</td>
+        <td>{{ r.issue_count }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
