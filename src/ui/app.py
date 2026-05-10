@@ -59,6 +59,9 @@ class HRApp(ctk.CTk):
         if name == "Dashboard":
             from src.ui.screens.dashboard import DashboardScreen
             DashboardScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "Import":
+            from src.ui.screens.import_screen import ImportScreen
+            ImportScreen(self.content).grid(row=0, column=0, sticky="nsew")
         else:
             # placeholder for other screens (will be replaced in next tasks)
             frame = ctk.CTkFrame(self.content, fg_color="transparent")
