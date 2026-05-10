@@ -74,6 +74,9 @@ class HRApp(ctk.CTk):
         elif name == "Export":
             from src.ui.screens.export import ExportScreen
             ExportScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "Settings":
+            from src.ui.screens.settings import SettingsScreen
+            SettingsScreen(self.content).grid(row=0, column=0, sticky="nsew")
         else:
             # placeholder for other screens (will be replaced in next tasks)
             frame = ctk.CTkFrame(self.content, fg_color="transparent")
