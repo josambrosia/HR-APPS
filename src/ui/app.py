@@ -1,0 +1,63 @@
+import customtkinter as ctk
+from typing import Dict, Callable
+
+from src.ui.theme import FONT_FAMILY
+
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
+
+class HRApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("HR Absensi App")
+        self.geometry("1180x720")
+        self.minsize(1024, 640)
+
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        self._build_sidebar()
+        self._build_content_area()
+        self._screens: Dict[str, ctk.CTkFrame] = {}
+        self._show_placeholder("Dashboard")
+
+    def _build_sidebar(self):
+        self.sidebar = ctk.CTkFrame(self, width=200, corner_radius=0)
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        self.sidebar.grid_propagate(False)
+
+        ctk.CTkLabel(self.sidebar, text="HR ABSENSI",
+                     font=(FONT_FAMILY, 16, "bold")).pack(pady=(20, 10))
+
+        nav_items = [
+            ("📊 Dashboard", "Dashboard"),
+            ("📥 Import", "Import"),
+            ("⚠ Issues", "Issues"),
+            ("📋 Summary", "Summary"),
+            ("📈 Insights", "Insights"),
+            ("📤 Export", "Export"),
+            ("⚙ Settings", "Settings"),
+        ]
+        for label, screen in nav_items:
+            ctk.CTkButton(
+                self.sidebar, text=label, anchor="w",
+                command=lambda s=screen: self._show_placeholder(s),
+                fg_color="transparent", hover_color="#334155",
+            ).pack(fill="x", padx=8, pady=2)
+
+    def _build_content_area(self):
+        self.content = ctk.CTkFrame(self, fg_color="transparent")
+        self.content.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        self.content.grid_rowconfigure(0, weight=1)
+        self.content.grid_columnconfigure(0, weight=1)
+
+    def _show_placeholder(self, name: str):
+        # Clear and show simple placeholder
+        for child in self.content.winfo_children():
+            child.destroy()
+        frame = ctk.CTkFrame(self.content, fg_color="transparent")
+        frame.grid(row=0, column=0, sticky="nsew")
+        ctk.CTkLabel(frame, text=name, font=(FONT_FAMILY, 28, "bold")).pack(pady=40)
+        ctk.CTkLabel(frame, text=f"Screen '{name}' — to be implemented in next tasks.",
+                     font=(FONT_FAMILY, 13)).pack()

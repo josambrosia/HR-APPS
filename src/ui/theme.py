@@ -1,0 +1,7 @@
+COLOR_BG = "#1a2332"
+COLOR_PANEL = "#1e293b"
+COLOR_ACCENT = "#4a9eff"
+COLOR_OK = "#4ade80"
+COLOR_WARN = "#fbbf24"
+COLOR_ERR = "#ef4444"
+FONT_FAMILY = "Segoe UI"
