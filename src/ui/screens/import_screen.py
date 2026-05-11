@@ -1,3 +1,4 @@
+from collections import Counter
 from pathlib import Path
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
@@ -6,9 +7,27 @@ from src.config import DB_PATH
 from src.db.connection import get_connection
 from src.db.employees import upsert_employee, get_employee_by_no_staff
 from src.db.attendance import upsert_attendance
+from src.db.settings import set_setting
 from src.parsers.fingerprint import parse_fingerprint_file
 from src.core.issue_detector import is_issue
 from src.ui.theme import FONT_FAMILY, COLOR_OK
+from src.ui.components.toast import show_success_toast
+
+
+_MONTH_ID = {
+    1: "Januari", 2: "Februari", 3: "Maret", 4: "April",
+    5: "Mei", 6: "Juni", 7: "Juli", 8: "Agustus",
+    9: "September", 10: "Oktober", 11: "November", 12: "Desember",
+}
+
+
+def _format_month_id(month_str: str) -> str:
+    """'2026-04' → 'April 2026'. Falls back to the raw string if unparseable."""
+    try:
+        year_s, m_s = month_str.split("-")
+        return f"{_MONTH_ID[int(m_s)]} {year_s}"
+    except (ValueError, KeyError):
+        return month_str
 
 
 class ImportScreen(ctk.CTkFrame):
@@ -71,6 +90,13 @@ class ImportScreen(ctk.CTkFrame):
         self.import_btn.configure(state="normal")
 
     def _on_confirm(self):
+        if not self._pending_rows:
+            return
+
+        # Auto-detect mode month from imported dates
+        months = [r.tanggal[:7] for r in self._pending_rows if r.tanggal]
+        mode_month = Counter(months).most_common(1)[0][0] if months else None
+
         with get_connection(DB_PATH) as conn:
             for r in self._pending_rows:
                 emp_id = upsert_employee(
@@ -85,7 +111,13 @@ class ImportScreen(ctk.CTkFrame):
                     has_issue=1 if is_issue(r) else 0,
                     imported_from=r.source_file,
                 )
-        messagebox.showinfo("Sukses", f"Impor {len(self._pending_rows)} baris selesai.")
+            if mode_month:
+                set_setting(conn, "current_month", mode_month)
+
+        row_count = len(self._pending_rows)
+        month_display = _format_month_id(mode_month) if mode_month else "-"
+
+        # Reset UI state before showing toast (so the toast is the last interaction)
         self.import_btn.configure(state="disabled")
         self._pending_rows = []
         self._pending_path = None
@@ -93,3 +125,12 @@ class ImportScreen(ctk.CTkFrame):
         self.preview.delete("1.0", "end")
         self.preview.insert("1.0", "(impor selesai. Pilih file lain bila perlu.)")
         self.preview.configure(state="disabled")
+
+        show_success_toast(
+            self.winfo_toplevel(),
+            title="Impor Berhasil",
+            message=(
+                f"{row_count} baris fingerprint berhasil diimpor.\n"
+                f"Bulan aktif diset ke {month_display}."
+            ),
+        )
