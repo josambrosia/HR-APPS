@@ -33,7 +33,7 @@ class DashboardScreen(ctk.CTkFrame):
     """
 
     PANEL_H_REGULAR = 220
-    PANEL_H_COACH = 290    # taller, non-scrollable for Mingguan view only
+    PANEL_H_COACH = 360    # spans rows 1+2 in Mingguan (Dept + Hari combined)
     PANEL_H_HARI = 130     # compact, non-scrollable (max 5-6 weekdays)
 
     def __init__(self, parent):
@@ -225,10 +225,10 @@ class DashboardScreen(ctk.CTkFrame):
             [Top 5 Late]   [Top 5 Teladan]
             [Dept]         [Hari Rawan]
 
-        Mingguan (Coaching shown):
+        Mingguan (Coaching shown, spans 2 rows on the left):
             [Top 5 Late]   [Top 5 Teladan]
-            [Coaching]     [Dept]
-            [Hari Rawan colspan=2]
+            [Coaching ↕]   [Dept]
+            [Coaching ↕]   [Hari Rawan]
         """
         late = self._panel_boxes["late"]
         teladan = self._panel_boxes["teladan"]
@@ -242,17 +242,17 @@ class DashboardScreen(ctk.CTkFrame):
 
         if is_bulanan:
             coach.grid_remove()
-            dept.grid(row=1, column=0, columnspan=1, sticky="nsew",
+            dept.grid(row=1, column=0, rowspan=1, columnspan=1, sticky="nsew",
                       padx=(0, 4), pady=4)
-            hari.grid(row=1, column=1, columnspan=1, sticky="nsew",
+            hari.grid(row=1, column=1, rowspan=1, columnspan=1, sticky="nsew",
                       padx=(4, 0), pady=4)
         else:
-            coach.grid(row=1, column=0, columnspan=1, sticky="nsew",
-                       padx=(0, 4), pady=4)
-            dept.grid(row=1, column=1, columnspan=1, sticky="nsew",
-                      padx=(4, 0), pady=4)
-            hari.grid(row=2, column=0, columnspan=2, sticky="nsew",
-                      pady=(4, 0))
+            coach.grid(row=1, column=0, rowspan=2, columnspan=1, sticky="nsew",
+                       padx=(0, 4), pady=(4, 0))
+            dept.grid(row=1, column=1, rowspan=1, columnspan=1, sticky="nsew",
+                      padx=(4, 0), pady=(4, 2))
+            hari.grid(row=2, column=1, rowspan=1, columnspan=1, sticky="nsew",
+                      padx=(4, 0), pady=(2, 0))
 
     def _query(self, start, end):
         """Memoized data fetch. Returns a dict of pre-computed result lists."""
