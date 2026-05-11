@@ -1,5 +1,4 @@
 import tempfile
-from datetime import date, timedelta
 from pathlib import Path
 
 import customtkinter as ctk
@@ -23,6 +22,19 @@ from src.ui.theme import (
 
 
 class DashboardScreen(ctk.CTkFrame):
+    """Dashboard analytics view.
+
+    Static widget structure (panels, KPI cards, ranking table container) is
+    built once in __init__. Tab/period switches only update the data inside
+    those widgets, avoiding expensive Canvas/Scrollable recreations.
+
+    Query results per (start, end) are memoized — switching back to a
+    previously-viewed period is instant.
+    """
+
+    PANEL_H_REGULAR = 220
+    PANEL_H_HARI = 150
+
     def __init__(self, parent):
         super().__init__(parent, fg_color="transparent")
         self.grid_columnconfigure(0, weight=1)
@@ -31,10 +43,25 @@ class DashboardScreen(ctk.CTkFrame):
         with get_connection(DB_PATH) as conn:
             self._current_month = get_setting(conn, "current_month") or ""
 
+        # Per-(start, end) query cache. Reset each time the screen is
+        # constructed (i.e., user navigates away and back), so writes in
+        # other screens won't show stale data.
+        self._query_cache: dict = {}
+
+        # Refs to widgets that get TEXT updated on period change
+        self._kpi_labels: dict = {}        # name -> CTkLabel for value
+        self._kpi_label_period: ctk.CTkLabel | None = None
+        self._panel_titles: dict = {}      # panel key -> CTkLabel for title
+        self._panel_content: dict = {}     # panel key -> parent frame for rows
+        self._rank_inner: ctk.CTkScrollableFrame | None = None
+
         self._build_header()
         self.body = ctk.CTkFrame(self, fg_color="transparent")
         self.body.grid(row=1, column=0, sticky="nsew")
-        self._reload()
+        self._build_static_widgets()
+        self._update_data()
+
+    # ──────────────────────────────────────────────────────────── Header
 
     def _build_header(self):
         header = ctk.CTkFrame(self, fg_color="transparent")
@@ -57,11 +84,112 @@ class DashboardScreen(ctk.CTkFrame):
             command=self._on_print,
         ).pack(side="right", padx=(8, 0))
 
-    def _on_period_change(self, _key):
-        self._reload()
+    # ──────────────────────────────────────────────────── Static widgets
+
+    def _build_static_widgets(self):
+        """Build all panels, KPI cards, and the ranking container ONCE."""
+        # Body uses 2-column grid: left (60%) dense panels + right (40%) ranking
+        self.body.grid_columnconfigure(0, weight=3)
+        self.body.grid_columnconfigure(1, weight=2)
+        self.body.grid_rowconfigure(1, weight=1)
+
+        # ── KPI ROW ──
+        kpi_frame = ctk.CTkFrame(self.body, fg_color="transparent")
+        kpi_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        for i in range(3):
+            kpi_frame.grid_columnconfigure(i, weight=1)
+
+        def _kpi(parent, label_text, name, color):
+            card = ctk.CTkFrame(parent, fg_color=COLOR_PANEL, corner_radius=8)
+            ctk.CTkLabel(card, text=label_text.upper(),
+                         font=(FONT_FAMILY, 10), text_color=COLOR_TEXT_DIM
+                         ).pack(anchor="w", padx=14, pady=(12, 0))
+            value_lbl = ctk.CTkLabel(
+                card, text="—", font=(FONT_FAMILY, 22, "bold"),
+                text_color=color,
+            )
+            value_lbl.pack(anchor="w", padx=14, pady=(0, 12))
+            self._kpi_labels[name] = value_lbl
+            return card
+
+        _kpi(kpi_frame, "Periode", "periode", COLOR_TEXT).grid(
+            row=0, column=0, padx=4, sticky="ew")
+        _kpi(kpi_frame, "Total Terlambat", "total_terlambat", COLOR_ACCENT).grid(
+            row=0, column=1, padx=4, sticky="ew")
+        _kpi(kpi_frame, "Coaching Flag", "coaching_count", COLOR_WARN).grid(
+            row=0, column=2, padx=4, sticky="ew")
+
+        # ── LEFT: dense panel grid ──
+        left = ctk.CTkFrame(self.body, fg_color="transparent")
+        left.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
+        left.grid_columnconfigure(0, weight=1)
+        left.grid_columnconfigure(1, weight=1)
+
+        def make_panel(parent, title, color, panel_key, fixed_height,
+                       scrollable):
+            box = ctk.CTkFrame(parent, fg_color=COLOR_PANEL, corner_radius=8,
+                                height=fixed_height)
+            box.grid_propagate(False)
+            box.grid_columnconfigure(0, weight=1)
+            box.grid_rowconfigure(1, weight=1)
+            title_lbl = ctk.CTkLabel(
+                box, text=title, font=(FONT_FAMILY, 12, "bold"),
+                text_color=color,
+            )
+            title_lbl.grid(row=0, column=0, sticky="w", padx=10, pady=(8, 4))
+            self._panel_titles[panel_key] = title_lbl
+
+            if scrollable:
+                content = ctk.CTkScrollableFrame(
+                    box, fg_color="transparent", corner_radius=0,
+                )
+            else:
+                content = ctk.CTkFrame(box, fg_color="transparent")
+            content.grid(row=1, column=0, sticky="nsew", padx=4, pady=(0, 6))
+            self._panel_content[panel_key] = content
+            return box
+
+        late = make_panel(left, "🔥 Top 5 Terlambat", COLOR_ACCENT,
+                          "late", self.PANEL_H_REGULAR, scrollable=False)
+        late.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 4))
+
+        teladan = make_panel(left, "🏆 Top 5 Teladan", COLOR_OK,
+                              "teladan", self.PANEL_H_REGULAR, scrollable=False)
+        teladan.grid(row=0, column=1, sticky="nsew", padx=(4, 0), pady=(0, 4))
+
+        coach = make_panel(left, "⚠ Butuh Coaching", COLOR_WARN,
+                            "coaching", self.PANEL_H_REGULAR, scrollable=True)
+        coach.grid(row=1, column=0, sticky="nsew", padx=(0, 4), pady=4)
+
+        dept = make_panel(left, "🏢 Ranking Departemen", COLOR_ACCENT,
+                           "dept", self.PANEL_H_REGULAR, scrollable=True)
+        dept.grid(row=1, column=1, sticky="nsew", padx=(4, 0), pady=4)
+
+        hari = make_panel(left, "📅 Hari Paling Rawan", COLOR_WARN,
+                           "hari", self.PANEL_H_HARI, scrollable=True)
+        hari.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=(4, 0))
+
+        # ── RIGHT: Ranking Lengkap (tall, always scrollable) ──
+        rank_box = ctk.CTkFrame(self.body, fg_color=COLOR_PANEL, corner_radius=8)
+        rank_box.grid(row=1, column=1, sticky="nsew")
+        ctk.CTkLabel(rank_box, text="📋 Ranking Lengkap",
+                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_TEXT
+                     ).pack(anchor="w", padx=12, pady=(8, 4))
+        hdr = ctk.CTkFrame(rank_box, fg_color="transparent")
+        hdr.pack(fill="x", padx=12)
+        for col, w in (("NAMA", 130), ("DEPT", 100), ("TERLAMBAT", 80),
+                       ("TELAT", 50), ("ISSUE", 50)):
+            ctk.CTkLabel(hdr, text=col, font=(FONT_FAMILY, 10, "bold"),
+                         text_color=COLOR_TEXT_DIM, width=w, anchor="w"
+                         ).pack(side="left")
+        self._rank_inner = ctk.CTkScrollableFrame(rank_box, fg_color="transparent")
+        self._rank_inner.pack(fill="both", expand=True, padx=12, pady=4)
+
+    # ──────────────────────────────────────────────────── Period range helper
 
     def _period_range(self):
         if not self._current_month:
+            from datetime import date, timedelta
             today = date.today()
             return (today - timedelta(days=30)).isoformat(), today.isoformat(), "Last 30 days"
         if self.nav.active == "semua":
@@ -77,183 +205,132 @@ class DashboardScreen(ctk.CTkFrame):
         start, end = full_month_range(self._current_month)
         return start, end, f"Bulanan ({self._current_month})"
 
-    def _dynamic_coaching_threshold(self, start_iso: str, end_iso: str) -> int:
-        """Threshold scales with period length: 75 min per calendar week."""
+    def _dynamic_coaching_threshold(self, start_iso, end_iso):
+        from datetime import date
         s = date.fromisoformat(start_iso)
         e = date.fromisoformat(end_iso)
-        days = (e - s).days + 1  # inclusive
-        weeks = max(1, (days + 6) // 7)  # ceil
+        days = (e - s).days + 1
+        weeks = max(1, (days + 6) // 7)
         return 75 * weeks
 
-    def _reload(self):
-        for w in self.body.winfo_children():
+    # ──────────────────────────────────────────────────── Data updates
+
+    def _on_period_change(self, _key):
+        self._update_data()
+
+    def _query(self, start, end):
+        """Memoized data fetch. Returns a dict of pre-computed result lists."""
+        key = (start, end)
+        if key in self._query_cache:
+            return self._query_cache[key]
+
+        threshold = self._dynamic_coaching_threshold(start, end)
+        with get_connection(DB_PATH) as conn:
+            data = {
+                "ranking": [dict(r) for r in terlambat_ranking(conn, start, end)],
+                "top5_late": [dict(r) for r in top_n_terlambat(conn, start, end, 5)],
+                "coaching": [dict(r) for r in coaching_flag(conn, start, end, threshold=threshold)],
+                "top5_teladan": [dict(r) for r in karyawan_teladan_top_n(conn, start, end, 5)],
+                "dept_rows": [dict(r) for r in ranking_departemen(conn, start, end)],
+                "day_rows": [dict(r) for r in hari_paling_rawan(conn, start, end)],
+                "threshold": threshold,
+            }
+        self._query_cache[key] = data
+        return data
+
+    def _clear_panel(self, panel_key):
+        """Wipe row widgets inside a panel's content frame (preserve container)."""
+        content = self._panel_content[panel_key]
+        for w in content.winfo_children():
             w.destroy()
 
-        # Two-column body: left dense panels (60%) + right tall Ranking (40%)
-        self.body.grid_columnconfigure(0, weight=3)
-        self.body.grid_columnconfigure(1, weight=2)
-        self.body.grid_rowconfigure(1, weight=1)
+    def _two_col_row(self, parent, left_text, right_text, right_color):
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", padx=6, pady=1)
+        ctk.CTkLabel(row, text=left_text, font=(FONT_FAMILY, 11),
+                     text_color=COLOR_TEXT, anchor="w").pack(side="left")
+        ctk.CTkLabel(row, text=right_text, font=(FONT_FAMILY, 11),
+                     text_color=right_color, anchor="e").pack(side="right")
 
+    def _empty(self, parent, text):
+        ctk.CTkLabel(parent, text=text, text_color=COLOR_TEXT_DIM,
+                     font=(FONT_FAMILY, 11)).pack(padx=8, pady=4)
+
+    def _update_data(self):
         start, end, label = self._period_range()
-        dynamic_threshold = self._dynamic_coaching_threshold(start, end)
+        data = self._query(start, end)
+        total_late = sum(r["total_terlambat"] for r in data["ranking"])
+        threshold = data["threshold"]
 
-        with get_connection(DB_PATH) as conn:
-            ranking = terlambat_ranking(conn, start, end)
-            top5_late = top_n_terlambat(conn, start, end, 5)
-            coaching = coaching_flag(conn, start, end, threshold=dynamic_threshold)
-            top5_teladan = karyawan_teladan_top_n(conn, start, end, 5)
-            dept_rows = ranking_departemen(conn, start, end)
-            day_rows = hari_paling_rawan(conn, start, end)
+        # KPI updates (just text — labels are reused)
+        self._kpi_labels["periode"].configure(text=label)
+        self._kpi_labels["total_terlambat"].configure(text=f"{total_late} mnt")
+        self._kpi_labels["coaching_count"].configure(text=str(len(data["coaching"])))
 
-        # ─────── KPI ROW ───────
-        kpi_frame = ctk.CTkFrame(self.body, fg_color="transparent")
-        kpi_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
-        for i in range(3):
-            kpi_frame.grid_columnconfigure(i, weight=1)
-
-        total_late = sum(r["total_terlambat"] for r in ranking)
-        KPICard(kpi_frame, "Periode", label).grid(row=0, column=0, padx=4, sticky="ew")
-        KPICard(kpi_frame, "Total Terlambat", f"{total_late} mnt",
-                value_color=COLOR_ACCENT
-                ).grid(row=0, column=1, padx=4, sticky="ew")
-        KPICard(kpi_frame, "Coaching Flag", str(len(coaching)),
-                value_color=COLOR_WARN
-                ).grid(row=0, column=2, padx=4, sticky="ew")
-
-        # ─────── LEFT: dense 2×3 panel grid ───────
-        left = ctk.CTkFrame(self.body, fg_color="transparent")
-        left.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
-        left.grid_columnconfigure(0, weight=1)
-        left.grid_columnconfigure(1, weight=1)
-
-        PANEL_H_REGULAR = 220
-        PANEL_H_HARI = 150
-
-        def make_panel(parent, title, color, fixed_height: int,
-                       scrollable: bool = True):
-            """Fixed-height panel with header. Content area scrolls if scrollable=True
-            (use for variable-length lists like Coaching), or is a plain frame
-            otherwise (use for bounded lists like Top 5)."""
-            box = ctk.CTkFrame(parent, fg_color=COLOR_PANEL, corner_radius=8,
-                               height=fixed_height)
-            box.grid_propagate(False)
-            box.grid_columnconfigure(0, weight=1)
-            box.grid_rowconfigure(1, weight=1)
-
-            ctk.CTkLabel(
-                box, text=title,
-                font=(FONT_FAMILY, 12, "bold"), text_color=color,
-            ).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 4))
-
-            if scrollable:
-                content = ctk.CTkScrollableFrame(
-                    box, fg_color="transparent", corner_radius=0,
-                )
-            else:
-                content = ctk.CTkFrame(box, fg_color="transparent")
-            content.grid(row=1, column=0, sticky="nsew", padx=4, pady=(0, 6))
-            return box, content
-
-        def populate_two_col(scroll_frame, rows, empty_msg, left_fn, right_fn,
-                             right_color):
-            if not rows:
-                ctk.CTkLabel(scroll_frame, text=empty_msg,
-                             text_color=COLOR_TEXT_DIM,
-                             font=(FONT_FAMILY, 11)).pack(padx=8, pady=4)
-                return
-            for r in rows:
-                row = ctk.CTkFrame(scroll_frame, fg_color="transparent")
-                row.pack(fill="x", padx=6, pady=1)
-                ctk.CTkLabel(row, text=left_fn(r), font=(FONT_FAMILY, 11),
-                             text_color=COLOR_TEXT, anchor="w").pack(side="left")
-                ctk.CTkLabel(row, text=right_fn(r), font=(FONT_FAMILY, 11),
-                             text_color=right_color, anchor="e"
-                             ).pack(side="right")
-
-        # Row 0: Top 5 Terlambat | Top 5 Teladan (bounded — non-scrollable)
-        late_box, late_content = make_panel(
-            left, "🔥 Top 5 Terlambat", COLOR_ACCENT, PANEL_H_REGULAR,
-            scrollable=False)
-        late_box.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 4))
-        populate_two_col(
-            late_content, top5_late, "Tidak ada keterlambatan.",
-            left_fn=lambda r: r["nama"],
-            right_fn=lambda r: f"{r['total_terlambat']} mnt",
-            right_color=COLOR_ACCENT,
+        # Coaching panel title with dynamic threshold
+        self._panel_titles["coaching"].configure(
+            text=f"⚠ Butuh Coaching (>{threshold} mnt)"
         )
 
-        teladan_box, teladan_content = make_panel(
-            left, "🏆 Top 5 Teladan", COLOR_OK, PANEL_H_REGULAR,
-            scrollable=False)
-        teladan_box.grid(row=0, column=1, sticky="nsew", padx=(4, 0), pady=(0, 4))
-        if not top5_teladan:
-            ctk.CTkLabel(teladan_content, text="Belum ada data.",
-                         text_color=COLOR_TEXT_DIM,
-                         font=(FONT_FAMILY, 11)).pack(padx=8, pady=4)
+        # ── Top 5 Late ──
+        self._clear_panel("late")
+        content = self._panel_content["late"]
+        if not data["top5_late"]:
+            self._empty(content, "Tidak ada keterlambatan.")
+        else:
+            for r in data["top5_late"]:
+                self._two_col_row(content, r["nama"],
+                                  f"{r['total_terlambat']} mnt", COLOR_ACCENT)
+
+        # ── Top 5 Teladan ──
+        self._clear_panel("teladan")
+        content = self._panel_content["teladan"]
+        if not data["top5_teladan"]:
+            self._empty(content, "Belum ada data.")
         else:
             medals = ["🥇", "🥈", "🥉", "4.", "5."]
-            for idx, r in enumerate(top5_teladan):
-                row = ctk.CTkFrame(teladan_content, fg_color="transparent")
-                row.pack(fill="x", padx=6, pady=1)
-                ctk.CTkLabel(row, text=f"{medals[idx]} {r['nama']}",
-                             font=(FONT_FAMILY, 11), text_color=COLOR_TEXT,
-                             anchor="w").pack(side="left")
-                ctk.CTkLabel(row, text=f"skor {r['score']}",
-                             font=(FONT_FAMILY, 11), text_color=COLOR_OK,
-                             anchor="e").pack(side="right")
+            for idx, r in enumerate(data["top5_teladan"]):
+                self._two_col_row(content, f"{medals[idx]} {r['nama']}",
+                                  f"skor {r['score']}", COLOR_OK)
 
-        # Row 1: Butuh Coaching (with dynamic threshold) | Ranking Departemen
-        coach_box, coach_scroll = make_panel(
-            left, f"⚠ Butuh Coaching (>{dynamic_threshold} mnt)",
-            COLOR_WARN, PANEL_H_REGULAR)
-        coach_box.grid(row=1, column=0, sticky="nsew", padx=(0, 4), pady=4)
-        populate_two_col(
-            coach_scroll, coaching, "Tidak ada. ✓",
-            left_fn=lambda r: r["nama"],
-            right_fn=lambda r: f"{r['total_terlambat']} mnt",
-            right_color=COLOR_WARN,
-        )
+        # ── Coaching ──
+        self._clear_panel("coaching")
+        content = self._panel_content["coaching"]
+        if not data["coaching"]:
+            self._empty(content, "Tidak ada. ✓")
+        else:
+            for r in data["coaching"]:
+                self._two_col_row(content, r["nama"],
+                                  f"{r['total_terlambat']} mnt", COLOR_WARN)
 
-        dept_box, dept_scroll = make_panel(
-            left, "🏢 Ranking Departemen", COLOR_ACCENT, PANEL_H_REGULAR)
-        dept_box.grid(row=1, column=1, sticky="nsew", padx=(4, 0), pady=4)
-        populate_two_col(
-            dept_scroll, dept_rows, "Belum ada data.",
-            left_fn=lambda r: f"{r['dept']} ({r['pegawai_count']})",
-            right_fn=lambda r: f"{r['total_terlambat']} mnt",
-            right_color=COLOR_ACCENT,
-        )
+        # ── Departemen ──
+        self._clear_panel("dept")
+        content = self._panel_content["dept"]
+        if not data["dept_rows"]:
+            self._empty(content, "Belum ada data.")
+        else:
+            for r in data["dept_rows"]:
+                self._two_col_row(content,
+                                  f"{r['dept']} ({r['pegawai_count']})",
+                                  f"{r['total_terlambat']} mnt", COLOR_ACCENT)
 
-        # Row 2: Hari Paling Rawan (spans both columns, shorter)
-        day_box, day_scroll = make_panel(
-            left, "📅 Hari Paling Rawan", COLOR_WARN, PANEL_H_HARI)
-        day_box.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=(4, 0))
-        populate_two_col(
-            day_scroll, day_rows, "Belum ada data harian.",
-            left_fn=lambda r: r["hari"],
-            right_fn=lambda r: f"{r['terlambat_count']} hari telat",
-            right_color=COLOR_WARN,
-        )
+        # ── Hari Rawan ──
+        self._clear_panel("hari")
+        content = self._panel_content["hari"]
+        if not data["day_rows"]:
+            self._empty(content, "Belum ada data harian.")
+        else:
+            for r in data["day_rows"]:
+                self._two_col_row(content, r["hari"],
+                                  f"{r['terlambat_count']} hari telat",
+                                  COLOR_WARN)
 
-        # ─────── RIGHT: Ranking Lengkap (tall) ───────
-        rank_box = ctk.CTkFrame(self.body, fg_color=COLOR_PANEL, corner_radius=8)
-        rank_box.grid(row=1, column=1, sticky="nsew")
-        ctk.CTkLabel(rank_box, text="📋 Ranking Lengkap",
-                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_TEXT
-                     ).pack(anchor="w", padx=12, pady=(8, 4))
-
-        hdr = ctk.CTkFrame(rank_box, fg_color="transparent")
-        hdr.pack(fill="x", padx=12)
-        for col, w in (("NAMA", 130), ("DEPT", 100), ("TERLAMBAT", 80),
-                       ("TELAT", 50), ("ISSUE", 50)):
-            ctk.CTkLabel(hdr, text=col, font=(FONT_FAMILY, 10, "bold"),
-                         text_color=COLOR_TEXT_DIM, width=w, anchor="w"
-                         ).pack(side="left")
-
-        inner = ctk.CTkScrollableFrame(rank_box, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=12, pady=4)
-        for r in ranking:
-            row = ctk.CTkFrame(inner, fg_color="transparent")
+        # ── Ranking Lengkap (right) ──
+        # Inner scrollable container is preserved; only rebuild its rows
+        for w in self._rank_inner.winfo_children():
+            w.destroy()
+        for r in data["ranking"]:
+            row = ctk.CTkFrame(self._rank_inner, fg_color="transparent")
             row.pack(fill="x", pady=1)
             for val, w in (
                 (r["nama"], 130), (r["dept"] or "-", 100),
@@ -265,6 +342,8 @@ class DashboardScreen(ctk.CTkFrame):
                              text_color=COLOR_TEXT, width=w, anchor="w"
                              ).pack(side="left")
 
+    # ─────────────────────────────────────────────────────────── Print
+
     def _on_print(self):
         from src.ui.components.print_dialog import PrintOptionsDialog
         PrintOptionsDialog(
@@ -272,7 +351,7 @@ class DashboardScreen(ctk.CTkFrame):
             on_submit=self._do_print,
         )
 
-    def _do_print(self, sections: dict, theme: str):
+    def _do_print(self, sections, theme):
         from src.ui.browser_launcher import open_html_in_browser
         from src.ui.components.toast import show_success_toast
 
