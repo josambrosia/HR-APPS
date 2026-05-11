@@ -62,6 +62,7 @@ def karyawan_teladan(
     sql = f"""
         SELECT e.id, e.nama, e.dept,
                SUM(CASE WHEN ar.reason_category IN ({placeholders}) THEN 0
+                        WHEN ar.masuk IS NULL THEN 0
                         ELSE COALESCE(ar.terlambat_menit, 0) END)
                  + SUM(CASE WHEN ar.tipe='Hari Kerja' AND ar.masuk IS NULL AND ar.keluar IS NULL
                             THEN 60 ELSE 0 END)
