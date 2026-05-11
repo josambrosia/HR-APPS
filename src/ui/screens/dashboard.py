@@ -33,7 +33,8 @@ class DashboardScreen(ctk.CTkFrame):
     """
 
     PANEL_H_REGULAR = 220
-    PANEL_H_HARI = 150
+    PANEL_H_COACH = 290    # taller, non-scrollable for Mingguan view only
+    PANEL_H_HARI = 130     # compact, non-scrollable (max 5-6 weekdays)
 
     def __init__(self, parent):
         super().__init__(parent, fg_color="transparent")
@@ -53,6 +54,7 @@ class DashboardScreen(ctk.CTkFrame):
         self._kpi_label_period: ctk.CTkLabel | None = None
         self._panel_titles: dict = {}      # panel key -> CTkLabel for title
         self._panel_content: dict = {}     # panel key -> parent frame for rows
+        self._panel_boxes: dict = {}       # panel key -> outer CTkFrame (for grid/grid_remove)
         self._rank_inner: ctk.CTkScrollableFrame | None = None
 
         self._build_header()
@@ -147,27 +149,25 @@ class DashboardScreen(ctk.CTkFrame):
                 content = ctk.CTkFrame(box, fg_color="transparent")
             content.grid(row=1, column=0, sticky="nsew", padx=4, pady=(0, 6))
             self._panel_content[panel_key] = content
+            self._panel_boxes[panel_key] = box
             return box
 
-        late = make_panel(left, "🔥 Top 5 Terlambat", COLOR_ACCENT,
-                          "late", self.PANEL_H_REGULAR, scrollable=False)
-        late.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 4))
+        # Top 5 panels — bounded, non-scrollable
+        make_panel(left, "🔥 Top 5 Terlambat", COLOR_ACCENT,
+                   "late", self.PANEL_H_REGULAR, scrollable=False)
+        make_panel(left, "🏆 Top 5 Teladan", COLOR_OK,
+                   "teladan", self.PANEL_H_REGULAR, scrollable=False)
+        # Coaching: taller, non-scrollable; only shown in Mingguan view
+        make_panel(left, "⚠ Butuh Coaching", COLOR_WARN,
+                   "coaching", self.PANEL_H_COACH, scrollable=False)
+        # Dept ranking: scrollable in case there are many depts
+        make_panel(left, "🏢 Ranking Departemen", COLOR_ACCENT,
+                   "dept", self.PANEL_H_REGULAR, scrollable=True)
+        # Hari Rawan: compact, non-scrollable (5-6 weekdays max)
+        make_panel(left, "📅 Hari Paling Rawan", COLOR_WARN,
+                   "hari", self.PANEL_H_HARI, scrollable=False)
 
-        teladan = make_panel(left, "🏆 Top 5 Teladan", COLOR_OK,
-                              "teladan", self.PANEL_H_REGULAR, scrollable=False)
-        teladan.grid(row=0, column=1, sticky="nsew", padx=(4, 0), pady=(0, 4))
-
-        coach = make_panel(left, "⚠ Butuh Coaching", COLOR_WARN,
-                            "coaching", self.PANEL_H_REGULAR, scrollable=True)
-        coach.grid(row=1, column=0, sticky="nsew", padx=(0, 4), pady=4)
-
-        dept = make_panel(left, "🏢 Ranking Departemen", COLOR_ACCENT,
-                           "dept", self.PANEL_H_REGULAR, scrollable=True)
-        dept.grid(row=1, column=1, sticky="nsew", padx=(4, 0), pady=4)
-
-        hari = make_panel(left, "📅 Hari Paling Rawan", COLOR_WARN,
-                           "hari", self.PANEL_H_HARI, scrollable=True)
-        hari.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=(4, 0))
+        # Initial grid positions set by _apply_layout() in _update_data()
 
         # ── RIGHT: Ranking Lengkap (tall, always scrollable) ──
         rank_box = ctk.CTkFrame(self.body, fg_color=COLOR_PANEL, corner_radius=8)
@@ -218,6 +218,42 @@ class DashboardScreen(ctk.CTkFrame):
     def _on_period_change(self, _key):
         self._update_data()
 
+    def _apply_layout(self, is_bulanan: bool):
+        """Reposition the 5 left-side panels based on whether period is Bulanan.
+
+        Bulanan (no Coaching panel — threshold scales by week, not meaningful monthly):
+            [Top 5 Late]   [Top 5 Teladan]
+            [Dept]         [Hari Rawan]
+
+        Mingguan (Coaching shown):
+            [Top 5 Late]   [Top 5 Teladan]
+            [Coaching]     [Dept]
+            [Hari Rawan colspan=2]
+        """
+        late = self._panel_boxes["late"]
+        teladan = self._panel_boxes["teladan"]
+        coach = self._panel_boxes["coaching"]
+        dept = self._panel_boxes["dept"]
+        hari = self._panel_boxes["hari"]
+
+        # Row 0 is identical in both layouts
+        late.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 4))
+        teladan.grid(row=0, column=1, sticky="nsew", padx=(4, 0), pady=(0, 4))
+
+        if is_bulanan:
+            coach.grid_remove()
+            dept.grid(row=1, column=0, columnspan=1, sticky="nsew",
+                      padx=(0, 4), pady=4)
+            hari.grid(row=1, column=1, columnspan=1, sticky="nsew",
+                      padx=(4, 0), pady=4)
+        else:
+            coach.grid(row=1, column=0, columnspan=1, sticky="nsew",
+                       padx=(0, 4), pady=4)
+            dept.grid(row=1, column=1, columnspan=1, sticky="nsew",
+                      padx=(4, 0), pady=4)
+            hari.grid(row=2, column=0, columnspan=2, sticky="nsew",
+                      pady=(4, 0))
+
     def _query(self, start, end):
         """Memoized data fetch. Returns a dict of pre-computed result lists."""
         key = (start, end)
@@ -258,6 +294,9 @@ class DashboardScreen(ctk.CTkFrame):
 
     def _update_data(self):
         start, end, label = self._period_range()
+        is_bulanan = (self.nav.active == "semua")
+        self._apply_layout(is_bulanan)
+
         data = self._query(start, end)
         total_late = sum(r["total_terlambat"] for r in data["ranking"])
         threshold = data["threshold"]
