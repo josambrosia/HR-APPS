@@ -3,6 +3,7 @@ from pathlib import Path
 
 import customtkinter as ctk
 from tkinter import messagebox
+from tkinter import ttk
 
 from src.config import DB_PATH
 from src.db.connection import get_connection
@@ -55,13 +56,29 @@ class DashboardScreen(ctk.CTkFrame):
         self._panel_titles: dict = {}      # panel key -> CTkLabel for title
         self._panel_content: dict = {}     # panel key -> parent frame for rows
         self._panel_boxes: dict = {}       # panel key -> outer CTkFrame (for grid/grid_remove)
-        self._rank_inner: ctk.CTkScrollableFrame | None = None
-
+        self._setup_treeview_style()
         self._build_header()
         self.body = ctk.CTkFrame(self, fg_color="transparent")
         self.body.grid(row=1, column=0, sticky="nsew")
         self._build_static_widgets()
         self._update_data()
+
+    def _setup_treeview_style(self):
+        style = ttk.Style()
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        style.configure(
+            "Ranking.Treeview",
+            background=COLOR_PANEL, fieldbackground=COLOR_PANEL,
+            foreground=COLOR_TEXT, rowheight=24, borderwidth=0,
+        )
+        style.configure(
+            "Ranking.Treeview.Heading",
+            background="#2C1B47", foreground=COLOR_TEXT_DIM,
+            relief="flat", font=(FONT_FAMILY, 10, "bold"),
+        )
 
     # ──────────────────────────────────────────────────────────── Header
 
@@ -169,21 +186,27 @@ class DashboardScreen(ctk.CTkFrame):
 
         # Initial grid positions set by _apply_layout() in _update_data()
 
-        # ── RIGHT: Ranking Lengkap (tall, always scrollable) ──
+        # ── RIGHT: Ranking Lengkap (ttk.Treeview — native, scrollable) ──
         rank_box = ctk.CTkFrame(self.body, fg_color=COLOR_PANEL, corner_radius=8)
         rank_box.grid(row=1, column=1, sticky="nsew")
         ctk.CTkLabel(rank_box, text="📋 Ranking Lengkap",
                      font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_TEXT
                      ).pack(anchor="w", padx=12, pady=(8, 4))
-        hdr = ctk.CTkFrame(rank_box, fg_color="transparent")
-        hdr.pack(fill="x", padx=12)
-        for col, w in (("NAMA", 130), ("DEPT", 100), ("TERLAMBAT", 80),
-                       ("TELAT", 50), ("TDK HADIR", 70)):
-            ctk.CTkLabel(hdr, text=col, font=(FONT_FAMILY, 10, "bold"),
-                         text_color=COLOR_TEXT_DIM, width=w, anchor="w"
-                         ).pack(side="left")
-        self._rank_inner = ctk.CTkScrollableFrame(rank_box, fg_color="transparent")
-        self._rank_inner.pack(fill="both", expand=True, padx=12, pady=4)
+
+        cols = ["nama", "dept", "terlambat", "telat", "tidak_hadir"]
+        widths = {"nama": 130, "dept": 100, "terlambat": 80,
+                  "telat": 50, "tidak_hadir": 70}
+        labels = {"nama": "Nama", "dept": "Dept", "terlambat": "Terlambat",
+                  "telat": "Telat", "tidak_hadir": "Tdk Hadir"}
+
+        self.rank_tree = ttk.Treeview(
+            rank_box, columns=cols, show="headings",
+            style="Ranking.Treeview", selectmode="none",
+        )
+        for c in cols:
+            self.rank_tree.heading(c, text=labels[c])
+            self.rank_tree.column(c, width=widths[c], anchor="w")
+        self.rank_tree.pack(fill="both", expand=True, padx=12, pady=(4, 8))
 
     # ──────────────────────────────────────────────────── Period range helper
 
@@ -364,22 +387,14 @@ class DashboardScreen(ctk.CTkFrame):
                                   f"{r['terlambat_count']} hari telat",
                                   COLOR_WARN)
 
-        # ── Ranking Lengkap (right) ──
-        # Inner scrollable container is preserved; only rebuild its rows
-        for w in self._rank_inner.winfo_children():
-            w.destroy()
+        # ── Ranking Lengkap (right) — Treeview ──
+        self.rank_tree.delete(*self.rank_tree.get_children())
         for r in data["ranking"]:
-            row = ctk.CTkFrame(self._rank_inner, fg_color="transparent")
-            row.pack(fill="x", pady=1)
-            for val, w in (
-                (r["nama"], 130), (r["dept"] or "-", 100),
-                (f"{r['total_terlambat']} mnt", 80),
-                (str(r["hari_telat"]), 50),
-                (str(r["tidak_hadir"]), 70),
-            ):
-                ctk.CTkLabel(row, text=val, font=(FONT_FAMILY, 11),
-                             text_color=COLOR_TEXT, width=w, anchor="w"
-                             ).pack(side="left")
+            self.rank_tree.insert("", "end", values=(
+                r["nama"], r["dept"] or "-",
+                f"{r['total_terlambat']} mnt",
+                r["hari_telat"], r["tidak_hadir"],
+            ))
 
     # ─────────────────────────────────────────────────────────── Print
 
