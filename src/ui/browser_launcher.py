@@ -5,8 +5,9 @@ Sublime, Notepad++) rather than browsers — especially on developer
 machines. The stdlib `webbrowser.open()` uses file associations on
 Windows, so it inherits this misrouting.
 
-This helper tries known browser executables explicitly. Edge is always
-present on Windows 10/11, so the fallback chain almost always succeeds.
+This helper tries known browser executables explicitly. Preference order:
+Chrome → Edge → Brave → Firefox. Edge is fallback because it's always
+on Windows 10/11.
 """
 import shutil
 import subprocess
@@ -17,18 +18,18 @@ from typing import Tuple
 
 # (Display name, exe name to look up via PATH)
 _PATH_CANDIDATES = [
-    ("Edge", "msedge.exe"),
     ("Chrome", "chrome.exe"),
+    ("Edge", "msedge.exe"),
     ("Brave", "brave.exe"),
     ("Firefox", "firefox.exe"),
 ]
 
 # Fallback hard-coded install paths if not in PATH
 _INSTALL_PATHS = [
-    ("Edge", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
-    ("Edge", r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
     ("Chrome", r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
     ("Chrome", r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+    ("Edge", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
+    ("Edge", r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
     ("Brave", r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"),
     ("Firefox", r"C:\Program Files\Mozilla Firefox\firefox.exe"),
     ("Firefox", r"C:\Program Files (x86)\Mozilla Firefox\firefox.exe"),
