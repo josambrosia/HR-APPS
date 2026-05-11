@@ -35,6 +35,7 @@ USER_DATA_ROOT = _user_data_root()
 DATA_DIR = USER_DATA_ROOT / "data"
 DB_PATH = DATA_DIR / "hr.db"
 TEMPLATES_DIR = RESOURCE_ROOT / "src" / "reports" / "templates"
+TEMPLATE_LAPORAN_BULANAN = RESOURCE_ROOT / "templates" / "laporan_bulanan_template.xlsx"
 
 # Defaults
 DEFAULT_SCHEDULE_START = "08.00"

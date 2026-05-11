@@ -7,6 +7,11 @@ a = Analysis(
     binaries=[],
     datas=[
         ('src/reports/templates/dashboard.html.j2', 'src/reports/templates'),
+        ('src/reports/templates/dashboard_v1_editorial.html.j2', 'src/reports/templates'),
+        ('src/reports/templates/dashboard_v2_dark_glass.html.j2', 'src/reports/templates'),
+        ('src/reports/templates/dashboard_v3_infographic.html.j2', 'src/reports/templates'),
+        ('src/reports/templates/dashboard_v4_corporate.html.j2', 'src/reports/templates'),
+        ('templates/laporan_bulanan_template.xlsx', 'templates'),
     ],
     hiddenimports=['customtkinter', 'PIL'],
     hookspath=[],

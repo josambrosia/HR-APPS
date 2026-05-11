@@ -65,4 +65,5 @@ Desktop.ini
 
 # ---- Generated reports ----
 *[filled].xlsx
+!templates/laporan_bulanan_template.xlsx
 hr-dashboard-*.html
