@@ -35,7 +35,6 @@ class HRApp(ctk.CTk):
             ("📥 Import", "Import"),
             ("⚠ Issues", "Issues"),
             ("📋 Summary", "Summary"),
-            ("📈 Insights", "Insights"),
             ("📤 Export", "Export"),
             ("⚙ Settings", "Settings"),
         ]
@@ -68,9 +67,6 @@ class HRApp(ctk.CTk):
         elif name == "Summary":
             from src.ui.screens.summary import SummaryScreen
             SummaryScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Insights":
-            from src.ui.screens.insights import InsightsScreen
-            InsightsScreen(self.content).grid(row=0, column=0, sticky="nsew")
         elif name == "Export":
             from src.ui.screens.export import ExportScreen
             ExportScreen(self.content).grid(row=0, column=0, sticky="nsew")
