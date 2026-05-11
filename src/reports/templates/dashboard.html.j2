@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>HR Dashboard — {{ period_label }}</title>
+<style>
+  :root {
+    --indigo:    #1E104E;
+    --purple:    #452E5A;
+    --orange:    #FF653F;
+    --gold:      #FFC85C;
+    --cream:     #FAF6F0;
+    --ink:       #2D1B4A;
+    --ink-dim:   #6B5B8C;
+    --paper:     #FFFFFF;
+    --shadow:    0 2px 8px rgba(30, 16, 78, 0.08);
+    --shadow-lg: 0 4px 16px rgba(30, 16, 78, 0.12);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, "Segoe UI", "Inter", Roboto, Arial, sans-serif;
+    margin: 0; padding: 0;
+    background: linear-gradient(135deg, #FAF6F0 0%, #F5EDFF 100%);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
+
+  /* HERO HEADER */
+  .hero {
+    background: linear-gradient(135deg, var(--indigo) 0%, var(--purple) 70%, var(--orange) 130%);
+    color: white;
+    border-radius: 18px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: ""; position: absolute; top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(255, 200, 92, 0.25) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .hero h1 {
+    font-size: 28px; font-weight: 800;
+    margin: 0 0 8px; letter-spacing: -0.5px;
+    position: relative;
+  }
+  .hero .subtitle {
+    font-size: 14px; opacity: 0.85;
+    margin: 0; position: relative;
+  }
+  .hero .period-chip {
+    display: inline-block; margin-top: 12px;
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 200, 92, 0.4);
+    padding: 6px 14px; border-radius: 20px;
+    font-size: 13px; font-weight: 600;
+    position: relative;
+  }
+
+  /* KPI GRID */
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 14px; margin-bottom: 24px;
+  }
+  .kpi {
+    background: var(--paper); border-radius: 14px; padding: 18px;
+    box-shadow: var(--shadow);
+    border-left: 4px solid transparent;
+    position: relative;
+  }
+  .kpi.accent-orange { border-left-color: var(--orange); }
+  .kpi.accent-purple { border-left-color: var(--purple); }
+  .kpi.accent-gold   { border-left-color: var(--gold); }
+  .kpi .icon { font-size: 26px; margin-bottom: 4px; }
+  .kpi .label {
+    font-size: 11px; color: var(--ink-dim);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    font-weight: 600; margin: 2px 0;
+  }
+  .kpi .value { font-size: 28px; font-weight: 800; color: var(--ink); }
+  .kpi .unit { font-size: 14px; font-weight: 500; color: var(--ink-dim); }
+
+  /* SECTION CARDS */
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .card {
+    background: var(--paper); border-radius: 14px; padding: 18px 22px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    font-size: 15px; font-weight: 700;
+    margin: 0 0 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .card.late h2     { color: var(--orange); }
+  .card.teladan h2  { color: #B58B00; }
+  .card.coaching h2 { color: var(--orange); }
+  .card.rank h2     { color: var(--purple); }
+
+  /* MEDAL LIST (Top 5) */
+  .medal-list { list-style: none; margin: 0; padding: 0; }
+  .medal-list li {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 0; border-bottom: 1px solid #F0EAF7;
+  }
+  .medal-list li:last-child { border-bottom: none; }
+  .medal-list .rank {
+    width: 28px; height: 28px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700;
+    border-radius: 50%; background: #F0EAF7; color: var(--purple);
+  }
+  .medal-list .name { flex: 1; font-weight: 600; color: var(--ink); }
+  .medal-list .dept { font-size: 11px; color: var(--ink-dim); margin-left: 4px; }
+  .medal-list .value {
+    font-weight: 700; padding: 3px 10px; border-radius: 12px;
+    font-size: 12px;
+  }
+  .medal-list.late .value { background: #FFE0D6; color: #B23A1A; }
+  .medal-list.teladan .value { background: #FFF1CC; color: #8A6800; }
+
+  /* COACHING FLAGS */
+  .flag {
+    background: linear-gradient(90deg, #FFE8DA, #FFF6E0);
+    border-left: 4px solid var(--orange);
+    padding: 12px 16px; border-radius: 8px;
+    margin: 8px 0;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .flag .who { font-weight: 700; color: var(--ink); }
+  .flag .stats { font-size: 12px; color: var(--ink-dim); }
+  .empty-state {
+    text-align: center; padding: 18px; color: var(--ink-dim);
+    font-style: italic; font-size: 13px;
+  }
+
+  /* RANKING TABLE */
+  table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    background: var(--paper); border-radius: 12px; overflow: hidden;
+  }
+  thead th {
+    background: var(--purple); color: white; font-weight: 700;
+    text-align: left; padding: 10px 14px;
+    font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  tbody tr:nth-child(odd) { background: #FBF7FF; }
+  tbody td {
+    padding: 9px 14px;
+    border-bottom: 1px solid #EFE5F9;
+  }
+  tbody td:first-child { font-weight: 600; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge.late { background: #FFE0D6; color: #B23A1A; }
+
+  /* FOOTER */
+  footer {
+    margin-top: 30px; padding-top: 16px;
+    border-top: 1px solid #E0D5F0;
+    font-size: 11px; color: var(--ink-dim);
+    text-align: center;
+  }
+
+  /* PRINT TIP BANNER (hidden on print) */
+  .print-tip {
+    background: linear-gradient(90deg, #FFF6E0, #FFE8DA);
+    border-radius: 10px; padding: 10px 16px; margin-bottom: 16px;
+    font-size: 12px; color: var(--ink-dim);
+    border: 1px solid #FFD9A8;
+  }
+  .print-tip strong { color: var(--ink); }
+
+  /* PRINT */
+  @media print {
+    body { background: white; }
+    .container { padding: 8px 16px; max-width: 100%; }
+    .hero {
+      border-radius: 8px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .kpi, .card { box-shadow: none; border: 1px solid #EEE; }
+    .print-tip { display: none; }
+    h2 { page-break-after: avoid; }
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="hero">
+      <h1>&#128202; Dashboard Insights HR</h1>
+      <p class="subtitle">Ringkasan kehadiran &amp; coaching</p>
+      <div class="period-chip">&#128197; {{ period_label }}</div>
+    </div>
+
+    <div class="print-tip">
+      &#128161; <strong>Tip:</strong> Untuk hasil PDF terbaik, aktifkan <em>"Background graphics"</em> di opsi Print browser.
+    </div>
+
+    {% if sections.kpi %}
+    <div class="kpi-grid">
+      <div class="kpi accent-orange">
+        <div class="icon">&#9201;&#65039;</div>
+        <div class="label">Total Terlambat</div>
+        <div class="value">{{ kpi.total_terlambat }} <span class="unit">mnt</span></div>
+      </div>
+      <div class="kpi accent-purple">
+        <div class="icon">&#128683;</div>
+        <div class="label">Hari Absen</div>
+        <div class="value">{{ kpi.total_absen }}</div>
+      </div>
+      <div class="kpi accent-gold">
+        <div class="icon">&#9888;&#65039;</div>
+        <div class="label">Butuh Coaching</div>
+        <div class="value">{{ kpi.coaching_count }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if sections.top5_late or sections.top5_teladan %}
+    <div class="row">
+      {% if sections.top5_late %}
+      <div class="card late">
+        <h2>&#128293; Top 5 Paling Terlambat</h2>
+        {% if top5_late %}
+        <ul class="medal-list late">
+          {% set medals = ['&#129351;', '&#129352;', '&#129353;', '4', '5'] %}
+          {% for r in top5_late %}
+            <li>
+              <span class="rank">{{ medals[loop.index0] }}</span>
+              <span class="name">{{ r.nama }}<span class="dept"> &middot; {{ r.dept or '-' }}</span></span>
+              <span class="value">{{ r.total_terlambat }} mnt</span>
+            </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-state">Tidak ada keterlambatan periode ini. &#128077;</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if sections.top5_teladan %}
+      <div class="card teladan">
+        <h2>&#127942; Top 5 Karyawan Teladan</h2>
+        {% if top5_teladan %}
+        <ul class="medal-list teladan">
+          {% set medals = ['&#129351;', '&#129352;', '&#129353;', '4', '5'] %}
+          {% for r in top5_teladan %}
+            <li>
+              <span class="rank">{{ medals[loop.index0] }}</span>
+              <span class="name">{{ r.nama }}<span class="dept"> &middot; {{ r.dept or '-' }}</span></span>
+              <span class="value">skor {{ r.score }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-state">Belum ada data cukup untuk menentukan teladan.</div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if sections.coaching %}
+    <div class="card coaching">
+      <h2>&#9888; Butuh Coaching (lebih dari {{ coaching_threshold }} mnt / periode)</h2>
+      {% if coaching %}
+        {% for r in coaching %}
+          <div class="flag">
+            <div class="who">&#127919; {{ r.nama }} <span style="color:var(--ink-dim);font-weight:500;">&middot; {{ r.dept or '-' }}</span></div>
+            <div class="stats">{{ r.total_terlambat }} mnt &middot; {{ r.hari_telat }} hari telat</div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">Tidak ada karyawan yang perlu coaching periode ini. &#10003;</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if sections.departemen or sections.hari_rawan %}
+    <div class="row">
+      {% if sections.departemen %}
+      <div class="card" style="grid-column: span 1;">
+        <h2 style="color: var(--orange);">&#127962; Ranking Departemen</h2>
+        {% if ranking_departemen %}
+        <table>
+          <thead>
+            <tr>
+              <th>Departemen</th>
+              <th>Pegawai</th>
+              <th>Terlambat</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for r in ranking_departemen %}
+            <tr>
+              <td><strong>{{ r.dept }}</strong></td>
+              <td>{{ r.pegawai_count }}</td>
+              <td>{% if r.total_terlambat > 0 %}<span class="badge late">{{ r.total_terlambat }} mnt</span>{% else %}<span style="color:var(--ink-dim);">0</span>{% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">Belum ada data departemen.</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if sections.hari_rawan %}
+      <div class="card">
+        <h2 style="color: var(--orange);">&#128197; Hari Paling Rawan</h2>
+        {% if hari_paling_rawan %}
+        <table>
+          <thead>
+            <tr>
+              <th>Hari</th>
+              <th>Hari Telat</th>
+              <th>Total Hari</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for r in hari_paling_rawan %}
+            <tr>
+              <td><strong>{{ r.hari }}</strong></td>
+              <td>{{ r.terlambat_count }}</td>
+              <td>{{ r.total_rows }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">Belum ada data harian.</div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if sections.ranking %}
+    <div class="card rank" style="margin-top:16px;">
+      <h2>&#128203; Ranking Keterlambatan Lengkap</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Nama</th>
+            <th>Dept</th>
+            <th>Terlambat</th>
+            <th>Hari Telat</th>
+            <th>Tidak Hadir</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in ranking %}
+          <tr>
+            <td>{{ r.nama }}</td>
+            <td>{{ r.dept or '-' }}</td>
+            <td>{% if r.total_terlambat > 0 %}<span class="badge late">{{ r.total_terlambat }} mnt</span>{% else %}<span style="color:var(--ink-dim);">0</span>{% endif %}</td>
+            <td>{{ r.hari_telat }}</td>
+            <td>{{ r.tidak_hadir }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <footer>
+      Generated by HR Absensi App &middot; {{ generated_at }}
+    </footer>
+  </div>
+</body>
+</html>

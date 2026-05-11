@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Infographic Report — {{ period_label }}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream:       #FFF8F0;
+    --purple-h:    #6C3FC6;
+    --purple-l:    #E8DCFF;
+    --orange-h:    #FF6B2B;
+    --orange-l:    #FFEDE0;
+    --mint-h:      #16A085;
+    --mint-l:      #D5F5EE;
+    --gold-h:      #D4A017;
+    --gold-l:      #FFF3C4;
+    --red-h:       #C0392B;
+    --red-l:       #FFE8E6;
+    --amber-h:     #E67E22;
+    --amber-l:     #FFF0D9;
+    --navy-h:      #1E2A4A;
+    --navy-l:      #E8EDF6;
+    --ink:         #1A1209;
+    --ink-dim:     #6B5B4E;
+  }
+
+  body {
+    font-family: -apple-system, "Segoe UI", "Inter", Roboto, Arial, sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    margin: 0;
+    padding: 0;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 40px,
+      rgba(108,63,198,0.03) 40px,
+      rgba(108,63,198,0.03) 41px
+    );
+  }
+
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 40px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  /* ── SECTION BADGE ── */
+  .section-badge { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+
+  .badge-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; flex-shrink: 0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  }
+
+  .badge-title { font-size: 22px; font-weight: 800; line-height: 1.1; letter-spacing: -0.5px; }
+  .badge-sub   { font-size: 12px; color: var(--ink-dim); margin-top: 3px; }
+
+  /* ── PRINT TIP ── */
+  .print-tip {
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--purple-l), #fff);
+    border-left: 5px solid var(--purple-h);
+    padding: 12px 18px;
+    font-size: 11px;
+    color: var(--ink-dim);
+  }
+
+  /* ── HERO ── */
+  .hero {
+    border-radius: 24px;
+    padding: 32px;
+    background: linear-gradient(135deg, var(--purple-h) 0%, #9B59B6 100%);
+    color: white;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: "";
+    position: absolute; top: -50px; right: -50px;
+    width: 180px; height: 180px;
+    background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .hero::after {
+    content: "";
+    position: absolute; bottom: -30px; left: -30px;
+    width: 120px; height: 120px;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .hero-emoji { font-size: 52px; margin-bottom: 12px; position: relative; }
+  .hero h1 { font-size: 32px; font-weight: 900; letter-spacing: -1px; position: relative; }
+
+  .hero .period {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.35);
+    padding: 5px 16px; border-radius: 20px;
+    font-size: 13px; font-weight: 600;
+    margin: 10px 0; position: relative;
+  }
+
+  .hero .gentime { font-size: 11px; opacity: 0.7; position: relative; }
+
+  /* ── KPI SECTION ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+  .kpi-card {
+    border-radius: 20px; padding: 22px 18px;
+    text-align: center; position: relative; overflow: hidden;
+  }
+
+  .kpi-card::after {
+    content: "";
+    position: absolute; bottom: -20px; right: -20px;
+    width: 80px; height: 80px;
+    border-radius: 50%; opacity: 0.15;
+  }
+
+  .kpi-card.orange { background: var(--orange-l); }
+  .kpi-card.orange::after { background: var(--orange-h); }
+  .kpi-card.mint   { background: var(--mint-l); }
+  .kpi-card.mint::after   { background: var(--mint-h); }
+  .kpi-card.gold   { background: var(--gold-l); }
+  .kpi-card.gold::after   { background: var(--gold-h); }
+
+  .kpi-emoji { font-size: 28px; margin-bottom: 8px; }
+
+  .kpi-ticker {
+    font-size: 34px; font-weight: 900; letter-spacing: -1px;
+    font-variant-numeric: tabular-nums; line-height: 1;
+  }
+
+  .kpi-ticker::before { content: "[ "; font-size: 20px; font-weight: 400; opacity: 0.5; }
+  .kpi-ticker::after  { content: " ]"; font-size: 20px; font-weight: 400; opacity: 0.5; }
+
+  .kpi-card.orange .kpi-ticker { color: var(--orange-h); }
+  .kpi-card.mint   .kpi-ticker { color: var(--mint-h); }
+  .kpi-card.gold   .kpi-ticker { color: var(--gold-h); }
+
+  .kpi-label {
+    font-size: 11px; font-weight: 600; color: var(--ink-dim);
+    margin-top: 6px; text-transform: uppercase; letter-spacing: 0.8px;
+  }
+
+  /* ── SECTION BLOCK ── */
+  .section-block {
+    border-radius: 22px; padding: 26px;
+    position: relative; overflow: hidden;
+  }
+
+  .section-block.red-theme    { background: linear-gradient(135deg, var(--red-l), #fff); }
+  .section-block.gold-theme   { background: linear-gradient(135deg, var(--gold-l), #fff); }
+  .section-block.amber-theme  { background: linear-gradient(135deg, var(--amber-l), #fff); }
+  .section-block.purple-theme { background: linear-gradient(135deg, var(--purple-l), #fff); }
+  .section-block.navy-theme   { background: linear-gradient(135deg, var(--navy-l), #fff); }
+  .section-block.mint-theme   { background: linear-gradient(135deg, var(--mint-l), #fff); }
+
+  /* ── BAR CHART ── */
+  .chart-rows { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+  .chart-row  { display: flex; flex-direction: column; gap: 5px; }
+
+  .chart-meta { display: flex; justify-content: space-between; align-items: baseline; }
+  .chart-name { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+  .chart-dept { font-size: 11px; color: var(--ink-dim); margin-left: 6px; }
+  .chart-val  { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+  .chart-track { height: 10px; background: rgba(0,0,0,0.06); border-radius: 10px; overflow: hidden; }
+  .chart-bar   { height: 100%; border-radius: 10px; }
+  .chart-bar.red  { background: linear-gradient(90deg, var(--red-h), #E74C3C); }
+  .chart-bar.gold { background: linear-gradient(90deg, var(--gold-h), #F1C40F); }
+  .chart-bar.navy { background: linear-gradient(90deg, var(--navy-h), #2E5090); }
+  .chart-bar.mint { background: linear-gradient(90deg, var(--mint-h), #1ABC9C); }
+
+  /* ── ACHIEVEMENT CARD ── */
+  .achievement-card {
+    border-radius: 16px; padding: 14px 16px; margin-top: 12px;
+    border: 2px solid; position: relative; overflow: hidden;
+    display: grid; grid-template-columns: 40px 1fr auto;
+    align-items: center; gap: 12px;
+  }
+
+  .achievement-card.gold-ribbon {
+    background: linear-gradient(135deg, #FFFBEA, #FFF3CC);
+    border-color: #D4A017;
+  }
+
+  .achievement-card::before {
+    content: "";
+    position: absolute; top: 0; right: 0;
+    width: 0; height: 0;
+    border-top: 36px solid var(--gold-h);
+    border-left: 36px solid transparent;
+    opacity: 0.4;
+  }
+
+  .ach-rank {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 900;
+  }
+
+  .ach-name  { font-size: 14px; font-weight: 700; }
+  .ach-dept  { font-size: 11px; color: var(--ink-dim); margin-top: 2px; }
+  .ach-score { font-size: 20px; font-weight: 900; color: var(--gold-h); }
+
+  /* ── COACHING CARDS ── */
+  .coaching-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+
+  .coaching-card {
+    background: white; border-radius: 16px; padding: 16px;
+    border-left: 5px solid var(--amber-h);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    position: relative;
+  }
+
+  .coaching-card::before {
+    content: "&#9889;";
+    font-size: 22px; position: absolute; top: 12px; right: 12px; opacity: 0.3;
+  }
+
+  .cc-name { font-size: 15px; font-weight: 800; color: var(--ink); }
+  .cc-dept { font-size: 11px; color: var(--ink-dim); margin-top: 1px; margin-bottom: 10px; }
+
+  .cc-stat { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
+  .cc-stat-label { font-size: 10px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+  .cc-stat-val   { font-size: 16px; font-weight: 800; color: var(--amber-h); font-variant-numeric: tabular-nums; }
+
+  /* ── DEPT & HARI TABLE ── */
+  .info-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12.5px; }
+
+  .info-table thead tr { background: var(--purple-h); color: white; }
+  .info-table thead th {
+    padding: 10px 12px; text-align: left;
+    font-size: 10px; letter-spacing: 1px;
+    text-transform: uppercase; font-weight: 600;
+  }
+  .info-table thead th.num { text-align: right; }
+  .info-table tbody tr:nth-child(odd)  { background: rgba(108,63,198,0.04); }
+  .info-table tbody tr:nth-child(even) { background: white; }
+  .info-table td { padding: 9px 12px; vertical-align: middle; }
+  .info-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  /* ── RANKING TABLE ── */
+  .ranking-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12.5px; }
+
+  .ranking-table thead tr { background: var(--purple-h); color: white; }
+  .ranking-table thead th {
+    padding: 10px 12px; text-align: left;
+    font-size: 10px; letter-spacing: 1px;
+    text-transform: uppercase; font-weight: 600;
+  }
+  .ranking-table thead th.num { text-align: right; }
+  .ranking-table tbody tr:nth-child(odd)  { background: rgba(108,63,198,0.04); }
+  .ranking-table tbody tr:nth-child(even) { background: white; }
+  .ranking-table td { padding: 9px 12px; vertical-align: middle; }
+  .ranking-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .r-rank-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%;
+    font-size: 11px; font-weight: 800;
+  }
+
+  .rnk-alert { background: var(--red-l);   color: var(--red-h); }
+  .rnk-ok    { background: var(--mint-l);  color: var(--mint-h); }
+  .rnk-mid   { background: var(--amber-l); color: var(--amber-h); }
+
+  .status-pill {
+    display: inline-block; padding: 2px 9px; border-radius: 20px;
+    font-size: 10.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  .pill-alert { background: var(--red-l);   color: var(--red-h); }
+  .pill-ok    { background: var(--mint-l);  color: var(--mint-h); }
+  .pill-mid   { background: var(--amber-l); color: var(--amber-h); }
+
+  .empty-state {
+    text-align: center; padding: 20px;
+    color: var(--ink-dim); font-style: italic; font-size: 12px;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    border-radius: 16px; background: var(--purple-h); color: white;
+    padding: 18px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; opacity: 0.9;
+  }
+
+  .footer-logo { font-size: 16px; font-weight: 800; letter-spacing: -0.5px; }
+
+  /* ── PRINT ── */
+  @media print {
+    body { background: var(--cream); background-image: none; }
+    .page { padding: 14mm 16mm; max-width: none; gap: 18px; }
+    .print-tip { display: none; }
+    .hero { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .ranking-table thead, .info-table thead { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .section-block, .kpi-card, .achievement-card, .coaching-card {
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    @page { margin: 10mm; size: A4; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-emoji">&#128202;</div>
+    <h1>Laporan HR Bulanan</h1>
+    <div class="period">{{ period_label }}</div>
+    <div class="gentime">Digenerate otomatis: {{ generated_at }} WIB</div>
+  </div>
+
+  <div class="print-tip">
+    &#128161; <strong>Tip:</strong> Aktifkan <em>"Background graphics"</em> di opsi Print untuk hasil PDF terbaik.
+  </div>
+
+  <!-- KPI -->
+  {% if sections.kpi %}
+  <div>
+    <div class="section-badge">
+      <div class="badge-icon" style="background:var(--orange-l)">&#11088;</div>
+      <div>
+        <div class="badge-title" style="color:var(--orange-h)">Key Performance Indicators</div>
+        <div class="badge-sub">Ringkasan angka utama bulan {{ period_label }}</div>
+      </div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card orange">
+        <div class="kpi-emoji">&#9200;</div>
+        <div class="kpi-ticker">{{ kpi.total_terlambat }}</div>
+        <div class="kpi-label">Menit Terlambat</div>
+      </div>
+      <div class="kpi-card mint">
+        <div class="kpi-emoji">&#128203;</div>
+        <div class="kpi-ticker">{{ kpi.total_absen }}</div>
+        <div class="kpi-label">Absen Tanpa Izin</div>
+      </div>
+      <div class="kpi-card gold">
+        <div class="kpi-emoji">&#127919;</div>
+        <div class="kpi-ticker">{{ kpi.coaching_count }}</div>
+        <div class="kpi-label">Dipanggil Coaching</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- TOP 5 LATE -->
+  {% if sections.top5_late %}
+  <div class="section-block red-theme">
+    <div class="section-badge">
+      <div class="badge-icon" style="background:var(--red-h)">&#128680;</div>
+      <div>
+        <div class="badge-title" style="color:var(--red-h)">Top 5 Keterlambatan</div>
+        <div class="badge-sub">Karyawan dengan akumulasi terlambat terbanyak</div>
+      </div>
+    </div>
+    {% if top5_late %}
+    {% set medals = ['&#127951;', '&#127952;', '&#127953;', '4.', '5.'] %}
+    {% set max_val = top5_late[0].total_terlambat if top5_late else 1 %}
+    {% set max_val = [max_val, 1] | max %}
+    <div class="chart-rows">
+      {% for r in top5_late %}
+      <div class="chart-row">
+        <div class="chart-meta">
+          <div><span class="chart-name">{{ medals[loop.index0] }} {{ r.nama }}</span><span class="chart-dept">&middot; {{ r.dept or '-' }}</span></div>
+          <span class="chart-val" style="color:var(--red-h)">{{ r.total_terlambat }} mnt</span>
+        </div>
+        <div class="chart-track"><div class="chart-bar red" style="width:{{ [((r.total_terlambat / max_val * 100) | int), 2] | max }}%"></div></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">Tidak ada keterlambatan periode ini.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- TOP 5 TELADAN -->
+  {% if sections.top5_teladan %}
+  <div class="section-block gold-theme">
+    <div class="section-badge">
+      <div class="badge-icon" style="background:var(--gold-h)">&#127942;</div>
+      <div>
+        <div class="badge-title" style="color:var(--gold-h)">Top 5 Teladan</div>
+        <div class="badge-sub">Karyawan dengan disiplin kehadiran terbaik</div>
+      </div>
+    </div>
+    {% if top5_teladan %}
+    {% set medal_icons = ['&#127951;', '&#127952;', '&#127953;', '&#128142;', '&#128142;'] %}
+    {% set medal_colors = ['#FFD700', '#C0C0C0', '#CD7F32'] %}
+    {% for r in top5_teladan %}
+    <div class="achievement-card gold-ribbon">
+      <div class="ach-rank" style="background:{% if loop.index0 < 3 %}{{ medal_colors[loop.index0] }}{% else %}var(--purple-l){% endif %};color:{% if loop.index0 < 3 %}white{% else %}var(--purple-h){% endif %}">{{ medal_icons[loop.index0] }}</div>
+      <div>
+        <div class="ach-name">{{ r.nama }}</div>
+        <div class="ach-dept">{{ r.dept or '-' }}</div>
+      </div>
+      <div class="ach-score">{{ r.score }} mnt</div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">Belum ada data teladan.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- COACHING -->
+  {% if sections.coaching %}
+  <div class="section-block amber-theme">
+    <div class="section-badge">
+      <div class="badge-icon" style="background:var(--amber-h)">&#127919;</div>
+      <div>
+        <div class="badge-title" style="color:var(--amber-h)">Coaching &amp; Pembinaan</div>
+        <div class="badge-sub">{{ coaching | length }} karyawan melewati batas threshold</div>
+      </div>
+    </div>
+    {% if coaching %}
+    <div class="coaching-grid">
+      {% for r in coaching %}
+      <div class="coaching-card">
+        <div class="cc-name">{{ r.nama }}</div>
+        <div class="cc-dept">{{ r.dept or '-' }}</div>
+        <div class="cc-stat"><span class="cc-stat-label">Terlambat</span><span class="cc-stat-val">{{ r.total_terlambat }} mnt</span></div>
+        <div class="cc-stat"><span class="cc-stat-label">Hari Telat</span><span class="cc-stat-val">{{ r.hari_telat }} hari</span></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">Tidak ada karyawan yang perlu coaching periode ini.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- RANKING DEPARTEMEN -->
+  {% if sections.departemen %}
+  <div class="section-block navy-theme">
+    <div class="section-badge">
+      <div class="badge-icon" style="background:var(--navy-h)">&#127962;</div>
+      <div>
+        <div class="badge-title" style="color:var(--navy-h)">Ranking Departemen</div>
+        <div class="badge-sub">Performa kehadiran per unit kerja</div>
+      </div>
+    </div>
+    {% if ranking_departemen %}
+    {% set max_dept = ranking_departemen[0].total_terlambat if ranking_departemen else 1 %}
+    {% set max_dept = [max_dept, 1] | max %}
+    <div class="chart-rows">
+      {% for r in ranking_departemen %}
+      <div class="chart-row">
+        <div class="chart-meta">
+          <div><span class="chart-name">{{ r.dept }}</span><span class="chart-dept">&middot; {{ r.pegawai_count }} org</span></div>
+          <span class="chart-val" style="color:var(--navy-h)">{{ r.total_terlambat }} mnt</span>
+        </div>
+        <div class="chart-track"><div class="chart-bar navy" style="width:{{ [((r.total_terlambat / max_dept * 100) | int), 2] | max }}%"></div></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">Belum ada data departemen.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- HARI PALING RAWAN -->
+  {% if sections.hari_rawan %}
+  <div class="section-block mint-theme">
+    <div class="section-badge">
+      <div class="badge-icon" style="background:var(--mint-h)">&#128197;</div>
+      <div>
+        <div class="badge-title" style="color:var(--mint-h)">Hari Paling Rawan</div>
+        <div class="badge-sub">Distribusi keterlambatan per hari dalam seminggu</div>
+      </div>
+    </div>
+    {% if hari_paling_rawan %}
+    {% set max_telat = hari_paling_rawan[0].terlambat_count if hari_paling_rawan else 1 %}
+    {% set max_telat = [max_telat, 1] | max %}
+    <div class="chart-rows">
+      {% for r in hari_paling_rawan %}
+      <div class="chart-row">
+        <div class="chart-meta">
+          <div><span class="chart-name">{{ r.hari }}</span><span class="chart-dept">&middot; {{ r.total_rows }} hari kerja</span></div>
+          <span class="chart-val" style="color:var(--mint-h)">{{ r.terlambat_count }} telat</span>
+        </div>
+        <div class="chart-track"><div class="chart-bar mint" style="width:{{ [((r.terlambat_count / max_telat * 100) | int), 2] | max }}%"></div></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">Belum ada data harian.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- RANKING -->
+  {% if sections.ranking %}
+  <div class="section-block purple-theme">
+    <div class="section-badge">
+      <div class="badge-icon" style="background:var(--purple-h)">&#128202;</div>
+      <div>
+        <div class="badge-title" style="color:var(--purple-h)">Ranking Lengkap</div>
+        <div class="badge-sub">Seluruh karyawan diurutkan berdasarkan keterlambatan</div>
+      </div>
+    </div>
+    {% if ranking %}
+    <table class="ranking-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nama</th>
+          <th>Departemen</th>
+          <th class="num">Terlambat</th>
+          <th class="num">Hari</th>
+          <th class="num">Tdk Hadir</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in ranking %}
+        <tr>
+          <td><span class="r-rank-badge {% if r.total_terlambat >= coaching_threshold %}rnk-alert{% elif r.total_terlambat == 0 %}rnk-ok{% else %}rnk-mid{% endif %}">{{ loop.index }}</span></td>
+          <td style="font-weight:700;{% if r.total_terlambat >= coaching_threshold %}color:var(--red-h){% elif r.total_terlambat == 0 %}color:var(--mint-h){% endif %}">{{ r.nama }}</td>
+          <td style="font-size:11px;color:var(--ink-dim)">{{ r.dept or '-' }}</td>
+          <td class="num" style="{% if r.total_terlambat >= coaching_threshold %}color:var(--red-h){% elif r.total_terlambat == 0 %}color:var(--mint-h){% endif %}">{{ r.total_terlambat }}</td>
+          <td class="num">{{ r.hari_telat }}</td>
+          <td class="num">{{ r.tidak_hadir }}</td>
+          <td>
+            {% if r.total_terlambat >= coaching_threshold %}<span class="status-pill pill-alert">Alert</span>
+            {% elif r.total_terlambat == 0 %}<span class="status-pill pill-ok">&#127951; Teladan</span>
+            {% else %}<span class="status-pill pill-mid">Cukup</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">Belum ada data ranking.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-logo">&#128202; HR Dashboard</div>
+    <div>Laporan Bulanan &bull; {{ period_label }}</div>
+    <div>Generated: {{ generated_at }}</div>
+  </div>
+
+</div>
+</body>
+</html>
