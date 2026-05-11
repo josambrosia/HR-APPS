@@ -41,7 +41,7 @@ class PrintOptionsDialog(ctk.CTkToplevel):
     ):
         super().__init__(parent)
         self.title("Pilih Opsi Cetak")
-        self.geometry("520x560")
+        self.geometry("620x680")
         self.resizable(False, False)
         self.configure(fg_color=COLOR_PANEL)
         self.transient(parent)
@@ -52,7 +52,7 @@ class PrintOptionsDialog(ctk.CTkToplevel):
         py = parent.winfo_rooty()
         pw = parent.winfo_width()
         ph = parent.winfo_height()
-        w, h = 520, 560
+        w, h = 620, 680
         x = px + (pw - w) // 2
         y = py + (ph - h) // 2
         self.geometry(f"{w}x{h}+{x}+{y}")
@@ -109,16 +109,20 @@ class PrintOptionsDialog(ctk.CTkToplevel):
 
         # Buttons
         btn_row = ctk.CTkFrame(self, fg_color="transparent")
-        btn_row.pack(fill="x", padx=20, pady=(20, 16), side="bottom")
+        btn_row.pack(fill="x", padx=20, pady=(24, 24), side="bottom")
         ctk.CTkButton(
             btn_row, text="Batal", command=self._on_cancel,
             fg_color="transparent", hover_color=COLOR_PANEL,
             border_width=1, border_color=COLOR_TEXT_DIM,
-            text_color=COLOR_TEXT, width=120,
-        ).pack(side="right", padx=(8, 0))
+            text_color=COLOR_TEXT,
+            width=170, height=44,
+            font=(FONT_FAMILY, 14, "bold"),
+        ).pack(side="right", padx=(12, 0))
         ctk.CTkButton(
-            btn_row, text="Cetak", command=self._on_ok,
-            fg_color=COLOR_OK, text_color="#1E104E", width=140,
+            btn_row, text="📄 Cetak", command=self._on_ok,
+            fg_color=COLOR_OK, text_color="#1E104E",
+            width=190, height=44,
+            font=(FONT_FAMILY, 14, "bold"),
         ).pack(side="right")
 
     def _on_ok(self):

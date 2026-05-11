@@ -140,21 +140,21 @@ def test_ranking_departemen_sorted_by_terlambat(temp_db_path):
         assert depts[1] == "DEPT_B"
 
 
-def test_hari_paling_rawan_counts_per_weekday(temp_db_path):
+def test_hari_paling_rawan_sorted_by_terlambat(temp_db_path):
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
         e = upsert_employee(conn, no_staff="1", nama="X", dept="A")
-        # 3 issues on Senin, 1 on Selasa
-        _add_att(conn, e, "2026-04-01", "Senin", None, None, None, has_issue=1)
-        _add_att(conn, e, "2026-04-02", "Selasa", None, None, None, has_issue=1)
-        _add_att(conn, e, "2026-04-08", "Senin", None, None, None, has_issue=1)
-        _add_att(conn, e, "2026-04-15", "Senin", None, None, None, has_issue=1)
+        # Senin: 1 late row; Selasa: 3 late rows
+        _add_att(conn, e, "2026-04-01", "Selasa", "08.10", "16.00", 10)
+        _add_att(conn, e, "2026-04-02", "Selasa", "08.20", "16.00", 20)
+        _add_att(conn, e, "2026-04-03", "Selasa", "08.30", "16.00", 30)
+        _add_att(conn, e, "2026-04-07", "Senin",  "08.05", "16.00", 5)
         rows = hari_paling_rawan(conn, "2026-04-01", "2026-04-30")
-        # Senin first (3 issues), Selasa second (1)
-        assert rows[0]["hari"] == "Senin"
-        assert rows[0]["issue_count"] == 3
-        assert rows[1]["hari"] == "Selasa"
-        assert rows[1]["issue_count"] == 1
+        # Selasa first (3 late rows), Senin second (1 late row)
+        assert rows[0]["hari"] == "Selasa"
+        assert rows[0]["terlambat_count"] == 3
+        assert rows[1]["hari"] == "Senin"
+        assert rows[1]["terlambat_count"] == 1
 
 
 def test_resolution_rate_basic(temp_db_path):

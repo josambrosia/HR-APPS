@@ -137,22 +137,22 @@ def ranking_departemen(
 def hari_paling_rawan(
     conn: sqlite3.Connection, start: str, end: str
 ) -> List[sqlite3.Row]:
-    """Issue count per weekday (Hari Kerja only), sorted DESC.
+    """Weekday breakdown sorted by terlambat_count DESC (most-late weekday first).
 
-    Returns rows: hari, issue_count, terlambat_count (rows where terlambat_menit > 0).
-    Weekdays come from the `hari` column in attendance_records.
+    Returns rows: hari, terlambat_count, issue_count (kept for compatibility),
+    total_rows.
     """
     sql = """
         SELECT hari,
-               SUM(CASE WHEN has_issue = 1 THEN 1 ELSE 0 END) AS issue_count,
                SUM(CASE WHEN terlambat_menit > 0 THEN 1 ELSE 0 END) AS terlambat_count,
+               SUM(CASE WHEN has_issue = 1 THEN 1 ELSE 0 END) AS issue_count,
                COUNT(*) AS total_rows
           FROM attendance_records
          WHERE tipe = 'Hari Kerja'
            AND tanggal BETWEEN ? AND ?
            AND hari IS NOT NULL
          GROUP BY hari
-         ORDER BY issue_count DESC, terlambat_count DESC, hari ASC
+         ORDER BY terlambat_count DESC, hari ASC
     """
     return conn.execute(sql, (start, end)).fetchall()
 

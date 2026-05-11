@@ -450,8 +450,6 @@
         <th>Departemen</th>
         <th class="num">Pegawai</th>
         <th class="num">Total Terlambat (mnt)</th>
-        <th class="num">Issue</th>
-        <th class="num">Hari Telat</th>
       </tr>
     </thead>
     <tbody>
@@ -461,8 +459,6 @@
         <td class="name-cell">{{ r.dept }}</td>
         <td class="num">{{ r.pegawai_count }}</td>
         <td class="num {% if r.total_terlambat > 0 %}alert-cell{% else %}ok-cell{% endif %}">{{ r.total_terlambat }}</td>
-        <td class="num">{{ r.issue_count }}</td>
-        <td class="num">{{ r.hari_telat }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -485,17 +481,15 @@
     <thead>
       <tr>
         <th>Hari</th>
-        <th class="num">Issue</th>
         <th class="num">Hari Telat</th>
         <th class="num">Total Hari Kerja</th>
       </tr>
     </thead>
     <tbody>
       {% for r in hari_paling_rawan %}
-      <tr {% if r.issue_count > 0 and loop.index == 1 %}class="alert-row"{% endif %}>
+      <tr {% if r.terlambat_count > 0 and loop.index == 1 %}class="alert-row"{% endif %}>
         <td class="name-cell">{{ r.hari }}</td>
-        <td class="num {% if r.issue_count > 0 %}alert-cell{% else %}ok-cell{% endif %}">{{ r.issue_count }}</td>
-        <td class="num">{{ r.terlambat_count }}</td>
+        <td class="num {% if r.terlambat_count > 0 %}alert-cell{% else %}ok-cell{% endif %}">{{ r.terlambat_count }}</td>
         <td class="num">{{ r.total_rows }}</td>
       </tr>
       {% endfor %}

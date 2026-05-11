@@ -481,7 +481,7 @@
           <div class="dept-bar-meta">
             <div>
               <span class="dept-bar-name">{{ r.dept }}</span>
-              <span class="dept-bar-sub"> &middot; {{ r.pegawai_count }} org &middot; {{ r.issue_count }} issue</span>
+              <span class="dept-bar-sub"> &middot; {{ r.pegawai_count }} org</span>
             </div>
             <span class="dept-bar-val">{{ r.total_terlambat }} mnt</span>
           </div>
@@ -499,19 +499,19 @@
     <div class="glass {% if sections.departemen %}col-6{% else %}col-12{% endif %}">
       <div class="section-label">&#128197; Hari Paling Rawan</div>
       {% if hari_paling_rawan %}
-      {% set max_issue = hari_paling_rawan[0].issue_count if hari_paling_rawan else 1 %}
-      {% set max_issue = [max_issue, 1] | max %}
+      {% set max_telat = hari_paling_rawan[0].terlambat_count if hari_paling_rawan else 1 %}
+      {% set max_telat = [max_telat, 1] | max %}
       <div class="dept-bar-list">
         {% for r in hari_paling_rawan %}
         <div class="dept-bar-row">
           <div class="dept-bar-meta">
             <div>
               <span class="dept-bar-name">{{ r.hari }}</span>
-              <span class="dept-bar-sub"> &middot; {{ r.terlambat_count }} telat &middot; {{ r.total_rows }} hari</span>
+              <span class="dept-bar-sub"> &middot; {{ r.total_rows }} hari kerja</span>
             </div>
-            <span class="dept-bar-val" style="color:var(--orange)">{{ r.issue_count }} issue</span>
+            <span class="dept-bar-val" style="color:var(--orange)">{{ r.terlambat_count }} telat</span>
           </div>
-          <div class="dept-bar-track"><div class="bar-fill orange" style="width:{{ [((r.issue_count / max_issue * 100) | int), 2] | max }}%"></div></div>
+          <div class="dept-bar-track"><div class="bar-fill orange" style="width:{{ [((r.terlambat_count / max_telat * 100) | int), 2] | max }}%"></div></div>
         </div>
         {% endfor %}
       </div>

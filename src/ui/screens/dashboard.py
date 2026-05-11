@@ -81,16 +81,23 @@ class DashboardScreen(ctk.CTkFrame):
         for w in self.body.winfo_children():
             w.destroy()
 
+        # Configure body to be a 2-column grid: left (60%) + right (40%)
+        self.body.grid_columnconfigure(0, weight=3)
+        self.body.grid_columnconfigure(1, weight=2)
+        self.body.grid_rowconfigure(1, weight=1)
+
         start, end, label = self._period_range()
         with get_connection(DB_PATH) as conn:
             ranking = terlambat_ranking(conn, start, end)
             top5_late = top_n_terlambat(conn, start, end, 5)
             coaching = coaching_flag(conn, start, end)
             top5_teladan = karyawan_teladan_top_n(conn, start, end, 5)
+            dept_rows = ranking_departemen(conn, start, end)
+            day_rows = hari_paling_rawan(conn, start, end)
 
-        # KPI row — 3 cards (drop single Teladan)
+        # ─────── KPI ROW (spans both columns) ───────
         kpi_frame = ctk.CTkFrame(self.body, fg_color="transparent")
-        kpi_frame.pack(fill="x", pady=(0, 12))
+        kpi_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         for i in range(3):
             kpi_frame.grid_columnconfigure(i, weight=1)
 
@@ -103,133 +110,132 @@ class DashboardScreen(ctk.CTkFrame):
                 value_color=COLOR_WARN
                 ).grid(row=0, column=2, padx=4, sticky="ew")
 
-        # Three panels: top5 late | top5 teladan | coaching
-        triple = ctk.CTkFrame(self.body, fg_color="transparent")
-        triple.pack(fill="x", pady=(8, 0))
-        for i in range(3):
-            triple.grid_columnconfigure(i, weight=1)
+        # ─────── LEFT: dense 2-col panel grid ───────
+        left = ctk.CTkFrame(self.body, fg_color="transparent")
+        left.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
+        left.grid_columnconfigure(0, weight=1)
+        left.grid_columnconfigure(1, weight=1)
 
-        # Top 5 Terlambat
-        late_box = ctk.CTkFrame(triple, fg_color=COLOR_PANEL, corner_radius=8)
-        late_box.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
-        ctk.CTkLabel(late_box, text="🔥 Top 5 Terlambat",
-                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_ACCENT
-                     ).pack(anchor="w", padx=12, pady=8)
+        def panel(title, color):
+            box = ctk.CTkFrame(left, fg_color=COLOR_PANEL, corner_radius=8)
+            ctk.CTkLabel(box, text=title,
+                         font=(FONT_FAMILY, 12, "bold"), text_color=color
+                         ).pack(anchor="w", padx=10, pady=(8, 4))
+            return box
+
+        # Row 0: Top 5 Late + Top 5 Teladan
+        late_box = panel("🔥 Top 5 Terlambat", COLOR_ACCENT)
+        late_box.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 4))
         if not top5_late:
             ctk.CTkLabel(late_box, text="Tidak ada keterlambatan.",
-                         text_color=COLOR_TEXT_DIM).pack(padx=12, pady=4)
+                         text_color=COLOR_TEXT_DIM, font=(FONT_FAMILY, 11)
+                         ).pack(padx=10, pady=4)
         for r in top5_late:
             row = ctk.CTkFrame(late_box, fg_color="transparent")
-            row.pack(fill="x", padx=12, pady=2)
-            ctk.CTkLabel(row, text=f"{r['nama']} ({r['dept']})",
+            row.pack(fill="x", padx=10, pady=1)
+            ctk.CTkLabel(row, text=r["nama"], font=(FONT_FAMILY, 11),
                          text_color=COLOR_TEXT).pack(side="left")
             ctk.CTkLabel(row, text=f"{r['total_terlambat']} mnt",
-                         text_color=COLOR_ACCENT).pack(side="right")
+                         font=(FONT_FAMILY, 11), text_color=COLOR_ACCENT
+                         ).pack(side="right")
 
-        # Top 5 Teladan
-        teladan_box = ctk.CTkFrame(triple, fg_color=COLOR_PANEL, corner_radius=8)
-        teladan_box.grid(row=0, column=1, sticky="nsew", padx=4)
-        ctk.CTkLabel(teladan_box, text="🏆 Top 5 Teladan",
-                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_OK
-                     ).pack(anchor="w", padx=12, pady=8)
+        teladan_box = panel("🏆 Top 5 Teladan", COLOR_OK)
+        teladan_box.grid(row=0, column=1, sticky="nsew", padx=(4, 0), pady=(0, 4))
         if not top5_teladan:
             ctk.CTkLabel(teladan_box, text="Belum ada data.",
-                         text_color=COLOR_TEXT_DIM).pack(padx=12, pady=4)
+                         text_color=COLOR_TEXT_DIM, font=(FONT_FAMILY, 11)
+                         ).pack(padx=10, pady=4)
         medals = ["🥇", "🥈", "🥉", "4.", "5."]
         for idx, r in enumerate(top5_teladan):
             row = ctk.CTkFrame(teladan_box, fg_color="transparent")
-            row.pack(fill="x", padx=12, pady=2)
+            row.pack(fill="x", padx=10, pady=1)
             ctk.CTkLabel(row, text=f"{medals[idx]} {r['nama']}",
-                         text_color=COLOR_TEXT).pack(side="left")
+                         font=(FONT_FAMILY, 11), text_color=COLOR_TEXT
+                         ).pack(side="left")
             ctk.CTkLabel(row, text=f"skor {r['score']}",
-                         text_color=COLOR_OK).pack(side="right")
+                         font=(FONT_FAMILY, 11), text_color=COLOR_OK
+                         ).pack(side="right")
 
-        # Butuh Coaching
-        coach_box = ctk.CTkFrame(triple, fg_color=COLOR_PANEL, corner_radius=8)
-        coach_box.grid(row=0, column=2, sticky="nsew", padx=(4, 0))
-        ctk.CTkLabel(coach_box, text="⚠ Butuh Coaching",
-                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_WARN
-                     ).pack(anchor="w", padx=12, pady=8)
+        # Row 1: Coaching + Departemen
+        coach_box = panel("⚠ Butuh Coaching", COLOR_WARN)
+        coach_box.grid(row=1, column=0, sticky="nsew", padx=(0, 4), pady=4)
         if not coaching:
             ctk.CTkLabel(coach_box, text="Tidak ada. ✓",
-                         text_color=COLOR_TEXT_DIM).pack(padx=12, pady=4)
+                         text_color=COLOR_TEXT_DIM, font=(FONT_FAMILY, 11)
+                         ).pack(padx=10, pady=4)
         for r in coaching:
             row = ctk.CTkFrame(coach_box, fg_color="transparent")
-            row.pack(fill="x", padx=12, pady=2)
+            row.pack(fill="x", padx=10, pady=1)
             ctk.CTkLabel(row, text=f"{r['nama']} · {r['total_terlambat']} mnt",
-                         text_color=COLOR_TEXT).pack(side="left")
+                         font=(FONT_FAMILY, 11), text_color=COLOR_TEXT
+                         ).pack(side="left")
 
-        # New row: Ranking Departemen + Hari Paling Rawan
-        with get_connection(DB_PATH) as conn:
-            dept_rows = ranking_departemen(conn, start, end)
-            day_rows = hari_paling_rawan(conn, start, end)
-
-        twin2 = ctk.CTkFrame(self.body, fg_color="transparent")
-        twin2.pack(fill="x", pady=(8, 0))
-        twin2.grid_columnconfigure(0, weight=1)
-        twin2.grid_columnconfigure(1, weight=1)
-
-        # Ranking Departemen
-        dept_box = ctk.CTkFrame(twin2, fg_color=COLOR_PANEL, corner_radius=8)
-        dept_box.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-        ctk.CTkLabel(dept_box, text="🏢 Ranking Departemen",
-                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_ACCENT
-                     ).pack(anchor="w", padx=12, pady=8)
+        dept_box = panel("🏢 Ranking Departemen", COLOR_ACCENT)
+        dept_box.grid(row=1, column=1, sticky="nsew", padx=(4, 0), pady=4)
         if not dept_rows:
-            ctk.CTkLabel(dept_box, text="Belum ada data departemen.",
-                         text_color=COLOR_TEXT_DIM).pack(padx=12, pady=4)
+            ctk.CTkLabel(dept_box, text="Belum ada data.",
+                         text_color=COLOR_TEXT_DIM, font=(FONT_FAMILY, 11)
+                         ).pack(padx=10, pady=4)
         for r in dept_rows:
             row = ctk.CTkFrame(dept_box, fg_color="transparent")
-            row.pack(fill="x", padx=12, pady=2)
-            ctk.CTkLabel(row, text=f"{r['dept']} ({r['pegawai_count']} org)",
-                         text_color=COLOR_TEXT).pack(side="left")
-            ctk.CTkLabel(row, text=f"{r['total_terlambat']} mnt · {r['issue_count']} issue",
-                         text_color=COLOR_ACCENT).pack(side="right")
-
-        # Hari Paling Rawan
-        day_box = ctk.CTkFrame(twin2, fg_color=COLOR_PANEL, corner_radius=8)
-        day_box.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
-        ctk.CTkLabel(day_box, text="📅 Hari Paling Rawan",
-                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_WARN
-                     ).pack(anchor="w", padx=12, pady=8)
-        if not day_rows:
-            ctk.CTkLabel(day_box, text="Belum ada data harian.",
-                         text_color=COLOR_TEXT_DIM).pack(padx=12, pady=4)
-        for r in day_rows:
-            row = ctk.CTkFrame(day_box, fg_color="transparent")
-            row.pack(fill="x", padx=12, pady=2)
-            ctk.CTkLabel(row, text=r["hari"],
-                         text_color=COLOR_TEXT).pack(side="left")
+            row.pack(fill="x", padx=10, pady=1)
             ctk.CTkLabel(
                 row,
-                text=f"{r['issue_count']} issue · {r['terlambat_count']} telat",
-                text_color=COLOR_TEXT_DIM,
-            ).pack(side="right")
+                text=f"{r['dept']} ({r['pegawai_count']})",
+                font=(FONT_FAMILY, 11), text_color=COLOR_TEXT,
+            ).pack(side="left")
+            ctk.CTkLabel(row, text=f"{r['total_terlambat']} mnt",
+                         font=(FONT_FAMILY, 11), text_color=COLOR_ACCENT
+                         ).pack(side="right")
 
-        # Ranking lengkap (unchanged from before)
+        # Row 2: Hari Paling Rawan (spans both columns)
+        day_box = panel("📅 Hari Paling Rawan", COLOR_WARN)
+        day_box.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=(4, 0))
+        if not day_rows:
+            ctk.CTkLabel(day_box, text="Belum ada data harian.",
+                         text_color=COLOR_TEXT_DIM, font=(FONT_FAMILY, 11)
+                         ).pack(padx=10, pady=4)
+        for r in day_rows:
+            row = ctk.CTkFrame(day_box, fg_color="transparent")
+            row.pack(fill="x", padx=10, pady=1)
+            ctk.CTkLabel(row, text=r["hari"], font=(FONT_FAMILY, 11),
+                         text_color=COLOR_TEXT).pack(side="left")
+            ctk.CTkLabel(row, text=f"{r['terlambat_count']} hari telat",
+                         font=(FONT_FAMILY, 11), text_color=COLOR_WARN
+                         ).pack(side="right")
+
+        left.grid_rowconfigure(0, weight=1)
+        left.grid_rowconfigure(1, weight=1)
+        left.grid_rowconfigure(2, weight=1)
+
+        # ─────── RIGHT: tall Ranking Lengkap ───────
         rank_box = ctk.CTkFrame(self.body, fg_color=COLOR_PANEL, corner_radius=8)
-        rank_box.pack(fill="both", expand=True, pady=(8, 0))
+        rank_box.grid(row=1, column=1, sticky="nsew")
         ctk.CTkLabel(rank_box, text="📋 Ranking Lengkap",
                      font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_TEXT
                      ).pack(anchor="w", padx=12, pady=(8, 4))
+
         hdr = ctk.CTkFrame(rank_box, fg_color="transparent")
         hdr.pack(fill="x", padx=12)
-        for col, w in (("NAMA", 200), ("DEPT", 140), ("TERLAMBAT", 100),
-                       ("HARI TELAT", 90), ("ISSUE", 70)):
+        # Tighter column widths for narrower right panel
+        for col, w in (("NAMA", 130), ("DEPT", 100), ("TERLAMBAT", 80),
+                       ("TELAT", 50), ("ISSUE", 50)):
             ctk.CTkLabel(hdr, text=col, font=(FONT_FAMILY, 10, "bold"),
                          text_color=COLOR_TEXT_DIM, width=w, anchor="w"
                          ).pack(side="left")
+
         inner = ctk.CTkScrollableFrame(rank_box, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=12, pady=4)
         for r in ranking:
             row = ctk.CTkFrame(inner, fg_color="transparent")
             row.pack(fill="x", pady=1)
             for val, w in (
-                (r["nama"], 200), (r["dept"] or "-", 140),
-                (f"{r['total_terlambat']} mnt", 100),
-                (str(r["hari_telat"]), 90), (str(r["issue_count"]), 70),
+                (r["nama"], 130), (r["dept"] or "-", 100),
+                (f"{r['total_terlambat']} mnt", 80),
+                (str(r["hari_telat"]), 50),
+                (str(r["issue_count"]), 50),
             ):
-                ctk.CTkLabel(row, text=val, font=(FONT_FAMILY, 12),
+                ctk.CTkLabel(row, text=val, font=(FONT_FAMILY, 11),
                              text_color=COLOR_TEXT, width=w, anchor="w"
                              ).pack(side="left")
 

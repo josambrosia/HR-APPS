@@ -301,7 +301,6 @@
               <th>Departemen</th>
               <th>Pegawai</th>
               <th>Terlambat</th>
-              <th>Issue</th>
             </tr>
           </thead>
           <tbody>
@@ -310,7 +309,6 @@
               <td><strong>{{ r.dept }}</strong></td>
               <td>{{ r.pegawai_count }}</td>
               <td>{% if r.total_terlambat > 0 %}<span class="badge late">{{ r.total_terlambat }} mnt</span>{% else %}<span style="color:var(--ink-dim);">0</span>{% endif %}</td>
-              <td>{{ r.issue_count }}</td>
             </tr>
           {% endfor %}
           </tbody>
@@ -329,7 +327,6 @@
           <thead>
             <tr>
               <th>Hari</th>
-              <th>Issue</th>
               <th>Hari Telat</th>
               <th>Total Hari</th>
             </tr>
@@ -338,7 +335,6 @@
           {% for r in hari_paling_rawan %}
             <tr>
               <td><strong>{{ r.hari }}</strong></td>
-              <td>{% if r.issue_count > 0 %}<span class="badge late">{{ r.issue_count }}</span>{% else %}0{% endif %}</td>
               <td>{{ r.terlambat_count }}</td>
               <td>{{ r.total_rows }}</td>
             </tr>
