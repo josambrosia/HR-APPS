@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional
 
 
@@ -21,7 +21,7 @@ def upsert_attendance(
 ) -> None:
     """Insert or update an attendance row. PRESERVES reason_category, reason_detail,
     resolved_at on conflict — those fields are user-owned, not raw fingerprint data."""
-    now = datetime.utcnow().isoformat(timespec="seconds")
+    now = datetime.now(UTC).isoformat(timespec="seconds")
     conn.execute(
         """
         INSERT INTO attendance_records (
@@ -56,7 +56,7 @@ def set_reason(
     category: str,
     detail: Optional[str],
 ) -> None:
-    now = datetime.utcnow().isoformat(timespec="seconds")
+    now = datetime.now(UTC).isoformat(timespec="seconds")
     conn.execute(
         """
         UPDATE attendance_records
@@ -94,6 +94,57 @@ def list_all_for_period(
         """,
         (start, end),
     ).fetchall()
+
+
+def list_issues_for_period(
+    conn: sqlite3.Connection,
+    start: str,
+    end: str,
+    resolved: Optional[bool] = None,
+):
+    """List has_issue=1 rows in [start,end], sorted by nama then tanggal.
+
+    resolved=None  → both open and resolved
+    resolved=False → only open (reason_category IS NULL)
+    resolved=True  → only resolved (reason_category IS NOT NULL)
+    """
+    base_sql = """
+        SELECT ar.*, e.nama, e.dept, e.no_staff
+          FROM attendance_records ar
+          JOIN employees e ON ar.employee_id = e.id
+         WHERE ar.has_issue = 1
+           AND ar.tanggal BETWEEN ? AND ?
+    """
+    params = [start, end]
+    if resolved is True:
+        base_sql += " AND ar.reason_category IS NOT NULL"
+    elif resolved is False:
+        base_sql += " AND ar.reason_category IS NULL"
+    base_sql += " ORDER BY e.nama ASC, ar.tanggal ASC"
+    return conn.execute(base_sql, params).fetchall()
+
+
+def count_issues_for_period(conn: sqlite3.Connection, start: str, end: str):
+    """Return {open, resolved, na, total} counts for has_issue=1 rows in range."""
+    row = conn.execute(
+        """
+        SELECT
+            SUM(CASE WHEN reason_category IS NULL THEN 1 ELSE 0 END) AS open_cnt,
+            SUM(CASE WHEN reason_category IS NOT NULL AND reason_category != 'na' THEN 1 ELSE 0 END) AS resolved_cnt,
+            SUM(CASE WHEN reason_category = 'na' THEN 1 ELSE 0 END) AS na_cnt,
+            COUNT(*) AS total_cnt
+          FROM attendance_records
+         WHERE has_issue = 1
+           AND tanggal BETWEEN ? AND ?
+        """,
+        (start, end),
+    ).fetchone()
+    return {
+        "open": row["open_cnt"] or 0,
+        "resolved": row["resolved_cnt"] or 0,
+        "na": row["na_cnt"] or 0,
+        "total": row["total_cnt"] or 0,
+    }
 
 
 def reset_month(conn: sqlite3.Connection) -> None:
