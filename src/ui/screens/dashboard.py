@@ -1,4 +1,3 @@
-import webbrowser
 import tempfile
 from datetime import date, timedelta
 from pathlib import Path
@@ -168,6 +167,9 @@ class DashboardScreen(ctk.CTkFrame):
                              ).pack(side="left")
 
     def _on_print(self):
+        from src.ui.browser_launcher import open_html_in_browser
+        from src.ui.components.toast import show_success_toast
+
         start, end, label = self._period_range()
         out_dir = Path(tempfile.gettempdir())
         try:
@@ -176,6 +178,25 @@ class DashboardScreen(ctk.CTkFrame):
                     conn, period_start=start, period_end=end,
                     period_label=label, out_dir=out_dir,
                 )
-            webbrowser.open(html_path.as_uri())
         except Exception as e:
             messagebox.showerror("Error generating PDF", str(e))
+            return
+
+        success, browser_name = open_html_in_browser(html_path)
+        if success:
+            show_success_toast(
+                self.winfo_toplevel(),
+                title="Dashboard Dibuka",
+                message=(
+                    f"Dashboard {label} dibuka di {browser_name}.\n"
+                    "Gunakan Ctrl+P untuk Save as PDF."
+                ),
+            )
+        else:
+            # Browser exe not found — give user a copyable path
+            messagebox.showwarning(
+                "Browser tidak ditemukan",
+                f"Tidak menemukan browser (Edge/Chrome/Firefox).\n\n"
+                f"File HTML tersimpan di:\n{html_path}\n\n"
+                "Buka manual: klik kanan → Open with → pilih browser."
+            )
