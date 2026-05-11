@@ -107,7 +107,7 @@ class MonthsScreen(ctk.CTkFrame):
         btn_row.pack(fill="x", padx=12, pady=(0, 12))
         ctk.CTkButton(
             btn_row, text="Buka", width=100,
-            fg_color=COLOR_OK, text_color="#1E104E",
+            fg_color=COLOR_ACCENT, text_color="#1E104E",
             command=lambda ym=m["year_month"]: self._on_buka(ym),
         ).pack(side="left", padx=4)
         ctk.CTkButton(
