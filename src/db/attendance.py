@@ -148,7 +148,12 @@ def count_issues_for_period(conn: sqlite3.Connection, start: str, end: str):
 
 
 def reset_month(conn: sqlite3.Connection) -> None:
-    """Wipe all attendance data — for 'Mulai Bulan Baru' workflow."""
+    """Wipe all attendance data — legacy 'Mulai Bulan Baru' workflow.
+
+    NOTE: No longer called from the UI (button removed when multi-month
+    support landed). Kept intentionally for future scripted/admin use
+    (e.g., per-month delete from Riwayat Bulan context menu).
+    """
     conn.execute("DELETE FROM attendance_records")
 
 

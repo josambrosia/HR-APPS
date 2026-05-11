@@ -64,6 +64,7 @@ Desktop.ini
 ~$*.xls
 
 # ---- Generated reports ----
-*[filled].xlsx
-!templates/laporan_bulanan_template.xlsx
+# Escape brackets — pattern matches literal "[filled].xlsx" / "[Auto Filled].xlsx" suffix.
+*\[filled\].xlsx
+*\[Auto\ Filled\].xlsx
 hr-dashboard-*.html
