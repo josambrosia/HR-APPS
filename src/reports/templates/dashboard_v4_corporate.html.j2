@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Corporate HR Report — {{ period_label }}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:     #1E2A4A;
+    --navy-dim: #2E3F6A;
+    --gold:     #B58B00;
+    --charcoal: #2C2C2C;
+    --slate:    #6B7280;
+    --rule:     #C8CDD8;
+    --row-alt:  #F4F5F8;
+    --paper:    #FFFFFF;
+    --alert-bg: #FEF3F2;
+    --ok-bg:    #F0FDF4;
+  }
+
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background: #EBEEF4;
+    color: var(--charcoal);
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 32px 0;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    background: var(--paper);
+    box-shadow: 0 2px 32px rgba(30,42,74,0.12);
+    padding: 0;
+    position: relative;
+  }
+
+  /* ── WATERMARK ── */
+  .page::before {
+    content: "CONFIDENTIAL";
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-35deg);
+    font-size: 90px; font-weight: 900;
+    color: rgba(30,42,74,0.04);
+    letter-spacing: 8px;
+    pointer-events: none; white-space: nowrap; z-index: 0;
+    font-family: Helvetica, Arial, sans-serif;
+  }
+
+  .page-inner { position: relative; z-index: 1; padding: 50px 56px; }
+
+  /* ── COVER HEADER ── */
+  .cover-header {
+    display: grid; grid-template-columns: auto 1fr;
+    gap: 24px; align-items: center;
+    padding-bottom: 28px;
+    border-bottom: 3px solid var(--navy);
+    margin-bottom: 28px;
+  }
+
+  .logo-block {
+    width: 64px; height: 64px;
+    background: var(--navy); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 22px; font-weight: 900;
+    letter-spacing: -1px; flex-shrink: 0;
+  }
+
+  .header-text .report-title {
+    font-size: 22px; font-weight: 700;
+    color: var(--navy); letter-spacing: 1px;
+    text-transform: uppercase; line-height: 1.2;
+  }
+
+  .header-text .report-subtitle {
+    font-size: 11px; color: var(--slate);
+    letter-spacing: 1.5px; text-transform: uppercase; margin-top: 3px;
+  }
+
+  .header-text .report-meta { margin-top: 8px; font-size: 12px; color: var(--slate); }
+
+  .confidential-badge {
+    display: inline-block; padding: 2px 10px;
+    border: 1.5px solid var(--gold); color: var(--gold);
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    border-radius: 2px; margin-top: 6px;
+  }
+
+  /* ── PRINT TIP ── */
+  .print-tip {
+    background: var(--row-alt);
+    border-left: 3px solid var(--gold);
+    padding: 8px 14px; margin-bottom: 20px;
+    font-size: 11px; color: var(--slate);
+    border-radius: 0 4px 4px 0;
+  }
+
+  /* ── SECTION HEADER ── */
+  .section-hdr {
+    display: flex; align-items: baseline; gap: 12px;
+    margin: 32px 0 14px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 6px;
+  }
+
+  .section-num {
+    font-size: 10px; font-weight: 700; color: var(--gold);
+    letter-spacing: 1px; text-transform: uppercase; min-width: 28px;
+  }
+
+  .section-title {
+    font-size: 13px; font-weight: 700;
+    color: var(--navy); letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+
+  .section-hdr-line { flex: 1; border-top: 1px solid var(--rule); margin-left: 8px; }
+
+  /* ── EXECUTIVE SUMMARY BOX ── */
+  .exec-box {
+    background: var(--row-alt);
+    border-left: 4px solid var(--navy);
+    padding: 18px 20px;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 8px;
+  }
+
+  .exec-box-title {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--navy); margin-bottom: 10px;
+  }
+
+  .exec-box ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+  .exec-box li {
+    font-size: 12.5px; color: var(--charcoal);
+    padding-left: 16px; position: relative;
+  }
+
+  .exec-box li::before {
+    content: "&#9650;";
+    position: absolute; left: 0;
+    font-size: 8px; color: var(--navy); top: 3px;
+  }
+
+  /* ── KPI CARDS ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+  .kpi-card {
+    border-top: 3px solid var(--navy);
+    padding: 16px 14px; background: var(--paper);
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 1px 4px rgba(30,42,74,0.06);
+  }
+
+  .kpi-card-num { font-size: 10px; font-weight: 700; color: var(--gold); letter-spacing: 1px; margin-bottom: 6px; }
+  .kpi-card-label { font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--slate); margin-bottom: 4px; }
+
+  .kpi-card-value {
+    font-size: 36px; font-weight: 800; color: var(--navy);
+    letter-spacing: -1.5px; font-variant-numeric: tabular-nums; line-height: 1;
+  }
+
+  .kpi-card-value.alert { color: #C0392B; }
+  .kpi-card-unit { font-size: 10.5px; color: var(--slate); margin-top: 3px; }
+
+  /* ── TABLES ── */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  .data-table thead tr {
+    background: var(--navy); color: white;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+
+  .data-table thead th {
+    padding: 9px 12px; text-align: left;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+
+  .data-table thead th.num { text-align: right; }
+
+  .data-table tbody tr:nth-child(odd)  { background: var(--row-alt); }
+  .data-table tbody tr:nth-child(even) { background: var(--paper); }
+  .data-table tbody tr.alert-row { background: var(--alert-bg) !important; }
+  .data-table tbody tr.ok-row    { background: var(--ok-bg) !important; }
+
+  .data-table td {
+    padding: 8px 12px; vertical-align: middle;
+    border-bottom: 1px solid rgba(200,205,216,0.4);
+  }
+
+  .data-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .data-table td.rank-cell { font-weight: 700; color: var(--navy); width: 30px; text-align: center; }
+  .data-table td.name-cell { font-weight: 600; color: var(--charcoal); }
+  .data-table td.dept-cell { color: var(--slate); font-size: 11px; }
+  .data-table td.alert-cell { color: #C0392B; font-weight: 600; }
+  .data-table td.ok-cell    { color: #16A085; font-weight: 600; }
+
+  /* ── STATUS LABELS ── */
+  .lbl {
+    display: inline-block; padding: 2px 7px;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.5px; text-transform: uppercase; border-radius: 2px;
+  }
+  .lbl-alert { background: #FEF3F2; color: #C0392B; border: 1px solid #C0392B; }
+  .lbl-ok    { background: #F0FDF4; color: #16A085; border: 1px solid #16A085; }
+  .lbl-mid   { background: #FFFBEB; color: #B58B00; border: 1px solid #B58B00; }
+
+  .coaching-note {
+    font-size: 11px; color: var(--slate);
+    font-style: italic; margin-top: 8px; padding-left: 4px;
+  }
+
+  .empty-state {
+    font-size: 12px; color: var(--slate);
+    font-style: italic; padding: 16px 0;
+  }
+
+  /* ── PAGE FOOTER ── */
+  .page-footer {
+    margin-top: 48px;
+    border-top: 2px solid var(--navy);
+    padding-top: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; color: var(--slate); letter-spacing: 0.5px;
+  }
+
+  .page-footer .stamp {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 2px; color: var(--gold);
+    text-transform: uppercase;
+    border: 1px solid var(--gold);
+    padding: 2px 7px; border-radius: 2px;
+  }
+
+  /* ── PRINT ── */
+  @media print {
+    body { background: white; padding: 0; }
+    .page { box-shadow: none; max-width: none; }
+    .page-inner { padding: 18mm 22mm; }
+    .page::before { position: fixed; }
+    .print-tip { display: none; }
+    .data-table thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .section-hdr { page-break-after: avoid; }
+    .kpi-row { page-break-inside: avoid; }
+    .data-table { page-break-inside: auto; }
+    thead { display: table-header-group; }
+    tbody tr { page-break-inside: avoid; }
+    .cover-header { page-break-after: avoid; }
+    .exec-box { page-break-inside: avoid; }
+    @page { margin: 12mm 16mm; size: A4; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+<div class="page-inner">
+
+  <!-- COVER HEADER -->
+  <div class="cover-header">
+    <div class="logo-block">HR</div>
+    <div class="header-text">
+      <div class="report-title">Laporan Kinerja Kehadiran &amp; Disiplin Karyawan</div>
+      <div class="report-subtitle">Human Resources Division &bull; Monthly Performance Report</div>
+      <div class="report-meta">
+        Periode: <strong>{{ period_label }}</strong> &nbsp;|&nbsp;
+        Digenerate: {{ generated_at }}
+      </div>
+      <div class="confidential-badge">Internal &mdash; Confidential</div>
+    </div>
+  </div>
+
+  <div class="print-tip">
+    &#128161; <strong>Tip:</strong> Aktifkan <em>"Background graphics"</em> di opsi Print untuk hasil PDF terbaik.
+  </div>
+
+  <!-- SECTION 01: EXECUTIVE SUMMARY (always shown) -->
+  <div class="section-hdr">
+    <span class="section-num">01</span>
+    <span class="section-title">Executive Summary</span>
+    <span class="section-hdr-line"></span>
+  </div>
+
+  <div class="exec-box">
+    <div class="exec-box-title">&#9670; Temuan Utama &mdash; {{ period_label }}</div>
+    <ul>
+      <li>Total akumulasi keterlambatan periode {{ period_label }} mencapai <strong>{{ kpi.total_terlambat }} menit</strong>.</li>
+      <li>Sebanyak <strong>{{ kpi.coaching_count }} karyawan</strong> melewati ambang batas keterlambatan dan dijadwalkan sesi coaching intensif.</li>
+      <li>Terdapat <strong>{{ kpi.total_absen }} hari absen</strong> tanpa keterangan yang tercatat pada periode ini.</li>
+    </ul>
+  </div>
+
+  {% if sections.kpi %}
+  <!-- SECTION 02: KEY METRICS -->
+  <div class="section-hdr">
+    <span class="section-num">02</span>
+    <span class="section-title">Key Performance Metrics</span>
+    <span class="section-hdr-line"></span>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-card-num">01</div>
+      <div class="kpi-card-label">Total Keterlambatan</div>
+      <div class="kpi-card-value alert">{{ kpi.total_terlambat }}</div>
+      <div class="kpi-card-unit">menit &bull; {{ period_label }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-num">02</div>
+      <div class="kpi-card-label">Absen Tanpa Izin</div>
+      <div class="kpi-card-value">{{ kpi.total_absen }}</div>
+      <div class="kpi-card-unit">hari kehadiran</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-card-num">03</div>
+      <div class="kpi-card-label">Dipanggil Coaching</div>
+      <div class="kpi-card-value alert">{{ kpi.coaching_count }}</div>
+      <div class="kpi-card-unit">karyawan</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if sections.top5_late %}
+  <!-- SECTION 03: TOP 5 LATE -->
+  <div class="section-hdr">
+    <span class="section-num">03</span>
+    <span class="section-title">&#9650; Top 5 Karyawan &mdash; Keterlambatan Tertinggi</span>
+    <span class="section-hdr-line"></span>
+  </div>
+
+  {% if top5_late %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:32px">#</th>
+        <th>Nama Karyawan</th>
+        <th>Departemen</th>
+        <th class="num">Total Terlambat (mnt)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in top5_late %}
+      <tr {% if loop.index == 1 %}class="alert-row"{% endif %}>
+        <td class="rank-cell">{{ loop.index }}</td>
+        <td class="name-cell {% if loop.index == 1 %}alert-cell{% endif %}">{{ r.nama }}</td>
+        <td class="dept-cell">{{ r.dept or '-' }}</td>
+        <td class="num {% if loop.index == 1 %}alert-cell{% endif %}">{{ r.total_terlambat }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">Tidak ada keterlambatan periode ini.</div>
+  {% endif %}
+  {% endif %}
+
+  {% if sections.top5_teladan %}
+  <!-- SECTION 04: TOP 5 TELADAN -->
+  <div class="section-hdr">
+    <span class="section-num">04</span>
+    <span class="section-title">&#9660; Top 5 Karyawan Teladan &mdash; Kehadiran Terbaik</span>
+    <span class="section-hdr-line"></span>
+  </div>
+
+  {% if top5_teladan %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:32px">#</th>
+        <th>Nama Karyawan</th>
+        <th>Departemen</th>
+        <th class="num">Skor Keterlambatan (mnt)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in top5_teladan %}
+      <tr {% if r.score == 0 %}class="ok-row"{% endif %}>
+        <td class="rank-cell">{{ loop.index }}</td>
+        <td class="name-cell {% if r.score == 0 %}ok-cell{% endif %}">{% if r.score == 0 %}[TOP] {% endif %}{{ r.nama }}</td>
+        <td class="dept-cell">{{ r.dept or '-' }}</td>
+        <td class="num {% if r.score == 0 %}ok-cell{% endif %}">{{ r.score }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">Belum ada data teladan.</div>
+  {% endif %}
+  {% endif %}
+
+  {% if sections.coaching %}
+  <!-- SECTION 05: COACHING -->
+  <div class="section-hdr">
+    <span class="section-num">05</span>
+    <span class="section-title">&#9670; Daftar Coaching &amp; Pembinaan</span>
+    <span class="section-hdr-line"></span>
+  </div>
+
+  {% if coaching %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:32px">#</th>
+        <th>Nama Karyawan</th>
+        <th>Departemen</th>
+        <th class="num">Total Terlambat (mnt)</th>
+        <th class="num">Hari Telat</th>
+        <th>Tindakan</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in coaching %}
+      <tr class="alert-row">
+        <td class="rank-cell">{{ loop.index }}</td>
+        <td class="name-cell alert-cell">{{ r.nama }}</td>
+        <td class="dept-cell">{{ r.dept or '-' }}</td>
+        <td class="num alert-cell">{{ r.total_terlambat }}</td>
+        <td class="num">{{ r.hari_telat }}</td>
+        <td><span class="lbl lbl-alert">Coaching</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="coaching-note">&#9670; Karyawan di atas dijadwalkan sesi pembinaan dengan supervisor departemen masing-masing.</div>
+  {% else %}
+  <div class="empty-state">Tidak ada karyawan yang perlu coaching periode ini.</div>
+  {% endif %}
+  {% endif %}
+
+  {% if sections.departemen %}
+  <!-- SECTION 06: RANKING DEPARTEMEN -->
+  <div class="section-hdr">
+    <span class="section-num">06</span>
+    <span class="section-title">&#9670; Ranking Departemen</span>
+    <span class="section-hdr-line"></span>
+  </div>
+
+  {% if ranking_departemen %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:32px">#</th>
+        <th>Departemen</th>
+        <th class="num">Pegawai</th>
+        <th class="num">Total Terlambat (mnt)</th>
+        <th class="num">Issue</th>
+        <th class="num">Hari Telat</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in ranking_departemen %}
+      <tr {% if r.total_terlambat > 0 and loop.index == 1 %}class="alert-row"{% endif %}>
+        <td class="rank-cell">{{ loop.index }}</td>
+        <td class="name-cell">{{ r.dept }}</td>
+        <td class="num">{{ r.pegawai_count }}</td>
+        <td class="num {% if r.total_terlambat > 0 %}alert-cell{% else %}ok-cell{% endif %}">{{ r.total_terlambat }}</td>
+        <td class="num">{{ r.issue_count }}</td>
+        <td class="num">{{ r.hari_telat }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">Belum ada data departemen.</div>
+  {% endif %}
+  {% endif %}
+
+  {% if sections.hari_rawan %}
+  <!-- SECTION 07: HARI PALING RAWAN -->
+  <div class="section-hdr">
+    <span class="section-num">07</span>
+    <span class="section-title">&#9670; Hari Paling Rawan</span>
+    <span class="section-hdr-line"></span>
+  </div>
+
+  {% if hari_paling_rawan %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Hari</th>
+        <th class="num">Issue</th>
+        <th class="num">Hari Telat</th>
+        <th class="num">Total Hari Kerja</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in hari_paling_rawan %}
+      <tr {% if r.issue_count > 0 and loop.index == 1 %}class="alert-row"{% endif %}>
+        <td class="name-cell">{{ r.hari }}</td>
+        <td class="num {% if r.issue_count > 0 %}alert-cell{% else %}ok-cell{% endif %}">{{ r.issue_count }}</td>
+        <td class="num">{{ r.terlambat_count }}</td>
+        <td class="num">{{ r.total_rows }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">Belum ada data harian.</div>
+  {% endif %}
+  {% endif %}
+
+  {% if sections.ranking %}
+  <!-- SECTION 08: FULL RANKING -->
+  <div class="section-hdr">
+    <span class="section-num">08</span>
+    <span class="section-title">&#9670; Ranking Lengkap Seluruh Karyawan</span>
+    <span class="section-hdr-line"></span>
+  </div>
+
+  {% if ranking %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:32px">#</th>
+        <th>Nama Karyawan</th>
+        <th>Departemen</th>
+        <th class="num">Terlambat (mnt)</th>
+        <th class="num">Hari Telat</th>
+        <th class="num">Isu</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in ranking %}
+      <tr {% if r.total_terlambat >= coaching_threshold %}class="alert-row"{% elif r.total_terlambat == 0 %}class="ok-row"{% endif %}>
+        <td class="rank-cell">{{ loop.index }}</td>
+        <td class="name-cell {% if r.total_terlambat >= coaching_threshold %}alert-cell{% elif r.total_terlambat == 0 %}ok-cell{% endif %}">{{ r.nama }}</td>
+        <td class="dept-cell">{{ r.dept or '-' }}</td>
+        <td class="num {% if r.total_terlambat >= coaching_threshold %}alert-cell{% elif r.total_terlambat == 0 %}ok-cell{% endif %}">{{ r.total_terlambat }}</td>
+        <td class="num">{{ r.hari_telat }}</td>
+        <td class="num">{{ r.issue_count }}</td>
+        <td>
+          {% if r.total_terlambat >= coaching_threshold %}<span class="lbl lbl-alert">Alert</span>
+          {% elif r.total_terlambat == 0 %}<span class="lbl lbl-ok">[TOP] Teladan</span>
+          {% else %}<span class="lbl lbl-mid">Cukup</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">Belum ada data ranking.</div>
+  {% endif %}
+  {% endif %}
+
+  <!-- PAGE FOOTER -->
+  <div class="page-footer">
+    <span>HR Division &bull; Internal Report &bull; {{ period_label }}</span>
+    <span class="stamp">Confidential</span>
+    <span>Generated: {{ generated_at }} &nbsp;&bull;&nbsp; Page 1 of 1</span>
+  </div>
+
+</div><!-- /page-inner -->
+</div><!-- /page -->
+</body>
+</html>

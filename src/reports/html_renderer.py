@@ -1,6 +1,7 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -11,6 +12,19 @@ from src.core.insights import (
 )
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+TEMPLATE_NAMES = {
+    "default":     "dashboard.html.j2",
+    "editorial":   "dashboard_v1_editorial.html.j2",
+    "dark_glass":  "dashboard_v2_dark_glass.html.j2",
+    "infographic": "dashboard_v3_infographic.html.j2",
+    "corporate":   "dashboard_v4_corporate.html.j2",
+}
+
+DEFAULT_SECTIONS = {
+    "kpi": True, "top5_late": True, "top5_teladan": True,
+    "coaching": True, "departemen": True, "hari_rawan": True, "ranking": True,
+}
 
 
 def _build_env() -> Environment:
@@ -28,8 +42,18 @@ def render_dashboard_html(
     period_label: str,
     out_dir: Path,
     threshold: int = DEFAULT_COACHING_THRESHOLD_MINUTES,
+    template_name: str = "default",
+    sections: Optional[dict] = None,
 ) -> Path:
-    """Render dashboard HTML and write to out_dir. Returns the file path."""
+    """Render dashboard HTML and write to out_dir. Returns the file path.
+
+    template_name picks the theme; sections is a dict of booleans deciding
+    which content blocks to include.
+    """
+    if sections is None:
+        sections = DEFAULT_SECTIONS.copy()
+    tmpl_file = TEMPLATE_NAMES.get(template_name, TEMPLATE_NAMES["default"])
+
     ranking = terlambat_ranking(conn, period_start, period_end)
     top5_late = top_n_terlambat(conn, period_start, period_end, n=5)
     coaching = coaching_flag(conn, period_start, period_end, threshold=threshold)
@@ -48,7 +72,7 @@ def render_dashboard_html(
     ).fetchone()[0]
 
     env = _build_env()
-    tmpl = env.get_template("dashboard.html.j2")
+    tmpl = env.get_template(tmpl_file)
     html = tmpl.render(
         period_label=period_label,
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -64,6 +88,7 @@ def render_dashboard_html(
         ranking=ranking,
         ranking_departemen=dept_rows,
         hari_paling_rawan=day_rows,
+        sections=sections,
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)

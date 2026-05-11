@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Dark Glass Dashboard — {{ period_label }}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-deep:    #0F0823;
+    --bg-mid:     #1E104E;
+    --bg-top:     #2A1A55;
+    --glass:      rgba(255,255,255,0.06);
+    --glass-border: rgba(255,255,255,0.10);
+    --orange:     #FF6B3D;
+    --gold:       #FFD060;
+    --purple:     #9D7CFF;
+    --text:       #EDE8FF;
+    --text-dim:   #9B92C8;
+    --text-faint: #5E587A;
+  }
+
+  body {
+    font-family: "Inter", "SF Pro Display", -apple-system, system-ui, sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+    margin: 0;
+    background-image:
+      radial-gradient(ellipse 600px 400px at 20% 10%, rgba(157,124,255,0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 400px 300px at 80% 30%, rgba(255,107,61,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 500px 350px at 50% 80%, rgba(30,16,78,0.8) 0%, transparent 80%),
+      linear-gradient(160deg, var(--bg-deep) 0%, var(--bg-mid) 50%, var(--bg-top) 100%);
+  }
+
+  .page { max-width: 1000px; margin: 0 auto; padding: 36px 32px; }
+
+  /* ── GLASS CARD ── */
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .glass::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  }
+
+  /* ── HERO HEADER ── */
+  .hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 24px 28px;
+    background: linear-gradient(135deg, rgba(157,124,255,0.12), rgba(255,107,61,0.08));
+    border: 1px solid rgba(157,124,255,0.25);
+    border-radius: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::after {
+    content: "";
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 220px; height: 220px;
+    background: radial-gradient(circle, rgba(157,124,255,0.2) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .hero-left h1 {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    color: #fff;
+    line-height: 1.1;
+  }
+
+  .hero-left h1 span { color: var(--gold); }
+
+  .hero-left .sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    margin-top: 6px;
+  }
+
+  .hero-badge {
+    background: linear-gradient(135deg, var(--purple), #6B4FCC);
+    color: white;
+    padding: 8px 18px;
+    border-radius: 30px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 20px rgba(157,124,255,0.4);
+    position: relative;
+  }
+
+  /* ── PRINT TIP ── */
+  .print-tip {
+    background: rgba(255,208,96,0.08);
+    border: 1px solid rgba(255,208,96,0.2);
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* ── BENTO GRID ── */
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .col-4  { grid-column: span 4; }
+  .col-5  { grid-column: span 5; }
+  .col-6  { grid-column: span 6; }
+  .col-7  { grid-column: span 7; }
+  .col-8  { grid-column: span 8; }
+  .col-12 { grid-column: span 12; }
+
+  /* ── KPI CARD ── */
+  .kpi-card { padding: 22px 20px; }
+
+  .kpi-icon { font-size: 22px; margin-bottom: 10px; display: block; }
+
+  .kpi-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .kpi-value {
+    font-size: 56px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -3px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-value.orange { color: var(--orange); text-shadow: 0 0 30px rgba(255,107,61,0.5); }
+  .kpi-value.gold   { color: var(--gold);   text-shadow: 0 0 30px rgba(255,208,96,0.4); }
+  .kpi-value.purple { color: var(--purple); text-shadow: 0 0 30px rgba(157,124,255,0.4); }
+
+  .kpi-unit {
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+  }
+
+  /* ── COACHING RING ── */
+  .ring-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 20px;
+    text-align: center;
+  }
+
+  .ring-wrap { position: relative; width: 100px; height: 100px; margin-bottom: 14px; }
+
+  .ring {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: conic-gradient(var(--orange) 0deg, var(--orange) 144deg, rgba(255,255,255,0.08) 144deg);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+
+  .ring::after {
+    content: "";
+    position: absolute;
+    width: 70px; height: 70px;
+    background: var(--bg-deep);
+    border-radius: 50%;
+  }
+
+  .ring-value {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 28px; font-weight: 900;
+    color: var(--orange); z-index: 2;
+    letter-spacing: -1px;
+  }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--glass-border);
+  }
+
+  /* ── BAR CHART ── */
+  .bar-list { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row  { display: flex; flex-direction: column; gap: 4px; }
+
+  .bar-meta { display: flex; justify-content: space-between; align-items: baseline; }
+  .bar-name { font-size: 12px; font-weight: 600; color: var(--text); letter-spacing: 0.3px; }
+  .bar-dept { font-size: 10px; color: var(--text-faint); }
+  .bar-val  { font-size: 14px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+
+  .bar-track { height: 7px; background: rgba(255,255,255,0.06); border-radius: 10px; overflow: hidden; }
+  .bar-fill  { height: 100%; border-radius: 10px; }
+  .bar-fill.orange { background: linear-gradient(90deg, var(--orange), #FF9A6C); box-shadow: 0 0 8px rgba(255,107,61,0.4); }
+  .bar-fill.gold   { background: linear-gradient(90deg, var(--gold), #FFF0A0); box-shadow: 0 0 8px rgba(255,208,96,0.4); }
+
+  /* ── COACHING LIST ── */
+  .coaching-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .coaching-row {
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    gap: 10px; align-items: center;
+    background: rgba(255,107,61,0.06);
+    border: 1px solid rgba(255,107,61,0.15);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+
+  .c-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--orange); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800;
+  }
+
+  .c-name { font-size: 13px; font-weight: 700; color: var(--text); }
+  .c-dept { font-size: 10px; color: var(--text-faint); margin-top: 1px; }
+  .c-stat-group { text-align: right; }
+  .c-mins { font-size: 14px; font-weight: 800; color: var(--orange); letter-spacing: -0.5px; }
+  .c-days { font-size: 10px; color: var(--text-faint); margin-top: 1px; }
+
+  /* ── DEPT + HARI RAWAN ── */
+  .dept-bar-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .dept-bar-row { display: flex; flex-direction: column; gap: 4px; }
+
+  .dept-bar-meta { display: flex; justify-content: space-between; align-items: baseline; }
+
+  .dept-bar-name { font-size: 12px; font-weight: 600; color: var(--text); }
+  .dept-bar-sub  { font-size: 10px; color: var(--text-faint); }
+  .dept-bar-val  { font-size: 13px; font-weight: 800; color: var(--purple); letter-spacing: -0.3px; }
+
+  .dept-bar-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 10px; overflow: hidden; }
+  .dept-bar-fill  { height: 100%; border-radius: 10px; background: linear-gradient(90deg, var(--purple), #C4AAFF); box-shadow: 0 0 8px rgba(157,124,255,0.3); }
+
+  /* ── RANKING TABLE ── */
+  .rank-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  .rank-table thead tr {
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .rank-table th {
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 500;
+  }
+
+  .rank-table th.num { text-align: right; }
+
+  .rank-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .rank-table td { padding: 8px 10px; vertical-align: middle; }
+  .rank-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .r-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    font-size: 10px; font-weight: 800;
+    background: rgba(255,255,255,0.08); color: var(--text-dim);
+  }
+
+  .r-badge.top { background: rgba(255,107,61,0.2); color: var(--orange); }
+  .r-badge.ok  { background: rgba(74,222,128,0.15); color: #4ADE80; }
+
+  .r-name { font-weight: 600; font-size: 12.5px; color: var(--text); }
+  .r-dept { font-size: 10px; color: var(--text-faint); }
+
+  .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+  .dot-alert  { background: var(--orange); box-shadow: 0 0 6px var(--orange); }
+  .dot-ok     { background: #4ADE80; box-shadow: 0 0 6px #4ADE80; }
+  .dot-mid    { background: var(--gold); }
+
+  .empty-state {
+    font-size: 12px; color: var(--text-faint);
+    font-style: italic; padding: 16px 0;
+    text-align: center;
+  }
+
+  /* ── FOOTER ── */
+  .footer-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px; margin-top: 14px; border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--glass-border);
+    font-size: 10.5px; color: var(--text-faint); letter-spacing: 0.4px;
+  }
+
+  /* ── PRINT ── */
+  @media print {
+    body { background: #ffffff !important; background-image: none !important; color: #1a1a1a; }
+    .page { padding: 16mm 18mm; max-width: none; }
+    .print-tip { display: none; }
+    .glass { background: #f5f5f5 !important; border: 1px solid #ccc !important; backdrop-filter: none !important; }
+    .hero { background: #1E104E !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .kpi-value.orange, .kpi-value.gold, .kpi-value.purple { text-shadow: none; }
+    .bar-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .coaching-row { background: #fff3f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    @page { margin: 12mm; size: A4; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-left">
+      <h1>HR Dashboard<br><span>{{ period_label }}</span></h1>
+      <div class="sub">&#9670; Laporan Kinerja Kehadiran &amp; Disiplin &nbsp;|&nbsp; Generated: {{ generated_at }}</div>
+    </div>
+    <div class="hero-badge">&#128202; &nbsp;Internal Report</div>
+  </div>
+
+  <div class="print-tip">
+    &#128161; <strong>Tip:</strong> Aktifkan <em>"Background graphics"</em> di opsi Print untuk hasil PDF terbaik.
+  </div>
+
+  {% if sections.kpi %}
+  <!-- KPI ROW -->
+  <div class="bento">
+    <div class="glass kpi-card col-4">
+      <span class="kpi-icon">&#9889;</span>
+      <div class="kpi-label">Total Keterlambatan</div>
+      <div class="kpi-value orange">{{ kpi.total_terlambat }}</div>
+      <div class="kpi-unit">menit &bull; {{ period_label }}</div>
+    </div>
+
+    <div class="glass kpi-card col-4">
+      <span class="kpi-icon">&#128203;</span>
+      <div class="kpi-label">Absen Tanpa Izin</div>
+      <div class="kpi-value gold">{{ kpi.total_absen }}</div>
+      <div class="kpi-unit">hari kehadiran</div>
+    </div>
+
+    <div class="glass ring-card col-4">
+      <div class="kpi-label">Dipanggil Coaching</div>
+      <div class="ring-wrap">
+        <div class="ring"></div>
+        <div class="ring-value">{{ kpi.coaching_count }}</div>
+      </div>
+      <div class="kpi-unit">{{ kpi.coaching_count }} karyawan</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if sections.top5_late or sections.top5_teladan %}
+  <!-- TOP 5 ROW -->
+  <div class="bento">
+    {% if sections.top5_late %}
+    <div class="glass {% if sections.top5_teladan %}col-7{% else %}col-12{% endif %}">
+      <div class="section-label">&#9889; Top 5 Keterlambatan</div>
+      {% if top5_late %}
+      <div class="bar-list">
+        {% set max_val = top5_late[0].total_terlambat if top5_late else 1 %}
+        {% for r in top5_late %}
+        <div class="bar-row">
+          <div class="bar-meta">
+            <div><span class="bar-name">{{ r.nama }}</span> <span class="bar-dept">&middot; {{ r.dept or '-' }}</span></div>
+            <span class="bar-val" style="color:var(--orange)">{{ r.total_terlambat }} mnt</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill orange" style="width:{{ [((r.total_terlambat / max_val * 100) | int), 2] | max }}%"></div></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">Tidak ada keterlambatan periode ini.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if sections.top5_teladan %}
+    <div class="glass {% if sections.top5_late %}col-5{% else %}col-12{% endif %}">
+      <div class="section-label">&#128142; Top 5 Teladan</div>
+      {% if top5_teladan %}
+      <div class="bar-list">
+        {% set max_score = top5_teladan[-1].score if top5_teladan else 1 %}
+        {% set max_score = [max_score, 1] | max %}
+        {% for r in top5_teladan %}
+        <div class="bar-row">
+          <div class="bar-meta">
+            <div><span class="bar-name">{{ r.nama }}</span> <span class="bar-dept">&middot; {{ r.dept or '-' }}</span></div>
+            <span class="bar-val" style="color:var(--gold)">{{ r.score }} mnt</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill gold" style="width:{{ [((r.score / max_score * 100) | int), 2] | max }}%"></div></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">Belum ada data teladan.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if sections.coaching %}
+  <!-- COACHING -->
+  <div class="bento">
+    <div class="glass col-12">
+      <div class="section-label">&#127919; Coaching &amp; Pembinaan</div>
+      {% if coaching %}
+      <div class="coaching-list">
+        {% for r in coaching %}
+        <div class="coaching-row">
+          <div class="c-num">{{ loop.index }}</div>
+          <div><div class="c-name">{{ r.nama }}</div><div class="c-dept">{{ r.dept or '-' }}</div></div>
+          <div class="c-stat-group"><div class="c-mins">{{ r.total_terlambat }} mnt</div><div class="c-days">{{ r.hari_telat }} hari telat</div></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">Tidak ada karyawan yang perlu coaching periode ini.</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if sections.departemen or sections.hari_rawan %}
+  <!-- RANKING DEPARTEMEN + HARI PALING RAWAN -->
+  <div class="bento">
+    {% if sections.departemen %}
+    <div class="glass {% if sections.hari_rawan %}col-6{% else %}col-12{% endif %}">
+      <div class="section-label">&#127962; Ranking Departemen</div>
+      {% if ranking_departemen %}
+      {% set max_dept = ranking_departemen[0].total_terlambat if ranking_departemen else 1 %}
+      {% set max_dept = [max_dept, 1] | max %}
+      <div class="dept-bar-list">
+        {% for r in ranking_departemen %}
+        <div class="dept-bar-row">
+          <div class="dept-bar-meta">
+            <div>
+              <span class="dept-bar-name">{{ r.dept }}</span>
+              <span class="dept-bar-sub"> &middot; {{ r.pegawai_count }} org &middot; {{ r.issue_count }} issue</span>
+            </div>
+            <span class="dept-bar-val">{{ r.total_terlambat }} mnt</span>
+          </div>
+          <div class="dept-bar-track"><div class="dept-bar-fill" style="width:{{ [((r.total_terlambat / max_dept * 100) | int), 2] | max }}%"></div></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">Belum ada data departemen.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if sections.hari_rawan %}
+    <div class="glass {% if sections.departemen %}col-6{% else %}col-12{% endif %}">
+      <div class="section-label">&#128197; Hari Paling Rawan</div>
+      {% if hari_paling_rawan %}
+      {% set max_issue = hari_paling_rawan[0].issue_count if hari_paling_rawan else 1 %}
+      {% set max_issue = [max_issue, 1] | max %}
+      <div class="dept-bar-list">
+        {% for r in hari_paling_rawan %}
+        <div class="dept-bar-row">
+          <div class="dept-bar-meta">
+            <div>
+              <span class="dept-bar-name">{{ r.hari }}</span>
+              <span class="dept-bar-sub"> &middot; {{ r.terlambat_count }} telat &middot; {{ r.total_rows }} hari</span>
+            </div>
+            <span class="dept-bar-val" style="color:var(--orange)">{{ r.issue_count }} issue</span>
+          </div>
+          <div class="dept-bar-track"><div class="bar-fill orange" style="width:{{ [((r.issue_count / max_issue * 100) | int), 2] | max }}%"></div></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">Belum ada data harian.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if sections.ranking %}
+  <!-- RANKING TABLE -->
+  <div class="bento">
+    <div class="glass col-12">
+      <div class="section-label">&#9670; Ranking Lengkap Karyawan</div>
+      {% if ranking %}
+      <table class="rank-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Nama</th>
+            <th>Departemen</th>
+            <th class="num">Terlambat</th>
+            <th class="num">Hari Telat</th>
+            <th class="num">Isu</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in ranking %}
+          <tr>
+            <td><span class="r-badge {% if r.total_terlambat >= coaching_threshold %}top{% elif r.total_terlambat == 0 %}ok{% endif %}">{{ loop.index }}</span></td>
+            <td><div class="r-name" style="{% if r.total_terlambat >= coaching_threshold %}color:var(--orange){% elif r.total_terlambat == 0 %}color:#4ADE80{% endif %}">{{ r.nama }}</div></td>
+            <td><div class="r-dept">{{ r.dept or '-' }}</div></td>
+            <td class="num" style="{% if r.total_terlambat >= coaching_threshold %}color:var(--orange){% elif r.total_terlambat == 0 %}color:#4ADE80{% endif %}">{{ r.total_terlambat }}</td>
+            <td class="num">{{ r.hari_telat }}</td>
+            <td class="num">{{ r.issue_count }}</td>
+            <td>
+              {% if r.total_terlambat >= coaching_threshold %}
+              <span class="status-dot dot-alert"></span><span style="font-size:11px;color:var(--orange)">Alert</span>
+              {% elif r.total_terlambat == 0 %}
+              <span class="status-dot dot-ok"></span><span style="font-size:11px;color:#4ADE80">Teladan</span>
+              {% else %}
+              <span class="status-dot dot-mid"></span><span style="font-size:11px;color:var(--gold)">Cukup</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">Belum ada data ranking.</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- FOOTER -->
+  <div class="footer-bar">
+    <span>&#9670; HR Dashboard &nbsp;&mdash;&nbsp; Internal &amp; Confidential</span>
+    <span>{{ period_label }}</span>
+    <span>Generated: {{ generated_at }}</span>
+  </div>
+
+</div>
+</body>
+</html>

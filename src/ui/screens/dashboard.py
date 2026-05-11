@@ -234,6 +234,13 @@ class DashboardScreen(ctk.CTkFrame):
                              ).pack(side="left")
 
     def _on_print(self):
+        from src.ui.components.print_dialog import PrintOptionsDialog
+        PrintOptionsDialog(
+            self.winfo_toplevel(),
+            on_submit=self._do_print,
+        )
+
+    def _do_print(self, sections: dict, theme: str):
         from src.ui.browser_launcher import open_html_in_browser
         from src.ui.components.toast import show_success_toast
 
@@ -244,6 +251,7 @@ class DashboardScreen(ctk.CTkFrame):
                 html_path = render_dashboard_html(
                     conn, period_start=start, period_end=end,
                     period_label=label, out_dir=out_dir,
+                    template_name=theme, sections=sections,
                 )
         except Exception as e:
             messagebox.showerror("Error generating PDF", str(e))
@@ -256,14 +264,13 @@ class DashboardScreen(ctk.CTkFrame):
                 title="Dashboard Dibuka",
                 message=(
                     f"Dashboard {label} dibuka di {browser_name}.\n"
-                    "Gunakan Ctrl+P untuk Save as PDF."
+                    f"Tema: {theme} · Gunakan Ctrl+P untuk Save as PDF."
                 ),
             )
         else:
-            # Browser exe not found — give user a copyable path
             messagebox.showwarning(
                 "Browser tidak ditemukan",
-                f"Tidak menemukan browser (Edge/Chrome/Firefox).\n\n"
+                f"Tidak menemukan browser (Chrome/Edge/Firefox).\n\n"
                 f"File HTML tersimpan di:\n{html_path}\n\n"
                 "Buka manual: klik kanan → Open with → pilih browser."
             )
