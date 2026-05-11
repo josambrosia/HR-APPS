@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from typing import Dict, Callable
+from typing import Dict
 
 from src.ui.theme import FONT_FAMILY
 

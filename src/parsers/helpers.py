@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional
 
 
 def parse_decimal_id(value) -> Optional[float]:

@@ -43,17 +43,35 @@ class InsightsScreen(ctk.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
         self._reload()
 
-    def _period_range(self) -> tuple:
-        # For MVP: return current month range. Later expand to weekly with selector.
+    def _period_range(self) -> tuple[str, str, str]:
+        """Resolve (start_iso, end_iso, label) based on Mingguan/Bulanan selection."""
+        period = self.period_var.get() if hasattr(self, "period_var") else "Bulanan"
+
+        if period == "Mingguan":
+            # End date = most recent imported_at date, or today if no imports yet
+            with get_connection(DB_PATH) as conn:
+                row = conn.execute(
+                    "SELECT MAX(tanggal) AS last_date FROM attendance_records"
+                ).fetchone()
+            anchor_iso = row["last_date"] if row and row["last_date"] else date.today().isoformat()
+            anchor = date.fromisoformat(anchor_iso)
+            start = anchor - timedelta(days=6)
+            return (
+                start.isoformat(),
+                anchor.isoformat(),
+                f"Minggu {start.strftime('%d')}-{anchor.strftime('%d %b %Y')}",
+            )
+
+        # Bulanan (default)
         with get_connection(DB_PATH) as conn:
-            cm = get_setting(conn, "current_month")  # e.g., "2026-04"
+            cm = get_setting(conn, "current_month")
         if cm and len(cm) == 7:
             year, month = map(int, cm.split("-"))
             from calendar import monthrange
             last_day = monthrange(year, month)[1]
             start = f"{year:04d}-{month:02d}-01"
             end = f"{year:04d}-{month:02d}-{last_day:02d}"
-            return start, end, f"{cm}"
+            return start, end, f"Bulanan ({cm})"
         # Fallback: last 30 days
         today = date.today()
         return (today - timedelta(days=30)).isoformat(), today.isoformat(), "Last 30 days"
@@ -119,11 +137,16 @@ class InsightsScreen(ctk.CTkFrame):
             ctk.CTkLabel(row, text=f"{r['nama']} · {r['total_terlambat']} mnt").pack(side="left")
 
     def _on_print(self):
+        import tempfile
         start, end, label = self._period_range()
-        out_dir = Path.home() / "AppData" / "Local" / "Temp"
-        with get_connection(DB_PATH) as conn:
-            html_path = render_dashboard_html(
-                conn, period_start=start, period_end=end,
-                period_label=label, out_dir=out_dir,
-            )
-        webbrowser.open(html_path.as_uri())
+        out_dir = Path(tempfile.gettempdir())
+        try:
+            with get_connection(DB_PATH) as conn:
+                html_path = render_dashboard_html(
+                    conn, period_start=start, period_end=end,
+                    period_label=label, out_dir=out_dir,
+                )
+            webbrowser.open(html_path.as_uri())
+        except Exception as e:
+            from tkinter import messagebox
+            messagebox.showerror("Error generating PDF", str(e))
