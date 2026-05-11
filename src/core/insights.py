@@ -67,3 +67,38 @@ def karyawan_teladan(
     """
     params = (*COACHING_EXCLUDED, start, end)
     return conn.execute(sql, params).fetchone()
+
+
+def karyawan_teladan_top_n(
+    conn: sqlite3.Connection, start: str, end: str, n: int = 5
+) -> List[sqlite3.Row]:
+    """Top N pegawai with the LOWEST composite score (best performers).
+
+    Composite formula:
+        score = SUM(terlambat_menit excluding work-justified)
+              + 60 * SUM(absen days)
+              + 30 * SUM(issue_count)
+
+    Filter: min 3 hari kerja in the period (excludes long-leave employees).
+    Tie-break: alphabetical by nama.
+    """
+    placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
+    sql = f"""
+        SELECT e.id, e.nama, e.dept,
+               SUM(CASE WHEN ar.reason_category IN ({placeholders}) THEN 0
+                        ELSE COALESCE(ar.terlambat_menit, 0) END)
+                 + SUM(CASE WHEN ar.tipe='Hari Kerja' AND ar.masuk IS NULL AND ar.keluar IS NULL
+                            THEN 60 ELSE 0 END)
+                 + SUM(CASE WHEN ar.has_issue = 1 THEN 30 ELSE 0 END) AS score,
+               COUNT(*) AS hari_kerja
+          FROM attendance_records ar
+          JOIN employees e ON ar.employee_id = e.id
+         WHERE ar.tanggal BETWEEN ? AND ?
+               AND ar.tipe = 'Hari Kerja'
+         GROUP BY e.id
+         HAVING hari_kerja >= 3
+         ORDER BY score ASC, e.nama ASC
+         LIMIT ?
+    """
+    params = (*COACHING_EXCLUDED, start, end, n)
+    return conn.execute(sql, params).fetchall()

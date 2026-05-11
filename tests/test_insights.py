@@ -3,7 +3,8 @@ from src.db.connection import get_connection
 from src.db.employees import upsert_employee
 from src.db.attendance import upsert_attendance, set_reason
 from src.core.insights import (
-    terlambat_ranking, top_n_terlambat, coaching_flag, karyawan_teladan
+    terlambat_ranking, top_n_terlambat, coaching_flag, karyawan_teladan,
+    karyawan_teladan_top_n,
 )
 
 
@@ -87,3 +88,37 @@ def test_karyawan_teladan_lowest_score_filter_min_3_days(temp_db_path):
         winner = karyawan_teladan(conn, "2026-04-01", "2026-04-30")
         assert winner is not None
         assert winner["nama"] == "ANDI"
+
+
+def test_karyawan_teladan_top_n_returns_n_sorted_by_score(temp_db_path):
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        # 4 employees with increasing late minutes
+        for i, late in enumerate([0, 5, 10, 20], start=1):
+            emp = _add_emp(conn, str(i), f"E{i}")
+            for d in range(1, 6):
+                _add_att(conn, emp, f"2026-04-0{d}", "Hari",
+                         "08.00" if late == 0 else f"08.{late:02d}",
+                         "16.00", late)
+
+        top3 = karyawan_teladan_top_n(conn, "2026-04-01", "2026-04-30", n=3)
+        assert len(top3) == 3
+        # Lowest score first
+        assert top3[0]["nama"] == "E1"  # 0 late
+        assert top3[1]["nama"] == "E2"  # 25 total late (5*5)
+        assert top3[2]["nama"] == "E3"  # 50 total late
+
+
+def test_karyawan_teladan_top_n_filter_min_3_days(temp_db_path):
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "REGULAR")
+        for d in range(1, 6):
+            _add_att(conn, a, f"2026-04-0{d}", "Hari", "08.00", "16.00", 0)
+        b = _add_emp(conn, "2", "SHORT")
+        for d in range(1, 3):  # only 2 days
+            _add_att(conn, b, f"2026-04-0{d}", "Hari", "08.00", "16.00", 0)
+        top = karyawan_teladan_top_n(conn, "2026-04-01", "2026-04-30", n=10)
+        names = [r["nama"] for r in top]
+        assert "REGULAR" in names
+        assert "SHORT" not in names

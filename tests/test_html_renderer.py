@@ -26,4 +26,4 @@ def test_render_html_contains_key_sections(temp_db_path, tmp_path):
     assert "ANDIKA" in content
     assert "50" in content  # terlambat menit shown
     assert "Top 5 Paling Terlambat" in content
-    assert "Ranking Lengkap" in content
+    assert "Ranking Keterlambatan Lengkap" in content

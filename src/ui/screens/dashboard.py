@@ -9,7 +9,8 @@ from src.config import DB_PATH
 from src.db.connection import get_connection
 from src.db.settings import get_setting
 from src.core.insights import (
-    terlambat_ranking, top_n_terlambat, coaching_flag, karyawan_teladan
+    terlambat_ranking, top_n_terlambat, coaching_flag,
+    karyawan_teladan_top_n,
 )
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.reports.html_renderer import render_dashboard_html
@@ -83,18 +84,17 @@ class DashboardScreen(ctk.CTkFrame):
         start, end, label = self._period_range()
         with get_connection(DB_PATH) as conn:
             ranking = terlambat_ranking(conn, start, end)
-            top5 = top_n_terlambat(conn, start, end, 5)
+            top5_late = top_n_terlambat(conn, start, end, 5)
             coaching = coaching_flag(conn, start, end)
-            teladan = karyawan_teladan(conn, start, end)
+            top5_teladan = karyawan_teladan_top_n(conn, start, end, 5)
 
+        # KPI row — 3 cards (drop single Teladan)
         kpi_frame = ctk.CTkFrame(self.body, fg_color="transparent")
         kpi_frame.pack(fill="x", pady=(0, 12))
-        for i in range(4):
+        for i in range(3):
             kpi_frame.grid_columnconfigure(i, weight=1)
 
         total_late = sum(r["total_terlambat"] for r in ranking)
-        teladan_name = teladan["nama"] if teladan else "-"
-
         KPICard(kpi_frame, "Periode", label).grid(row=0, column=0, padx=4, sticky="ew")
         KPICard(kpi_frame, "Total Terlambat", f"{total_late} mnt",
                 value_color=COLOR_ACCENT
@@ -102,33 +102,52 @@ class DashboardScreen(ctk.CTkFrame):
         KPICard(kpi_frame, "Coaching Flag", str(len(coaching)),
                 value_color=COLOR_WARN
                 ).grid(row=0, column=2, padx=4, sticky="ew")
-        KPICard(kpi_frame, "Teladan", teladan_name, value_color=COLOR_OK
-                ).grid(row=0, column=3, padx=4, sticky="ew")
 
-        twin = ctk.CTkFrame(self.body, fg_color="transparent")
-        twin.pack(fill="x", pady=(8, 0))
-        twin.grid_columnconfigure(0, weight=1)
-        twin.grid_columnconfigure(1, weight=1)
+        # Three panels: top5 late | top5 teladan | coaching
+        triple = ctk.CTkFrame(self.body, fg_color="transparent")
+        triple.pack(fill="x", pady=(8, 0))
+        for i in range(3):
+            triple.grid_columnconfigure(i, weight=1)
 
-        top5_box = ctk.CTkFrame(twin, fg_color=COLOR_PANEL, corner_radius=8)
-        top5_box.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-        ctk.CTkLabel(top5_box, text="🔥 Top 5 Terlambat",
+        # Top 5 Terlambat
+        late_box = ctk.CTkFrame(triple, fg_color=COLOR_PANEL, corner_radius=8)
+        late_box.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+        ctk.CTkLabel(late_box, text="🔥 Top 5 Terlambat",
                      font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_ACCENT
                      ).pack(anchor="w", padx=12, pady=8)
-        if not top5:
-            ctk.CTkLabel(top5_box, text="Tidak ada keterlambatan.",
+        if not top5_late:
+            ctk.CTkLabel(late_box, text="Tidak ada keterlambatan.",
                          text_color=COLOR_TEXT_DIM).pack(padx=12, pady=4)
-        for r in top5:
-            row = ctk.CTkFrame(top5_box, fg_color="transparent")
+        for r in top5_late:
+            row = ctk.CTkFrame(late_box, fg_color="transparent")
             row.pack(fill="x", padx=12, pady=2)
             ctk.CTkLabel(row, text=f"{r['nama']} ({r['dept']})",
                          text_color=COLOR_TEXT).pack(side="left")
             ctk.CTkLabel(row, text=f"{r['total_terlambat']} mnt",
                          text_color=COLOR_ACCENT).pack(side="right")
 
-        coach_box = ctk.CTkFrame(twin, fg_color=COLOR_PANEL, corner_radius=8)
-        coach_box.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
-        ctk.CTkLabel(coach_box, text="⚠ Butuh Coaching (>75 mnt)",
+        # Top 5 Teladan
+        teladan_box = ctk.CTkFrame(triple, fg_color=COLOR_PANEL, corner_radius=8)
+        teladan_box.grid(row=0, column=1, sticky="nsew", padx=4)
+        ctk.CTkLabel(teladan_box, text="🏆 Top 5 Teladan",
+                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_OK
+                     ).pack(anchor="w", padx=12, pady=8)
+        if not top5_teladan:
+            ctk.CTkLabel(teladan_box, text="Belum ada data.",
+                         text_color=COLOR_TEXT_DIM).pack(padx=12, pady=4)
+        medals = ["🥇", "🥈", "🥉", "4.", "5."]
+        for idx, r in enumerate(top5_teladan):
+            row = ctk.CTkFrame(teladan_box, fg_color="transparent")
+            row.pack(fill="x", padx=12, pady=2)
+            ctk.CTkLabel(row, text=f"{medals[idx]} {r['nama']}",
+                         text_color=COLOR_TEXT).pack(side="left")
+            ctk.CTkLabel(row, text=f"skor {r['score']}",
+                         text_color=COLOR_OK).pack(side="right")
+
+        # Butuh Coaching
+        coach_box = ctk.CTkFrame(triple, fg_color=COLOR_PANEL, corner_radius=8)
+        coach_box.grid(row=0, column=2, sticky="nsew", padx=(4, 0))
+        ctk.CTkLabel(coach_box, text="⚠ Butuh Coaching",
                      font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_WARN
                      ).pack(anchor="w", padx=12, pady=8)
         if not coaching:
@@ -140,6 +159,7 @@ class DashboardScreen(ctk.CTkFrame):
             ctk.CTkLabel(row, text=f"{r['nama']} · {r['total_terlambat']} mnt",
                          text_color=COLOR_TEXT).pack(side="left")
 
+        # Ranking lengkap (unchanged from before)
         rank_box = ctk.CTkFrame(self.body, fg_color=COLOR_PANEL, corner_radius=8)
         rank_box.pack(fill="both", expand=True, pady=(8, 0))
         ctk.CTkLabel(rank_box, text="📋 Ranking Lengkap",
