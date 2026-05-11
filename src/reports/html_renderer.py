@@ -6,7 +6,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.config import DEFAULT_COACHING_THRESHOLD_MINUTES
 from src.core.insights import (
-    terlambat_ranking, top_n_terlambat, coaching_flag, karyawan_teladan_top_n
+    terlambat_ranking, top_n_terlambat, coaching_flag, karyawan_teladan_top_n,
+    ranking_departemen, hari_paling_rawan,
 )
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -33,6 +34,8 @@ def render_dashboard_html(
     top5_late = top_n_terlambat(conn, period_start, period_end, n=5)
     coaching = coaching_flag(conn, period_start, period_end, threshold=threshold)
     top5_teladan = karyawan_teladan_top_n(conn, period_start, period_end, n=5)
+    dept_rows = ranking_departemen(conn, period_start, period_end)
+    day_rows = hari_paling_rawan(conn, period_start, period_end)
 
     total_terlambat = sum(r["total_terlambat"] for r in ranking)
     total_absen = conn.execute(
@@ -59,6 +62,8 @@ def render_dashboard_html(
         coaching=coaching,
         coaching_threshold=threshold,
         ranking=ranking,
+        ranking_departemen=dept_rows,
+        hari_paling_rawan=day_rows,
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)

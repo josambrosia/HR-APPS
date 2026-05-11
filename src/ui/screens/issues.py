@@ -8,6 +8,7 @@ from src.db.settings import get_setting
 from src.db.attendance import (
     set_reason, list_issues_for_period, count_issues_for_period,
 )
+from src.core.insights import resolution_rate
 from src.core.reason_mapper import REASON_LABELS, REASON_NEEDS_DETAIL, render_alasan_ijin
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.ui.components.kpi_card import KPICard
@@ -95,7 +96,7 @@ class IssuesScreen(ctk.CTkFrame):
     def _build_stats(self):
         self.stats = ctk.CTkFrame(self, fg_color="transparent")
         self.stats.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
-        for i in range(4):
+        for i in range(5):
             self.stats.grid_columnconfigure(i, weight=1)
         self._stats_cards = []
 
@@ -103,14 +104,22 @@ class IssuesScreen(ctk.CTkFrame):
         for c in self._stats_cards:
             c.destroy()
         self._stats_cards = []
+
+        # Compute resolution rate for the current range
+        start, end = self._active_range()
+        with get_connection(DB_PATH) as conn:
+            rr = resolution_rate(conn, start, end)
+        rate_str = f"{rr['rate_pct']}%" if rr["total"] > 0 else "—"
+
         cards = [
-            ("Open", counts["open"], COLOR_ACCENT),
-            ("Resolved", counts["resolved"], COLOR_OK),
-            ("NA", counts["na"], COLOR_ERR),
-            ("Total", counts["total"], COLOR_TEXT),
+            ("Open", str(counts["open"]), COLOR_ACCENT),
+            ("Resolved", str(counts["resolved"]), COLOR_OK),
+            ("NA", str(counts["na"]), COLOR_ERR),
+            ("Total", str(counts["total"]), COLOR_TEXT),
+            ("Resolution Rate", rate_str, COLOR_OK),
         ]
         for i, (label, val, color) in enumerate(cards):
-            c = KPICard(self.stats, label, str(val), value_color=color)
+            c = KPICard(self.stats, label, val, value_color=color)
             c.grid(row=0, column=i, padx=4, sticky="ew")
             self._stats_cards.append(c)
 

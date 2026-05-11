@@ -10,7 +10,7 @@ from src.db.connection import get_connection
 from src.db.settings import get_setting
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
-    karyawan_teladan_top_n,
+    karyawan_teladan_top_n, ranking_departemen, hari_paling_rawan,
 )
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.reports.html_renderer import render_dashboard_html
@@ -158,6 +158,53 @@ class DashboardScreen(ctk.CTkFrame):
             row.pack(fill="x", padx=12, pady=2)
             ctk.CTkLabel(row, text=f"{r['nama']} · {r['total_terlambat']} mnt",
                          text_color=COLOR_TEXT).pack(side="left")
+
+        # New row: Ranking Departemen + Hari Paling Rawan
+        with get_connection(DB_PATH) as conn:
+            dept_rows = ranking_departemen(conn, start, end)
+            day_rows = hari_paling_rawan(conn, start, end)
+
+        twin2 = ctk.CTkFrame(self.body, fg_color="transparent")
+        twin2.pack(fill="x", pady=(8, 0))
+        twin2.grid_columnconfigure(0, weight=1)
+        twin2.grid_columnconfigure(1, weight=1)
+
+        # Ranking Departemen
+        dept_box = ctk.CTkFrame(twin2, fg_color=COLOR_PANEL, corner_radius=8)
+        dept_box.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        ctk.CTkLabel(dept_box, text="🏢 Ranking Departemen",
+                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_ACCENT
+                     ).pack(anchor="w", padx=12, pady=8)
+        if not dept_rows:
+            ctk.CTkLabel(dept_box, text="Belum ada data departemen.",
+                         text_color=COLOR_TEXT_DIM).pack(padx=12, pady=4)
+        for r in dept_rows:
+            row = ctk.CTkFrame(dept_box, fg_color="transparent")
+            row.pack(fill="x", padx=12, pady=2)
+            ctk.CTkLabel(row, text=f"{r['dept']} ({r['pegawai_count']} org)",
+                         text_color=COLOR_TEXT).pack(side="left")
+            ctk.CTkLabel(row, text=f"{r['total_terlambat']} mnt · {r['issue_count']} issue",
+                         text_color=COLOR_ACCENT).pack(side="right")
+
+        # Hari Paling Rawan
+        day_box = ctk.CTkFrame(twin2, fg_color=COLOR_PANEL, corner_radius=8)
+        day_box.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        ctk.CTkLabel(day_box, text="📅 Hari Paling Rawan",
+                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_WARN
+                     ).pack(anchor="w", padx=12, pady=8)
+        if not day_rows:
+            ctk.CTkLabel(day_box, text="Belum ada data harian.",
+                         text_color=COLOR_TEXT_DIM).pack(padx=12, pady=4)
+        for r in day_rows:
+            row = ctk.CTkFrame(day_box, fg_color="transparent")
+            row.pack(fill="x", padx=12, pady=2)
+            ctk.CTkLabel(row, text=r["hari"],
+                         text_color=COLOR_TEXT).pack(side="left")
+            ctk.CTkLabel(
+                row,
+                text=f"{r['issue_count']} issue · {r['terlambat_count']} telat",
+                text_color=COLOR_TEXT_DIM,
+            ).pack(side="right")
 
         # Ranking lengkap (unchanged from before)
         rank_box = ctk.CTkFrame(self.body, fg_color=COLOR_PANEL, corner_radius=8)

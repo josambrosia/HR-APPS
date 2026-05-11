@@ -279,6 +279,64 @@
       {% endif %}
     </div>
 
+    <div class="row">
+      <div class="card" style="grid-column: span 1;">
+        <h2 style="color: var(--orange);">🏢 Ranking Departemen</h2>
+        {% if ranking_departemen %}
+        <table>
+          <thead>
+            <tr>
+              <th>Departemen</th>
+              <th>Pegawai</th>
+              <th>Terlambat</th>
+              <th>Issue</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for r in ranking_departemen %}
+            <tr>
+              <td><strong>{{ r.dept }}</strong></td>
+              <td>{{ r.pegawai_count }}</td>
+              <td>{% if r.total_terlambat > 0 %}<span class="badge late">{{ r.total_terlambat }} mnt</span>{% else %}<span style="color:var(--ink-dim);">0</span>{% endif %}</td>
+              <td>{{ r.issue_count }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">Belum ada data departemen.</div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <h2 style="color: var(--orange);">📅 Hari Paling Rawan</h2>
+        {% if hari_paling_rawan %}
+        <table>
+          <thead>
+            <tr>
+              <th>Hari</th>
+              <th>Issue</th>
+              <th>Hari Telat</th>
+              <th>Total Hari</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for r in hari_paling_rawan %}
+            <tr>
+              <td><strong>{{ r.hari }}</strong></td>
+              <td>{% if r.issue_count > 0 %}<span class="badge late">{{ r.issue_count }}</span>{% else %}0{% endif %}</td>
+              <td>{{ r.terlambat_count }}</td>
+              <td>{{ r.total_rows }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">Belum ada data harian.</div>
+        {% endif %}
+      </div>
+    </div>
+
     <div class="card rank" style="margin-top:16px;">
       <h2>&#128203; Ranking Keterlambatan Lengkap</h2>
       <table>

@@ -4,7 +4,7 @@ from src.db.employees import upsert_employee
 from src.db.attendance import upsert_attendance, set_reason
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag, karyawan_teladan,
-    karyawan_teladan_top_n,
+    karyawan_teladan_top_n, ranking_departemen, hari_paling_rawan, resolution_rate,
 )
 
 
@@ -122,3 +122,59 @@ def test_karyawan_teladan_top_n_filter_min_3_days(temp_db_path):
         names = [r["nama"] for r in top]
         assert "REGULAR" in names
         assert "SHORT" not in names
+
+
+def test_ranking_departemen_sorted_by_terlambat(temp_db_path):
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        # Dept A: 100 min total, Dept B: 30 min total
+        a1 = upsert_employee(conn, no_staff="A1", nama="A1", dept="DEPT_A")
+        b1 = upsert_employee(conn, no_staff="B1", nama="B1", dept="DEPT_B")
+        for d in range(1, 4):
+            _add_att(conn, a1, f"2026-04-0{d}", "Hari", "08.30", "16.00", 30)
+        for d in range(1, 4):
+            _add_att(conn, b1, f"2026-04-0{d}", "Hari", "08.10", "16.00", 10)
+        rows = ranking_departemen(conn, "2026-04-01", "2026-04-30")
+        depts = [r["dept"] for r in rows]
+        assert depts[0] == "DEPT_A"  # 90 min > 30 min
+        assert depts[1] == "DEPT_B"
+
+
+def test_hari_paling_rawan_counts_per_weekday(temp_db_path):
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        e = upsert_employee(conn, no_staff="1", nama="X", dept="A")
+        # 3 issues on Senin, 1 on Selasa
+        _add_att(conn, e, "2026-04-01", "Senin", None, None, None, has_issue=1)
+        _add_att(conn, e, "2026-04-02", "Selasa", None, None, None, has_issue=1)
+        _add_att(conn, e, "2026-04-08", "Senin", None, None, None, has_issue=1)
+        _add_att(conn, e, "2026-04-15", "Senin", None, None, None, has_issue=1)
+        rows = hari_paling_rawan(conn, "2026-04-01", "2026-04-30")
+        # Senin first (3 issues), Selasa second (1)
+        assert rows[0]["hari"] == "Senin"
+        assert rows[0]["issue_count"] == 3
+        assert rows[1]["hari"] == "Selasa"
+        assert rows[1]["issue_count"] == 1
+
+
+def test_resolution_rate_basic(temp_db_path):
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        e = upsert_employee(conn, no_staff="1", nama="X", dept="A")
+        for d in range(1, 5):  # 4 issues
+            _add_att(conn, e, f"2026-04-0{d}", "Hari", None, None, None, has_issue=1)
+        # Resolve 2 of them
+        ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM attendance_records ORDER BY id LIMIT 2"
+        ).fetchall()]
+        for i in ids:
+            set_reason(conn, attendance_id=i, category="cuti", detail=None)
+        result = resolution_rate(conn, "2026-04-01", "2026-04-30")
+        assert result == {"resolved": 2, "total": 4, "rate_pct": 50.0}
+
+
+def test_resolution_rate_empty(temp_db_path):
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        result = resolution_rate(conn, "2026-04-01", "2026-04-30")
+        assert result == {"resolved": 0, "total": 0, "rate_pct": 0.0}
