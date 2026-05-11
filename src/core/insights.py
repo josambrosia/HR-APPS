@@ -7,16 +7,27 @@ from src.config import COACHING_EXCLUDED
 def terlambat_ranking(
     conn: sqlite3.Connection, start: str, end: str
 ) -> List[sqlite3.Row]:
-    """All employees ranked by total_terlambat DESC, excluding work-justified rows."""
+    """All employees ranked by total_terlambat DESC.
+
+    A row contributes to terlambat aggregations only if the employee
+    actually clocked in (`masuk IS NOT NULL`). Truly absent days
+    (both masuk AND keluar NULL on Hari Kerja) are counted separately
+    as `tidak_hadir`.
+    """
     placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
     sql = f"""
         SELECT e.id, e.nama, e.dept,
                SUM(CASE WHEN ar.reason_category IN ({placeholders}) THEN 0
+                        WHEN ar.masuk IS NULL THEN 0
                         ELSE COALESCE(ar.terlambat_menit, 0) END) AS total_terlambat,
-               COUNT(CASE WHEN ar.terlambat_menit > 0
+               COUNT(CASE WHEN ar.masuk IS NOT NULL
+                          AND ar.terlambat_menit > 0
                           AND (ar.reason_category IS NULL
                                OR ar.reason_category NOT IN ({placeholders}))
                           THEN 1 END) AS hari_telat,
+               SUM(CASE WHEN ar.tipe = 'Hari Kerja'
+                          AND ar.masuk IS NULL AND ar.keluar IS NULL
+                        THEN 1 ELSE 0 END) AS tidak_hadir,
                SUM(CASE WHEN ar.has_issue = 1 THEN 1 ELSE 0 END) AS issue_count
           FROM attendance_records ar
           JOIN employees e ON ar.employee_id = e.id
@@ -72,20 +83,12 @@ def karyawan_teladan(
 def karyawan_teladan_top_n(
     conn: sqlite3.Connection, start: str, end: str, n: int = 5
 ) -> List[sqlite3.Row]:
-    """Top N pegawai with the LOWEST composite score (best performers).
-
-    Composite formula:
-        score = SUM(terlambat_menit excluding work-justified)
-              + 60 * SUM(absen days)
-              + 30 * SUM(issue_count)
-
-    Filter: min 3 hari kerja in the period (excludes long-leave employees).
-    Tie-break: alphabetical by nama.
-    """
+    """Top N best performers (lowest composite score)."""
     placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
     sql = f"""
         SELECT e.id, e.nama, e.dept,
                SUM(CASE WHEN ar.reason_category IN ({placeholders}) THEN 0
+                        WHEN ar.masuk IS NULL THEN 0
                         ELSE COALESCE(ar.terlambat_menit, 0) END)
                  + SUM(CASE WHEN ar.tipe='Hari Kerja' AND ar.masuk IS NULL AND ar.keluar IS NULL
                             THEN 60 ELSE 0 END)
@@ -107,21 +110,18 @@ def karyawan_teladan_top_n(
 def ranking_departemen(
     conn: sqlite3.Connection, start: str, end: str
 ) -> List[sqlite3.Row]:
-    """Departments ranked by total_terlambat DESC (excluding work-justified rows).
-
-    Returns rows with: dept, total_terlambat, issue_count, hari_telat,
-    pegawai_count (distinct employees with activity in period).
-    """
     placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
     sql = f"""
         SELECT e.dept,
                SUM(CASE WHEN ar.reason_category IN ({placeholders}) THEN 0
+                        WHEN ar.masuk IS NULL THEN 0
                         ELSE COALESCE(ar.terlambat_menit, 0) END) AS total_terlambat,
                SUM(CASE WHEN ar.has_issue = 1 THEN 1 ELSE 0 END) AS issue_count,
-               SUM(CASE WHEN ar.terlambat_menit > 0
+               COUNT(CASE WHEN ar.masuk IS NOT NULL
+                          AND ar.terlambat_menit > 0
                           AND (ar.reason_category IS NULL
                                OR ar.reason_category NOT IN ({placeholders}))
-                          THEN 1 ELSE 0 END) AS hari_telat,
+                          THEN 1 END) AS hari_telat,
                COUNT(DISTINCT e.id) AS pegawai_count
           FROM attendance_records ar
           JOIN employees e ON ar.employee_id = e.id
@@ -137,14 +137,13 @@ def ranking_departemen(
 def hari_paling_rawan(
     conn: sqlite3.Connection, start: str, end: str
 ) -> List[sqlite3.Row]:
-    """Weekday breakdown sorted by terlambat_count DESC (most-late weekday first).
+    """Weekday breakdown sorted by terlambat_count DESC.
 
-    Returns rows: hari, terlambat_count, issue_count (kept for compatibility),
-    total_rows.
+    Terlambat counts only rows where the employee actually clocked in.
     """
     sql = """
         SELECT hari,
-               SUM(CASE WHEN terlambat_menit > 0 THEN 1 ELSE 0 END) AS terlambat_count,
+               SUM(CASE WHEN masuk IS NOT NULL AND terlambat_menit > 0 THEN 1 ELSE 0 END) AS terlambat_count,
                SUM(CASE WHEN has_issue = 1 THEN 1 ELSE 0 END) AS issue_count,
                COUNT(*) AS total_rows
           FROM attendance_records

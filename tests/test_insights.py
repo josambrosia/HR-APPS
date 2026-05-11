@@ -178,3 +178,25 @@ def test_resolution_rate_empty(temp_db_path):
     with get_connection(temp_db_path) as conn:
         result = resolution_rate(conn, "2026-04-01", "2026-04-30")
         assert result == {"resolved": 0, "total": 0, "rate_pct": 0.0}
+
+
+def test_terlambat_excludes_absent_days(temp_db_path):
+    """Absent days (no masuk) must not contribute to terlambat_menit sums."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp = upsert_employee(conn, no_staff="1", nama="X", dept="A")
+        # Day 1: present + late 30 min — should count
+        _add_att(conn, emp, "2026-04-01", "Senin", "08.30", "16.00", 30)
+        # Day 2: ABSENT (both null) but with bogus terlambat=99 — must NOT count
+        upsert_attendance(
+            conn, employee_id=emp, tanggal="2026-04-02",
+            hari="Selasa", tipe="Hari Kerja", jadwal="08.00 - 16.00",
+            masuk=None, keluar=None, kerja_jam=None,
+            lembur_jam=None, terlambat_menit=99,
+            has_issue=1, imported_from="W1.xls",
+        )
+        rows = terlambat_ranking(conn, "2026-04-01", "2026-04-30")
+        r = rows[0]
+        assert r["total_terlambat"] == 30  # NOT 30+99
+        assert r["hari_telat"] == 1        # only day 1 counts
+        assert r["tidak_hadir"] == 1       # day 2 counted as absent

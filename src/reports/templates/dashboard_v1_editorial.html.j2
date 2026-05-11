@@ -578,7 +578,7 @@
           <th>Departemen</th>
           <th class="num">Terlambat (mnt)</th>
           <th class="num">Hari Telat</th>
-          <th class="num">Isu</th>
+          <th class="num">Tdk Hadir</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -590,7 +590,7 @@
           <td class="dept">{{ r.dept or '-' }}</td>
           <td class="num {% if r.total_terlambat == 0 %}green-text{% elif loop.index <= 3 %}red-text{% endif %}">{{ r.total_terlambat }}</td>
           <td class="num">{{ r.hari_telat }}</td>
-          <td class="num">{{ r.issue_count }}</td>
+          <td class="num">{{ r.tidak_hadir }}</td>
           <td>
             {% if r.total_terlambat >= coaching_threshold %}<span class="alert-flag">Alert</span>
             {% elif r.total_terlambat == 0 %}<span class="clean-flag">Baik</span>

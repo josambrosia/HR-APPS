@@ -528,7 +528,7 @@
           <th>Departemen</th>
           <th class="num">Terlambat</th>
           <th class="num">Hari</th>
-          <th class="num">Isu</th>
+          <th class="num">Tdk Hadir</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -540,7 +540,7 @@
           <td style="font-size:11px;color:var(--ink-dim)">{{ r.dept or '-' }}</td>
           <td class="num" style="{% if r.total_terlambat >= coaching_threshold %}color:var(--red-h){% elif r.total_terlambat == 0 %}color:var(--mint-h){% endif %}">{{ r.total_terlambat }}</td>
           <td class="num">{{ r.hari_telat }}</td>
-          <td class="num">{{ r.issue_count }}</td>
+          <td class="num">{{ r.tidak_hadir }}</td>
           <td>
             {% if r.total_terlambat >= coaching_threshold %}<span class="status-pill pill-alert">Alert</span>
             {% elif r.total_terlambat == 0 %}<span class="status-pill pill-ok">&#127951; Teladan</span>

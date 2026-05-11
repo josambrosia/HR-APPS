@@ -359,7 +359,7 @@
             <th>Dept</th>
             <th>Terlambat</th>
             <th>Hari Telat</th>
-            <th>Issue</th>
+            <th>Tidak Hadir</th>
           </tr>
         </thead>
         <tbody>
@@ -369,7 +369,7 @@
             <td>{{ r.dept or '-' }}</td>
             <td>{% if r.total_terlambat > 0 %}<span class="badge late">{{ r.total_terlambat }} mnt</span>{% else %}<span style="color:var(--ink-dim);">0</span>{% endif %}</td>
             <td>{{ r.hari_telat }}</td>
-            <td>{{ r.issue_count }}</td>
+            <td>{{ r.tidak_hadir }}</td>
           </tr>
         {% endfor %}
         </tbody>

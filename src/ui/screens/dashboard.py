@@ -178,7 +178,7 @@ class DashboardScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(rank_box, fg_color="transparent")
         hdr.pack(fill="x", padx=12)
         for col, w in (("NAMA", 130), ("DEPT", 100), ("TERLAMBAT", 80),
-                       ("TELAT", 50), ("ISSUE", 50)):
+                       ("TELAT", 50), ("TDK HADIR", 70)):
             ctk.CTkLabel(hdr, text=col, font=(FONT_FAMILY, 10, "bold"),
                          text_color=COLOR_TEXT_DIM, width=w, anchor="w"
                          ).pack(side="left")
@@ -375,7 +375,7 @@ class DashboardScreen(ctk.CTkFrame):
                 (r["nama"], 130), (r["dept"] or "-", 100),
                 (f"{r['total_terlambat']} mnt", 80),
                 (str(r["hari_telat"]), 50),
-                (str(r["issue_count"]), 50),
+                (str(r["tidak_hadir"]), 70),
             ):
                 ctk.CTkLabel(row, text=val, font=(FONT_FAMILY, 11),
                              text_color=COLOR_TEXT, width=w, anchor="w"
