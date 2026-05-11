@@ -8,12 +8,13 @@ import sqlite3
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
+from datetime import datetime
 from typing import Optional
 
 from openpyxl import load_workbook
 from openpyxl.cell import MergedCell
 
-from src.config import TEMPLATE_LAPORAN_BULANAN
+from src.config import TEMPLATE_LAPORAN_BULANAN, REASON_CATEGORIES
 from src.core.reason_mapper import render_alasan_ijin
 
 
@@ -25,11 +26,8 @@ MONTH_NAMES_ID = [
 # Schedule end (16:00) in minutes-from-midnight, for pulang_cepat computation.
 JADWAL_END_MINUTES = 16 * 60
 
-# Reason categories that count toward the "Ijin (Hari)" column.
-IJIN_CATEGORIES = (
-    "izin_sakit", "cuti", "tugas_lapangan", "tugas_paparan",
-    "terlambat_kerja", "terlambat_lain", "lupa_absen",
-)
+# All reason categories except "na" (which means "we don't know yet" — not really an ijin)
+IJIN_CATEGORIES = tuple(c for c in REASON_CATEGORIES if c != "na")
 
 
 @dataclass
@@ -131,7 +129,6 @@ def _apply_row_styles(ws, row_num: int, styles: list):
 
 def _write_data_row(ws, row_num: int, db_row, derived: dict, styles: list):
     """Write 17 cells for one attendance record + apply styles."""
-    from datetime import datetime
     _unmerge_row(ws, row_num)
     tanggal_val = db_row["tanggal"]
     if isinstance(tanggal_val, str):
@@ -149,6 +146,8 @@ def _write_data_row(ws, row_num: int, db_row, derived: dict, styles: list):
     else:
         alasan = None
 
+    # Numeric columns: source fields (kerja_jam, lembur_jam, terlambat_menit) write 0 explicitly;
+    # derived counters (absen, lupa, ijin, pulang_cepat, kurang) suppress 0 as visual blank.
     values = [
         db_row["nama"],                                # A: Nama
         db_row.get("dept") or "",                       # B: Dept
@@ -161,7 +160,7 @@ def _write_data_row(ws, row_num: int, db_row, derived: dict, styles: list):
         db_row.get("kerja_jam") if db_row.get("kerja_jam") is not None else "",
         db_row.get("lembur_jam") if db_row.get("lembur_jam") is not None else "",
         derived["kurang_jam"] if derived["kurang_jam"] else "",
-        db_row.get("terlambat_menit") if db_row.get("terlambat_menit") else "",
+        db_row.get("terlambat_menit") if db_row.get("terlambat_menit") is not None else "",
         derived["pulang_cepat_menit"] if derived["pulang_cepat_menit"] else "",
         derived["absen_hari"] if derived["absen_hari"] else "",
         derived["lupa_hari"] if derived["lupa_hari"] else "",
@@ -199,6 +198,8 @@ def _write_total_row(ws, row_num: int, total: dict, styles: list):
     then I-P have the sums. Q is blank.
     """
     _unmerge_row(ws, row_num)
+    # Columns B-H (2-8) intentionally left blank — they get merged with A
+    # below to form the "Total Personal:" label span.
     ws.cell(row=row_num, column=1, value="Total Personal:")
     ws.cell(row=row_num, column=9, value=round(total["kerja_jam"], 1))
     ws.cell(row=row_num, column=10, value=round(total["lembur_jam"], 1))
@@ -233,7 +234,7 @@ def generate_monthly_report(
     # BEFORE deleting rows, to avoid openpyxl's internal shift-bug leaving
     # phantom MergedCell objects in the cell cache.
     for rng in list(ws.merged_cells.ranges):
-        if rng.max_row > 2:
+        if rng.min_row > 2:
             ws.unmerge_cells(str(rng))
 
     # Strip the sample rows (rows 3 and 4)
@@ -271,7 +272,7 @@ def generate_monthly_report(
     rows_generated = 0
     na_count = 0
 
-    for emp_name, emp_records in employee_blocks:
+    for _emp_name, emp_records in employee_blocks:
         total = _init_total()
         for r in emp_records:
             derived = compute_derived(r)
