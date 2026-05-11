@@ -56,6 +56,8 @@ class DashboardScreen(ctk.CTkFrame):
         self._panel_titles: dict = {}      # panel key -> CTkLabel for title
         self._panel_content: dict = {}     # panel key -> parent frame for rows
         self._panel_boxes: dict = {}       # panel key -> outer CTkFrame (for grid/grid_remove)
+        self._panel_rows: dict[str, list[dict]] = {}   # panel_key -> [{"frame", "left", "right"}, ...]
+        self._panel_empty: dict[str, ctk.CTkLabel] = {}  # panel_key -> empty-state label
         self._setup_treeview_style()
         self._build_header()
         self.body = ctk.CTkFrame(self, fg_color="transparent")
@@ -144,8 +146,7 @@ class DashboardScreen(ctk.CTkFrame):
         left.grid_columnconfigure(0, weight=1)
         left.grid_columnconfigure(1, weight=1)
 
-        def make_panel(parent, title, color, panel_key, fixed_height,
-                       scrollable):
+        def make_panel(parent, title, color, panel_key, fixed_height):
             box = ctk.CTkFrame(parent, fg_color=COLOR_PANEL, corner_radius=8,
                                 height=fixed_height)
             box.grid_propagate(False)
@@ -158,31 +159,33 @@ class DashboardScreen(ctk.CTkFrame):
             title_lbl.grid(row=0, column=0, sticky="w", padx=10, pady=(8, 4))
             self._panel_titles[panel_key] = title_lbl
 
-            if scrollable:
-                content = ctk.CTkScrollableFrame(
-                    box, fg_color="transparent", corner_radius=0,
-                )
-            else:
-                content = ctk.CTkFrame(box, fg_color="transparent")
+            content = ctk.CTkFrame(box, fg_color="transparent")
             content.grid(row=1, column=0, sticky="nsew", padx=4, pady=(0, 6))
             self._panel_content[panel_key] = content
             self._panel_boxes[panel_key] = box
             return box
 
-        # Top 5 panels — bounded, non-scrollable
+        # Top 5 panels — bounded
         make_panel(left, "🔥 Top 5 Terlambat", COLOR_ACCENT,
-                   "late", self.PANEL_H_REGULAR, scrollable=False)
+                   "late", self.PANEL_H_REGULAR)
         make_panel(left, "🏆 Top 5 Teladan", COLOR_OK,
-                   "teladan", self.PANEL_H_REGULAR, scrollable=False)
+                   "teladan", self.PANEL_H_REGULAR)
         # Coaching: taller, non-scrollable; only shown in Mingguan view
         make_panel(left, "⚠ Butuh Coaching", COLOR_WARN,
-                   "coaching", self.PANEL_H_COACH, scrollable=False)
+                   "coaching", self.PANEL_H_COACH)
         # Dept ranking: non-scrollable (~4 depts, bounded)
         make_panel(left, "🏢 Ranking Departemen", COLOR_ACCENT,
-                   "dept", self.PANEL_H_REGULAR, scrollable=False)
+                   "dept", self.PANEL_H_REGULAR)
         # Hari Rawan: compact, non-scrollable (5-6 weekdays max)
         make_panel(left, "📅 Hari Paling Rawan", COLOR_WARN,
-                   "hari", self.PANEL_H_HARI, scrollable=False)
+                   "hari", self.PANEL_H_HARI)
+
+        # Pre-build widget pools for each panel (eliminates destroy/rebuild on tab switch)
+        self._build_panel_pool("late", size=5, empty_text="Tidak ada keterlambatan.")
+        self._build_panel_pool("teladan", size=5, empty_text="Belum ada data.")
+        self._build_panel_pool("coaching", size=20, empty_text="Tidak ada. ✓")
+        self._build_panel_pool("dept", size=8, empty_text="Belum ada data.")
+        self._build_panel_pool("hari", size=7, empty_text="Belum ada data harian.")
 
         # Initial grid positions set by _apply_layout() in _update_data()
 
@@ -207,6 +210,54 @@ class DashboardScreen(ctk.CTkFrame):
             self.rank_tree.heading(c, text=labels[c])
             self.rank_tree.column(c, width=widths[c], anchor="w")
         self.rank_tree.pack(fill="both", expand=True, padx=12, pady=(4, 8))
+
+    def _make_pool_row(self, panel_key: str) -> dict:
+        """Create one pool row (frame + left/right labels). Created hidden — packed by _populate_pool."""
+        parent = self._panel_content[panel_key]
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        left = ctk.CTkLabel(frame, text="", font=(FONT_FAMILY, 11),
+                             text_color=COLOR_TEXT, anchor="w")
+        right = ctk.CTkLabel(frame, text="", font=(FONT_FAMILY, 11),
+                              text_color=COLOR_TEXT, anchor="e")
+        left.pack(side="left")
+        right.pack(side="right")
+        return {"frame": frame, "left": left, "right": right}
+
+    def _build_panel_pool(self, panel_key: str, size: int, empty_text: str) -> None:
+        """Pre-create row pool + empty-state label for a panel."""
+        parent = self._panel_content[panel_key]
+        self._panel_empty[panel_key] = ctk.CTkLabel(
+            parent, text=empty_text, text_color=COLOR_TEXT_DIM,
+            font=(FONT_FAMILY, 11),
+        )
+        self._panel_rows[panel_key] = [
+            self._make_pool_row(panel_key) for _ in range(size)
+        ]
+
+    def _populate_pool(self, panel_key: str, items: list, formatter) -> None:
+        """Reconfigure pool to show `items`. formatter(item) -> (left_text, right_text, right_color)."""
+        rows = self._panel_rows[panel_key]
+        empty_lbl = self._panel_empty[panel_key]
+
+        # Hide everything first to guarantee correct stack order
+        empty_lbl.pack_forget()
+        for r in rows:
+            r["frame"].pack_forget()
+
+        if not items:
+            empty_lbl.pack(padx=8, pady=4)
+            return
+
+        # Auto-grow pool if dataset exceeds preallocated size (rare)
+        while len(rows) < len(items):
+            rows.append(self._make_pool_row(panel_key))
+
+        # Pack visible rows in order, with text + color updated
+        for i, item in enumerate(items):
+            lt, rt, rc = formatter(item)
+            rows[i]["left"].configure(text=lt)
+            rows[i]["right"].configure(text=rt, text_color=rc)
+            rows[i]["frame"].pack(fill="x", padx=6, pady=1)
 
     # ──────────────────────────────────────────────────── Period range helper
 
@@ -335,57 +386,38 @@ class DashboardScreen(ctk.CTkFrame):
         )
 
         # ── Top 5 Late ──
-        self._clear_panel("late")
-        content = self._panel_content["late"]
-        if not data["top5_late"]:
-            self._empty(content, "Tidak ada keterlambatan.")
-        else:
-            for r in data["top5_late"]:
-                self._two_col_row(content, r["nama"],
-                                  f"{r['total_terlambat']} mnt", COLOR_ACCENT)
+        self._populate_pool(
+            "late", data["top5_late"],
+            lambda r: (r["nama"], f"{r['total_terlambat']} mnt", COLOR_ACCENT),
+        )
 
-        # ── Top 5 Teladan ──
-        self._clear_panel("teladan")
-        content = self._panel_content["teladan"]
-        if not data["top5_teladan"]:
-            self._empty(content, "Belum ada data.")
-        else:
-            medals = ["🥇", "🥈", "🥉", "4.", "5."]
-            for idx, r in enumerate(data["top5_teladan"]):
-                self._two_col_row(content, f"{medals[idx]} {r['nama']}",
-                                  f"skor {r['score']}", COLOR_OK)
+        # ── Top 5 Teladan (medals require index → wrap with enumerate) ──
+        medals = ["🥇", "🥈", "🥉", "4.", "5."]
+        teladan_indexed = list(enumerate(data["top5_teladan"]))
+        self._populate_pool(
+            "teladan", teladan_indexed,
+            lambda iv: (f"{medals[iv[0]]} {iv[1]['nama']}",
+                        f"skor {iv[1]['score']}", COLOR_OK),
+        )
 
         # ── Coaching ──
-        self._clear_panel("coaching")
-        content = self._panel_content["coaching"]
-        if not data["coaching"]:
-            self._empty(content, "Tidak ada. ✓")
-        else:
-            for r in data["coaching"]:
-                self._two_col_row(content, r["nama"],
-                                  f"{r['total_terlambat']} mnt", COLOR_WARN)
+        self._populate_pool(
+            "coaching", data["coaching"],
+            lambda r: (r["nama"], f"{r['total_terlambat']} mnt", COLOR_WARN),
+        )
 
         # ── Departemen ──
-        self._clear_panel("dept")
-        content = self._panel_content["dept"]
-        if not data["dept_rows"]:
-            self._empty(content, "Belum ada data.")
-        else:
-            for r in data["dept_rows"]:
-                self._two_col_row(content,
-                                  f"{r['dept']} ({r['pegawai_count']})",
-                                  f"{r['total_terlambat']} mnt", COLOR_ACCENT)
+        self._populate_pool(
+            "dept", data["dept_rows"],
+            lambda r: (f"{r['dept']} ({r['pegawai_count']})",
+                       f"{r['total_terlambat']} mnt", COLOR_ACCENT),
+        )
 
         # ── Hari Rawan ──
-        self._clear_panel("hari")
-        content = self._panel_content["hari"]
-        if not data["day_rows"]:
-            self._empty(content, "Belum ada data harian.")
-        else:
-            for r in data["day_rows"]:
-                self._two_col_row(content, r["hari"],
-                                  f"{r['terlambat_count']} hari telat",
-                                  COLOR_WARN)
+        self._populate_pool(
+            "hari", data["day_rows"],
+            lambda r: (r["hari"], f"{r['terlambat_count']} hari telat", COLOR_WARN),
+        )
 
         # ── Ranking Lengkap (right) — Treeview ──
         self.rank_tree.delete(*self.rank_tree.get_children())
