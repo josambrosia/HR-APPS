@@ -160,9 +160,9 @@ class DashboardScreen(ctk.CTkFrame):
         # Coaching: taller, non-scrollable; only shown in Mingguan view
         make_panel(left, "⚠ Butuh Coaching", COLOR_WARN,
                    "coaching", self.PANEL_H_COACH, scrollable=False)
-        # Dept ranking: scrollable in case there are many depts
+        # Dept ranking: non-scrollable (~4 depts, bounded)
         make_panel(left, "🏢 Ranking Departemen", COLOR_ACCENT,
-                   "dept", self.PANEL_H_REGULAR, scrollable=True)
+                   "dept", self.PANEL_H_REGULAR, scrollable=False)
         # Hari Rawan: compact, non-scrollable (5-6 weekdays max)
         make_panel(left, "📅 Hari Paling Rawan", COLOR_WARN,
                    "hari", self.PANEL_H_HARI, scrollable=False)
