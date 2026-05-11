@@ -5,8 +5,7 @@ from src.config import DB_PATH
 from src.db.connection import get_connection
 from src.db.settings import get_setting, set_setting
 from src.db.employees import list_employees
-from src.db.attendance import reset_month
-from src.ui.theme import FONT_FAMILY, COLOR_PANEL, COLOR_ERR
+from src.ui.theme import FONT_FAMILY, COLOR_PANEL
 
 
 class SettingsScreen(ctk.CTkFrame):
@@ -55,12 +54,6 @@ class SettingsScreen(ctk.CTkFrame):
         ctk.CTkButton(parent, text="Simpan Pengaturan",
                       command=self._save).pack(anchor="w", pady=12)
 
-        ctk.CTkLabel(parent, text=" ", height=20).pack()
-        ctk.CTkButton(
-            parent, text="🔄 Mulai Bulan Baru (hapus semua data attendance)",
-            fg_color=COLOR_ERR, command=self._reset_month,
-        ).pack(anchor="w", pady=8)
-
     def _build_pegawai(self, parent):
         ctk.CTkLabel(parent, text="Pegawai auto-populated dari import. Toggle Active untuk hide dari list.",
                      font=(FONT_FAMILY, 11), text_color="#94a3b8"
@@ -103,18 +96,3 @@ class SettingsScreen(ctk.CTkFrame):
             set_setting(conn, "coaching_threshold_min", self.thr_var.get().strip())
         messagebox.showinfo("Tersimpan", "Pengaturan disimpan.")
 
-    def _reset_month(self):
-        if not messagebox.askyesno(
-            "Konfirmasi",
-            "Hapus SEMUA data attendance bulan ini?\n"
-            "Master pegawai & settings TIDAK terhapus.\n\nLanjut?"
-        ):
-            return
-        if not messagebox.askyesno(
-            "Konfirmasi sekali lagi",
-            "Yakin? Aksi ini tidak bisa di-undo."
-        ):
-            return
-        with get_connection(DB_PATH) as conn:
-            reset_month(conn)
-        messagebox.showinfo("Selesai", "Data attendance terhapus.")
