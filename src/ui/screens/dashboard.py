@@ -129,8 +129,11 @@ class DashboardScreen(ctk.CTkFrame):
         PANEL_H_REGULAR = 220
         PANEL_H_HARI = 150
 
-        def make_panel(parent, title, color, fixed_height: int):
-            """Fixed-height panel with header and internal scroll area."""
+        def make_panel(parent, title, color, fixed_height: int,
+                       scrollable: bool = True):
+            """Fixed-height panel with header. Content area scrolls if scrollable=True
+            (use for variable-length lists like Coaching), or is a plain frame
+            otherwise (use for bounded lists like Top 5)."""
             box = ctk.CTkFrame(parent, fg_color=COLOR_PANEL, corner_radius=8,
                                height=fixed_height)
             box.grid_propagate(False)
@@ -142,11 +145,14 @@ class DashboardScreen(ctk.CTkFrame):
                 font=(FONT_FAMILY, 12, "bold"), text_color=color,
             ).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 4))
 
-            scroll = ctk.CTkScrollableFrame(
-                box, fg_color="transparent", corner_radius=0,
-            )
-            scroll.grid(row=1, column=0, sticky="nsew", padx=4, pady=(0, 6))
-            return box, scroll
+            if scrollable:
+                content = ctk.CTkScrollableFrame(
+                    box, fg_color="transparent", corner_radius=0,
+                )
+            else:
+                content = ctk.CTkFrame(box, fg_color="transparent")
+            content.grid(row=1, column=0, sticky="nsew", padx=4, pady=(0, 6))
+            return box, content
 
         def populate_two_col(scroll_frame, rows, empty_msg, left_fn, right_fn,
                              right_color):
@@ -164,28 +170,30 @@ class DashboardScreen(ctk.CTkFrame):
                              text_color=right_color, anchor="e"
                              ).pack(side="right")
 
-        # Row 0: Top 5 Terlambat | Top 5 Teladan
-        late_box, late_scroll = make_panel(
-            left, "🔥 Top 5 Terlambat", COLOR_ACCENT, PANEL_H_REGULAR)
+        # Row 0: Top 5 Terlambat | Top 5 Teladan (bounded — non-scrollable)
+        late_box, late_content = make_panel(
+            left, "🔥 Top 5 Terlambat", COLOR_ACCENT, PANEL_H_REGULAR,
+            scrollable=False)
         late_box.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 4))
         populate_two_col(
-            late_scroll, top5_late, "Tidak ada keterlambatan.",
+            late_content, top5_late, "Tidak ada keterlambatan.",
             left_fn=lambda r: r["nama"],
             right_fn=lambda r: f"{r['total_terlambat']} mnt",
             right_color=COLOR_ACCENT,
         )
 
-        teladan_box, teladan_scroll = make_panel(
-            left, "🏆 Top 5 Teladan", COLOR_OK, PANEL_H_REGULAR)
+        teladan_box, teladan_content = make_panel(
+            left, "🏆 Top 5 Teladan", COLOR_OK, PANEL_H_REGULAR,
+            scrollable=False)
         teladan_box.grid(row=0, column=1, sticky="nsew", padx=(4, 0), pady=(0, 4))
         if not top5_teladan:
-            ctk.CTkLabel(teladan_scroll, text="Belum ada data.",
+            ctk.CTkLabel(teladan_content, text="Belum ada data.",
                          text_color=COLOR_TEXT_DIM,
                          font=(FONT_FAMILY, 11)).pack(padx=8, pady=4)
         else:
             medals = ["🥇", "🥈", "🥉", "4.", "5."]
             for idx, r in enumerate(top5_teladan):
-                row = ctk.CTkFrame(teladan_scroll, fg_color="transparent")
+                row = ctk.CTkFrame(teladan_content, fg_color="transparent")
                 row.pack(fill="x", padx=6, pady=1)
                 ctk.CTkLabel(row, text=f"{medals[idx]} {r['nama']}",
                              font=(FONT_FAMILY, 11), text_color=COLOR_TEXT,
