@@ -521,3 +521,395 @@ App dianggap selesai (MVP) jika:
 ---
 
 *End of spec.*
+
+---
+
+# Part II — Current State (post-MVP iterations, as of 2026-05-11)
+
+The original spec above describes the MVP design. After implementation the user iterated
+extensively. This section captures the **current state** as of 2026-05-11 so that a new
+session reading only this file has enough context to continue work without re-exploring
+the codebase from scratch.
+
+---
+
+## II.1 Theme Palette
+
+Swapped from dark-blue/cool to **purple/indigo + orange/gold** (per user mockup).
+
+| Token | Value | Usage |
+|---|---|---|
+| `COLOR_BG` | `#1E104E` | App background |
+| `COLOR_PANEL` | `#452E5A` | Cards, panels |
+| `COLOR_ACCENT` | `#FF653F` | Active nav, buttons, orange highlights |
+| `COLOR_GOLD` | `#FFC85C` | Secondary accent, inactive nav border |
+| `COLOR_TEXT` | `#F5F1FF` | Primary text |
+| `COLOR_TEXT_DIM` | `#A9A0C5` | Secondary / dim text |
+| `COLOR_PANEL_OPEN` | `#523456` | Issues screen — OPEN rows tint |
+| `COLOR_PANEL_RESOLVED` | `#3B2A4D` | Issues screen — RESOLVED rows tint |
+
+Defined in `src/ui/theme.py`.
+
+---
+
+## II.2 Auto-Detect Bulan Aktif on Import
+
+User no longer manually sets `current_month` in Settings. On import confirmation the
+**mode month of the imported dates** becomes `current_month` automatically (stored via
+`set_setting`).
+
+A custom success toast (`src/ui/components/toast.py`) is shown after import:
+
+- Semi-transparent modal overlay
+- Click anywhere (or press Escape) to dismiss
+- Shows "Import berhasil — bulan aktif diperbarui ke {month}" message
+
+---
+
+## II.3 Browser Launcher for HTML Print
+
+`src/ui/browser_launcher.py` — `open_html_in_browser(path)` explicitly invokes browser
+executables rather than relying on `os.startfile` / `webbrowser.open`, which on dev
+machines often opens `.html` in VSCode via Windows file association.
+
+Detection order (first found wins):
+
+1. Chrome (`chrome.exe`)
+2. Edge (`msedge.exe`)
+3. Brave (`brave.exe`)
+4. Firefox (`firefox.exe`)
+
+Falls back to `webbrowser.open` if none located. User prefers Chrome.
+
+---
+
+## II.4 Navigation Changes (Insights Removed)
+
+Insights menu **removed**. Its analytics content moved into Dashboard. Dashboard is now the
+analytics view.
+
+Sidebar items (6, in order):
+
+1. Dashboard
+2. Import
+3. Issues
+4. Summary
+5. Export
+6. Settings
+
+---
+
+## II.5 Dashboard — Current Design
+
+Dashboard (`src/ui/screens/dashboard.py`) has been redesigned multiple times.
+
+### Header
+
+Title + `WeekNavBar` (`Semua | Minggu 1 | … | Minggu N`) + "Cetak / Export PDF" button.
+
+### KPI Row (3 cards)
+
+| Card | Content |
+|---|---|
+| Periode | Date range of selected period |
+| Total Terlambat | Aggregate late minutes for period |
+| Coaching Flag | Count of employees over dynamic threshold |
+
+### Adaptive Layout Per Period
+
+**Bulanan (Semua):**
+
+- No Coaching panel (threshold is weekly-meaningful only).
+- Left 2×2 grid: Top 5 Late · Top 5 Teladan / Departemen · Hari Rawan
+- Right column: Ranking Lengkap (tall, scrollable)
+
+**Mingguan:**
+
+- Coaching panel spans 2 rows on left (360 px tall).
+- Column-1 stack: Dept (top-right of coaching area) + Hari Rawan (bottom-right).
+- Right column: Ranking Lengkap (scrollable).
+
+### Performance
+
+- **Per-period query cache**: `self._query_cache[(start, end)]` memoizes 6 query results.
+  Switching back to a visited tab is instant.
+- **Static widgets reused**: `_build_static_widgets()` runs once in `__init__`. Tab switch
+  only calls `_update_data()`, which updates KPI text and replaces rows inside existing
+  panel content frames — no widget teardown/rebuild.
+
+### Coaching Threshold Scaling
+
+`dynamic_threshold = 75 × ceil(days / 7)`
+
+- Minggu 1 week (7 days) → 75 mnt
+- Full month (~30 days) → 75 × 5 = 375 mnt
+
+### Panel Sizing
+
+All small panels are **fixed-height with `grid_propagate(False)`**. Only Ranking Lengkap
+(right column) is scrollable.
+
+---
+
+## II.6 Issues Screen — Current Design
+
+`src/ui/screens/issues.py`
+
+### Header
+
+Title + `WeekNavBar` (same component as Dashboard, same Semua/Minggu 1–N pills).
+
+### Stats Row — 5 KPI Cards
+
+Open · Resolved · NA · Total · **Resolution Rate %**
+
+### Tables
+
+Uses **`ttk.Treeview`** (native widget — much faster than `CTkScrollableFrame` for large
+datasets).
+
+Two stacked Treeviews:
+
+| Table | Tint | Columns |
+|---|---|---|
+| OPEN ISSUES | `COLOR_PANEL_OPEN` | Nama · Dept · Tanggal · Jenis Issue |
+| RESOLVED | `COLOR_PANEL_RESOLVED` | Nama · Dept · Tanggal · Jenis Issue · **Alasan** |
+
+Sort order: **Nama ASC, Tanggal ASC** (grouped by employee for easier reason input).
+
+### Right Panel — Reason Input
+
+- Kategori dropdown shows only human-readable labels (e.g., "Tugas Lapangan"); keys stored
+  separately via `REASON_CATEGORIES` in `src/config.py`.
+- Optional Detail text field.
+- Save button always packed below Detail field.
+
+---
+
+## II.7 New / Changed Core Functions
+
+### `karyawan_teladan_top_n` (was single winner)
+
+```python
+# src/core/insights.py
+def karyawan_teladan_top_n(conn, start, end, n=5) -> list[dict]:
+    ...
+```
+
+Returns top-N employees with lowest `terlambat_menit` (and no absences) for the period.
+
+### `terlambat_menit` Aggregation Fix
+
+All aggregations now require `masuk IS NOT NULL` — employee must have clocked in to count
+as "late". Applied to:
+
+- `terlambat_ranking`
+- `karyawan_teladan` / `karyawan_teladan_top_n`
+- `ranking_departemen`
+- `hari_paling_rawan`
+
+### Other Logic Fixes
+
+| Item | Change |
+|---|---|
+| `Hari Paling Rawan` sort | `terlambat_count DESC` only (was `issue_count`) |
+| `Ranking Departemen` columns | Dept · Pegawai · Terlambat (Issue column removed) |
+| `Ranking Lengkap` columns | Nama · Dept · Terlambat · Telat · **Tidak Hadir** (was Issue) |
+| `tidak_hadir` definition | `tipe='Hari Kerja' AND masuk IS NULL AND keluar IS NULL` |
+| `report_filler` | Skips `MergedCell` objects (real `Laporan Bulanan.xlsx` has merged cells in Total Personal rows) |
+
+---
+
+## II.8 Week Period Logic
+
+Changed from day 1–7 fixed chunks to **Monday–Sunday ISO weeks** with partial weeks at
+month boundaries.
+
+Example — April 2026 (Apr 1 = Wednesday):
+
+| Week | Range |
+|---|---|
+| Week 1 | Apr 1–5 (partial Wed–Sun) |
+| Week 2 | Apr 6–12 (Mon–Sun) |
+| Week 3 | Apr 13–19 (Mon–Sun) |
+| Week 4 | Apr 20–26 (Mon–Sun) |
+| Week 5 | Apr 27–30 (partial Mon–Thu) |
+
+Functions in `src/core/week_utils.py`:
+
+- `weeks_in_month(year, month)` → list of `(start_date, end_date)` tuples
+- `week_number_for(date, year, month)` → 1-based week index
+- `full_month_range(year, month)` → `(first, last)` dates
+
+---
+
+## II.9 WeekNavBar Component
+
+`src/ui/components/week_nav.py` — reusable pill navigation bar.
+
+- Active pill: orange fill (`COLOR_ACCENT`)
+- Inactive pill: gold border on transparent (`COLOR_GOLD`)
+- Used by both Dashboard and Issues screens
+
+---
+
+## II.10 Keyboard Navigation
+
+`Tab` works natively via tkinter focus traversal. `Enter` on a focused `CTkButton` invokes
+it via:
+
+```python
+# src/ui/app.py — HRApp.__init__
+app.bind_all("<Return>", _on_return_key)
+```
+
+where `_on_return_key` calls `.invoke()` on the currently focused widget if it is a
+`CTkButton`.
+
+---
+
+## II.11 Print Customization Dialog
+
+`src/ui/components/print_dialog.py` — `PrintOptionsDialog`
+
+- **Size**: 620 × 680 px
+- **Section checkboxes** (7): KPI · Top 5 Late · Top 5 Teladan · Coaching · Departemen ·
+  Hari Rawan · Ranking
+- **Theme radio buttons** (5): Default · Editorial · Dark Glass · Infographic · Corporate
+- Buttons: Cancel (170 × 44, bold 14 pt) · Cetak (190 × 44, bold 14 pt)
+- Returns `{"sections": {...}, "theme": "..."}` dict or `None` on cancel.
+
+---
+
+## II.12 HTML Print Themes (5)
+
+All templates live in `src/reports/templates/`. All accept:
+
+- `sections` dict (keys matching section checkboxes)
+- `coaching_threshold` (int, minutes)
+- Standard data context (rankings, top5, dept, hari, kpi values)
+
+| File | Style |
+|---|---|
+| `dashboard.html.j2` | Default — premium light |
+| `dashboard_v1_editorial.html.j2` | Newspaper / magazine |
+| `dashboard_v2_dark_glass.html.j2` | Dark glassmorphism with CSS bar charts |
+| `dashboard_v3_infographic.html.j2` | Bold colorful, podium visuals |
+| `dashboard_v4_corporate.html.j2` | Navy / gold annual-report |
+
+Rendered via `src/reports/html_renderer.py` → `render_dashboard_html(data, template_name, sections, coaching_threshold)`.
+
+---
+
+## II.13 File Structure (current)
+
+```
+src/
+├── config.py                         # paths (PyInstaller-aware), constants, COACHING_EXCLUDED, REASON_CATEGORIES
+├── main.py                           # entry point: init_db + HRApp().mainloop()
+├── db/
+│   ├── schema.py                     # DDL + init_db (idempotent, seeds default settings)
+│   ├── connection.py                 # get_connection context manager (FK on, Row factory)
+│   ├── employees.py                  # upsert_employee, list_employees, get_employee_by_no_staff/nama
+│   ├── attendance.py                 # upsert_attendance (preserves reason), set_reason, list_open_issues,
+│   │                                 #   list_issues_for_period, count_issues_for_period, reset_month
+│   └── settings.py                   # get_setting / set_setting (key-value)
+├── parsers/
+│   ├── helpers.py                    # parse_decimal_id, parse_time_dot, parse_date_id
+│   └── fingerprint.py                # parse_fingerprint_file → List[FingerprintRow] (handles NaN)
+├── core/
+│   ├── issue_detector.py             # is_issue(row) -> bool
+│   ├── reason_mapper.py              # REASON_LABELS, REASON_NEEDS_DETAIL, render_alasan_ijin
+│   ├── issue_summary.py              # render_summary_for_employee → WA-ready text
+│   ├── insights.py                   # terlambat_ranking, top_n_terlambat, coaching_flag,
+│   │                                 #   karyawan_teladan, karyawan_teladan_top_n,
+│   │                                 #   ranking_departemen, hari_paling_rawan, resolution_rate
+│   ├── week_utils.py                 # Mon-Sun weeks_in_month, week_number_for, full_month_range
+│   └── report_filler.py              # fill_monthly_report (preserves formatting, skips MergedCells)
+├── reports/
+│   ├── html_renderer.py              # render_dashboard_html(data, template_name, sections, threshold)
+│   └── templates/
+│       ├── dashboard.html.j2
+│       ├── dashboard_v1_editorial.html.j2
+│       ├── dashboard_v2_dark_glass.html.j2
+│       ├── dashboard_v3_infographic.html.j2
+│       └── dashboard_v4_corporate.html.j2
+└── ui/
+    ├── app.py                        # HRApp: sidebar nav + content area + Enter→invoke binding
+    ├── theme.py                      # palette + fonts (purple/orange/gold)
+    ├── browser_launcher.py           # open_html_in_browser (Chrome > Edge > Brave > Firefox)
+    ├── components/
+    │   ├── kpi_card.py
+    │   ├── data_table.py             # (legacy — unused after Issues moved to Treeview)
+    │   ├── week_nav.py               # WeekNavBar pill component
+    │   ├── toast.py                  # show_success_toast — click-anywhere-dismiss modal
+    │   └── print_dialog.py           # PrintOptionsDialog — sections + theme picker
+    └── screens/
+        ├── dashboard.py              # Analytics view + adaptive layout + per-period cache
+        ├── import_screen.py          # File picker, parse preview, auto-set current_month, toast
+        ├── issues.py                 # ttk.Treeview based, per-week stats + open/resolved sep.
+        ├── summary.py                # WA-copy by employee
+        ├── export.py                 # Fill Laporan Bulanan
+        └── settings.py               # General tab (month/threshold/jadwal/reset) + Pegawai tab
+
+tests/  (69 tests, all green)
+├── conftest.py
+├── test_helpers.py                   # 11 tests
+├── test_fingerprint_parser.py        # 5 tests
+├── test_issue_detector.py            # 5 tests
+├── test_reason_mapper.py             # 4 tests
+├── test_issue_summary.py             # 3 tests
+├── test_report_filler.py             # 2 tests
+├── test_insights.py                  # 11 tests
+├── test_html_renderer.py             # 1 test
+├── test_attendance_repo.py           # 4 tests
+├── test_attendance_period_filters.py # 4 tests
+├── test_employees_repo.py            # 4 tests
+├── test_connection.py                # 3 tests
+├── test_schema.py                    # 3 tests
+├── test_settings_repo.py             # 3 tests
+├── test_week_utils.py                # 5 tests (Mon-Sun logic incl. partial weeks)
+└── test_conftest_sanity.py           # 1 test
+
+Other:
+├── HR-Absensi.spec                   # PyInstaller config (bundles templates via datas)
+├── requirements.txt
+├── requirements-dev.txt
+├── pyproject.toml                    # pytest config (pythonpath=["src"])
+├── .python-version                   # 3.13
+├── README.md
+└── docs/superpowers/
+    ├── specs/2026-05-11-hr-absensi-app-design.md   ← this file
+    └── plans/2026-05-11-hr-absensi-app-implementation.md
+```
+
+---
+
+## II.14 Outstanding Tech Debt (none blocking)
+
+| Item | File | Notes |
+|---|---|---|
+| `datetime.utcnow()` deprecation | `src/db/attendance.py` | ~45 warnings from one file; replace with `datetime.now(UTC)`. Will become error in future Python. |
+| Raw SQL in UI | `src/ui/screens/dashboard.py`, `src/ui/screens/settings.py` | KPI counts + `toggle_active`. Should use repo functions. |
+| Unused component | `src/ui/components/data_table.py` | Dead code since Issues moved to Treeview. Safe to delete. |
+| Duplicated CSS | All 5 HTML templates | Minor; could extract shared stylesheet. |
+
+---
+
+## II.15 Workflow for New Sessions
+
+1. **Read this spec** for full context.
+2. **Branch**: `implement-mvp` (local). Many commits ahead of origin.
+   - User said **no auto-push**. Always ask before `git push`.
+3. **Run tests**:
+   ```
+   .venv/Scripts/python.exe -m pytest -q
+   ```
+   Expected: **69 passed, 0 failed**.
+4. **Build .exe**:
+   ```
+   pyinstaller HR-Absensi.spec --clean --noconfirm
+   ```
+   Output: `dist/HR-Absensi/HR-Absensi.exe` (~13 MB, `--onedir` mode).
+5. **.exe may be running** — user often has it open for smoke-testing. Ask to close before
+   rebuild if you hit `PermissionError` on the output binary.
