@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Tuple
 
 from openpyxl import load_workbook
+from openpyxl.cell import MergedCell
 
 from src.core.reason_mapper import render_alasan_ijin
 from src.parsers.helpers import parse_date_id
@@ -67,7 +68,13 @@ def fill_monthly_report(
         else:
             text = "NA / Belum ada kabar"
             summary.na_count += 1
-        ws.cell(row=r, column=ALASAN_IJIN_COL, value=text)
+
+        target = ws.cell(row=r, column=ALASAN_IJIN_COL)
+        if isinstance(target, MergedCell):
+            # Cell is part of a merged range; skip to avoid read-only error.
+            # The top-left cell of the merge already carries the displayed value.
+            continue
+        target.value = text
 
     out_path = xlsx_path.with_name(f"{xlsx_path.stem} [filled].xlsx")
     wb.save(out_path)
