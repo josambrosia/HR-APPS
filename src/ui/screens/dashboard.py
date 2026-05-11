@@ -348,24 +348,6 @@ class DashboardScreen(ctk.CTkFrame):
         self._query_cache[key] = data
         return data
 
-    def _clear_panel(self, panel_key):
-        """Wipe row widgets inside a panel's content frame (preserve container)."""
-        content = self._panel_content[panel_key]
-        for w in content.winfo_children():
-            w.destroy()
-
-    def _two_col_row(self, parent, left_text, right_text, right_color):
-        row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", padx=6, pady=1)
-        ctk.CTkLabel(row, text=left_text, font=(FONT_FAMILY, 11),
-                     text_color=COLOR_TEXT, anchor="w").pack(side="left")
-        ctk.CTkLabel(row, text=right_text, font=(FONT_FAMILY, 11),
-                     text_color=right_color, anchor="e").pack(side="right")
-
-    def _empty(self, parent, text):
-        ctk.CTkLabel(parent, text=text, text_color=COLOR_TEXT_DIM,
-                     font=(FONT_FAMILY, 11)).pack(padx=8, pady=4)
-
     def _update_data(self):
         start, end, label = self._period_range()
         is_bulanan = (self.nav.active == "semua")
