@@ -150,3 +150,30 @@ def count_issues_for_period(conn: sqlite3.Connection, start: str, end: str):
 def reset_month(conn: sqlite3.Connection) -> None:
     """Wipe all attendance data — for 'Mulai Bulan Baru' workflow."""
     conn.execute("DELETE FROM attendance_records")
+
+
+def list_months_with_stats(conn: sqlite3.Connection):
+    """List all months present in attendance_records with per-month stats,
+    ordered newest-first.
+
+    Returns rows (sqlite3.Row) with columns:
+      - year_month: str ("YYYY-MM")
+      - hari_count: int (distinct dates with records)
+      - records_count: int (total rows)
+      - open_issues_count: int (has_issue=1 AND reason_category IS NULL)
+    """
+    return conn.execute(
+        """
+        SELECT
+            substr(tanggal, 1, 7) AS year_month,
+            COUNT(DISTINCT tanggal) AS hari_count,
+            COUNT(*) AS records_count,
+            SUM(CASE
+                WHEN has_issue = 1 AND reason_category IS NULL THEN 1
+                ELSE 0
+            END) AS open_issues_count
+          FROM attendance_records
+         GROUP BY year_month
+         ORDER BY year_month DESC
+        """
+    ).fetchall()
