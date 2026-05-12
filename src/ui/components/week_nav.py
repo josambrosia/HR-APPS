@@ -2,7 +2,7 @@
 
 Renders pills: [Semua] [Minggu 1 (01-07)] [Minggu 2 (08-14)] ...
 
-Active pill uses orange fill; inactive pills have a subtle gold border
+Active pill uses magenta fill; inactive pills have a subtle border
 on a transparent background. Calls back when user clicks a different pill.
 """
 from typing import Callable, Dict, Optional
@@ -10,7 +10,10 @@ from typing import Callable, Dict, Optional
 import customtkinter as ctk
 
 from src.core.week_utils import weeks_in_month
-from src.ui.theme import COLOR_ACCENT, COLOR_OK, COLOR_PANEL, FONT_FAMILY
+from src.ui.theme import (
+    COLOR_ACCENT, COLOR_BG, COLOR_BORDER, COLOR_SURFACE_HIGH,
+    COLOR_TEXT_DIM, FONT_SMALL,
+)
 
 
 class WeekNavBar(ctk.CTkFrame):
@@ -54,11 +57,11 @@ class WeekNavBar(ctk.CTkFrame):
             self, text=label,
             command=lambda k=key: self._on_click(k),
             fg_color="transparent",
-            hover_color=COLOR_PANEL,
+            hover_color=COLOR_SURFACE_HIGH,
             corner_radius=14, height=30,
-            border_width=1, border_color=COLOR_OK,
-            text_color=COLOR_OK,
-            font=(FONT_FAMILY, 12, "bold"),
+            border_width=1, border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT_DIM,
+            font=FONT_SMALL,
         )
         btn.pack(side="left", padx=4)
         self._buttons[key] = btn
@@ -75,14 +78,14 @@ class WeekNavBar(ctk.CTkFrame):
             if key == self._active:
                 btn.configure(
                     fg_color=COLOR_ACCENT,
-                    text_color="#1E104E",   # dark text on bright orange for contrast
+                    text_color=COLOR_BG,   # dark text on bright magenta for contrast
                     border_color=COLOR_ACCENT,
                 )
             else:
                 btn.configure(
                     fg_color="transparent",
-                    text_color=COLOR_OK,
-                    border_color=COLOR_OK,
+                    text_color=COLOR_TEXT_DIM,
+                    border_color=COLOR_BORDER,
                 )
 
     def set_active(self, key: str):

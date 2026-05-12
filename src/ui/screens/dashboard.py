@@ -16,8 +16,18 @@ from src.core.week_utils import weeks_in_month, full_month_range
 from src.reports.html_renderer import render_dashboard_html
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.theme import (
-    FONT_FAMILY, COLOR_OK, COLOR_WARN, COLOR_ACCENT, COLOR_PANEL,
-    COLOR_TEXT, COLOR_TEXT_DIM,
+    FONT_FAMILY, FONT_MONO,
+    COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
+    COLOR_BORDER,
+    COLOR_ACCENT, COLOR_ACCENT_HOVER,
+    COLOR_SECONDARY,
+    COLOR_INFO, COLOR_SUCCESS, COLOR_WARN,
+    COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED, COLOR_TEXT_DISABLED,
+    FONT_DISPLAY, FONT_SUBHEAD,
+    FONT_BODY_BOLD, FONT_SMALL, FONT_LABEL,
+    FONT_MONO_DATA, FONT_MONO_SMALL,
+    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
+    RADIUS_MD,
 )
 
 
@@ -72,13 +82,24 @@ class DashboardScreen(ctk.CTkFrame):
             pass
         style.configure(
             "Ranking.Treeview",
-            background=COLOR_PANEL, fieldbackground=COLOR_PANEL,
-            foreground=COLOR_TEXT, rowheight=24, borderwidth=0,
+            background=COLOR_SURFACE,
+            fieldbackground=COLOR_SURFACE,
+            foreground=COLOR_TEXT,
+            rowheight=24,
+            borderwidth=0,
+            font=FONT_SMALL,
         )
         style.configure(
             "Ranking.Treeview.Heading",
-            background="#2C1B47", foreground=COLOR_TEXT_DIM,
-            relief="flat", font=(FONT_FAMILY, 10, "bold"),
+            background=COLOR_SURFACE_HIGH,
+            foreground=COLOR_TEXT_MUTED,
+            relief="flat",
+            font=(FONT_FAMILY, 9, "bold"),
+        )
+        style.map(
+            "Ranking.Treeview",
+            background=[("selected", COLOR_SURFACE_HIGH)],
+            foreground=[("selected", COLOR_TEXT)],
         )
 
     # ──────────────────────────────────────────────────────────── Header
@@ -88,9 +109,16 @@ class DashboardScreen(ctk.CTkFrame):
         header.grid(row=0, column=0, sticky="ew", pady=(0, 16))
 
         ctk.CTkLabel(
-            header, text="Dashboard", font=(FONT_FAMILY, 24, "bold"),
+            header, text="Dashboard",
+            font=FONT_DISPLAY,
             text_color=COLOR_TEXT,
-        ).pack(side="left", padx=(0, 16))
+        ).pack(side="left", padx=(0, 0))
+
+        ctk.CTkLabel(
+            header, text="/ insights",
+            font=FONT_MONO_SMALL,
+            text_color=COLOR_TEXT_DISABLED,
+        ).pack(side="left", padx=(SPACE_SM, SPACE_LG), pady=(SPACE_SM, 0))
 
         self.nav = WeekNavBar(
             header, current_month=self._current_month,
@@ -100,9 +128,11 @@ class DashboardScreen(ctk.CTkFrame):
 
         ctk.CTkButton(
             header, text="📄 Cetak / Export PDF",
-            fg_color=COLOR_OK, text_color="#1E104E",
+            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+            text_color=COLOR_BG,
+            font=FONT_BODY_BOLD,
             command=self._on_print,
-        ).pack(side="right", padx=(8, 0))
+        ).pack(side="right", padx=(SPACE_SM, 0))
 
     # ──────────────────────────────────────────────────── Static widgets
 
@@ -119,25 +149,31 @@ class DashboardScreen(ctk.CTkFrame):
         for i in range(3):
             kpi_frame.grid_columnconfigure(i, weight=1)
 
-        def _kpi(parent, label_text, name, color):
-            card = ctk.CTkFrame(parent, fg_color=COLOR_PANEL, corner_radius=8)
-            ctk.CTkLabel(card, text=label_text.upper(),
-                         font=(FONT_FAMILY, 10), text_color=COLOR_TEXT_DIM
-                         ).pack(anchor="w", padx=14, pady=(12, 0))
+        def _kpi(parent, label_text, name, color, mono=False):
+            card = ctk.CTkFrame(
+                parent, fg_color=COLOR_SURFACE,
+                border_width=1, border_color=COLOR_BORDER,
+                corner_radius=RADIUS_MD,
+            )
+            ctk.CTkLabel(
+                card, text=label_text.upper(),
+                font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
+            ).pack(anchor="w", padx=SPACE_LG, pady=(SPACE_MD, 0))
             value_lbl = ctk.CTkLabel(
-                card, text="—", font=(FONT_FAMILY, 22, "bold"),
+                card, text="—",
+                font=(FONT_MONO, 24, "bold") if mono else (FONT_FAMILY, 17, "bold"),
                 text_color=color,
             )
-            value_lbl.pack(anchor="w", padx=14, pady=(0, 12))
+            value_lbl.pack(anchor="w", padx=SPACE_LG, pady=(0, SPACE_MD))
             self._kpi_labels[name] = value_lbl
             return card
 
-        _kpi(kpi_frame, "Periode", "periode", COLOR_TEXT).grid(
-            row=0, column=0, padx=4, sticky="ew")
-        _kpi(kpi_frame, "Total Terlambat", "total_terlambat", COLOR_ACCENT).grid(
-            row=0, column=1, padx=4, sticky="ew")
-        _kpi(kpi_frame, "Coaching Flag", "coaching_count", COLOR_WARN).grid(
-            row=0, column=2, padx=4, sticky="ew")
+        _kpi(kpi_frame, "Periode", "periode", COLOR_INFO, mono=False).grid(
+            row=0, column=0, padx=SPACE_XS, sticky="ew")
+        _kpi(kpi_frame, "Total Terlambat", "total_terlambat", COLOR_WARN, mono=True).grid(
+            row=0, column=1, padx=SPACE_XS, sticky="ew")
+        _kpi(kpi_frame, "Coaching Flag", "coaching_count", COLOR_WARN, mono=True).grid(
+            row=0, column=2, padx=SPACE_XS, sticky="ew")
 
         # ── LEFT: dense panel grid ──
         left = ctk.CTkFrame(self.body, fg_color="transparent")
@@ -146,37 +182,42 @@ class DashboardScreen(ctk.CTkFrame):
         left.grid_columnconfigure(1, weight=1)
 
         def make_panel(parent, title, color, panel_key, fixed_height):
-            box = ctk.CTkFrame(parent, fg_color=COLOR_PANEL, corner_radius=8,
-                                height=fixed_height)
+            box = ctk.CTkFrame(
+                parent, fg_color=COLOR_SURFACE,
+                border_width=1, border_color=COLOR_BORDER,
+                corner_radius=RADIUS_MD,
+                height=fixed_height,
+            )
             box.grid_propagate(False)
             box.grid_columnconfigure(0, weight=1)
             box.grid_rowconfigure(1, weight=1)
             title_lbl = ctk.CTkLabel(
-                box, text=title, font=(FONT_FAMILY, 12, "bold"),
+                box, text=title,
+                font=FONT_SUBHEAD,
                 text_color=color,
             )
-            title_lbl.grid(row=0, column=0, sticky="w", padx=10, pady=(8, 4))
+            title_lbl.grid(row=0, column=0, sticky="w", padx=SPACE_MD, pady=(SPACE_SM, SPACE_XS))
             self._panel_titles[panel_key] = title_lbl
 
             content = ctk.CTkFrame(box, fg_color="transparent")
-            content.grid(row=1, column=0, sticky="nsew", padx=4, pady=(0, 6))
+            content.grid(row=1, column=0, sticky="nsew", padx=SPACE_XS, pady=(0, SPACE_SM))
             self._panel_content[panel_key] = content
             self._panel_boxes[panel_key] = box
             return box
 
         # Top 5 panels — bounded
-        make_panel(left, "🔥 Top 5 Terlambat", COLOR_ACCENT,
+        make_panel(left, "🔥 Top 5 Terlambat", COLOR_TEXT,
                    "late", self.PANEL_H_REGULAR)
-        make_panel(left, "🏆 Top 5 Teladan", COLOR_OK,
+        make_panel(left, "🏆 Top 5 Teladan", COLOR_SECONDARY,
                    "teladan", self.PANEL_H_REGULAR)
         # Coaching: taller, non-scrollable; only shown in Mingguan view
         make_panel(left, "⚠ Butuh Coaching", COLOR_WARN,
                    "coaching", self.PANEL_H_COACH)
         # Dept ranking: non-scrollable (~4 depts, bounded)
-        make_panel(left, "🏢 Ranking Departemen", COLOR_ACCENT,
+        make_panel(left, "🏢 Ranking Departemen", COLOR_TEXT,
                    "dept", self.PANEL_H_REGULAR)
         # Hari Rawan: compact, non-scrollable (5-6 weekdays max)
-        make_panel(left, "📅 Hari Paling Rawan", COLOR_WARN,
+        make_panel(left, "📅 Hari Paling Rawan", COLOR_TEXT,
                    "hari", self.PANEL_H_HARI)
 
         # Pre-build widget pools for each panel (eliminates destroy/rebuild on tab switch)
@@ -189,11 +230,17 @@ class DashboardScreen(ctk.CTkFrame):
         # Initial grid positions set by _apply_layout() in _update_data()
 
         # ── RIGHT: Ranking Lengkap (ttk.Treeview — native, scrollable) ──
-        rank_box = ctk.CTkFrame(self.body, fg_color=COLOR_PANEL, corner_radius=8)
+        rank_box = ctk.CTkFrame(
+            self.body, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER,
+            corner_radius=RADIUS_MD,
+        )
         rank_box.grid(row=1, column=1, sticky="nsew")
-        ctk.CTkLabel(rank_box, text="📋 Ranking Lengkap",
-                     font=(FONT_FAMILY, 13, "bold"), text_color=COLOR_TEXT
-                     ).pack(anchor="w", padx=12, pady=(8, 4))
+        ctk.CTkLabel(
+            rank_box, text="📋 Ranking Lengkap",
+            font=FONT_SUBHEAD,
+            text_color=COLOR_TEXT,
+        ).pack(anchor="w", padx=SPACE_MD, pady=(SPACE_SM, SPACE_XS))
 
         cols = ["nama", "dept", "terlambat", "telat", "tidak_hadir"]
         widths = {"nama": 130, "dept": 100, "terlambat": 80,
@@ -213,13 +260,30 @@ class DashboardScreen(ctk.CTkFrame):
     def _make_pool_row(self, panel_key: str) -> dict:
         """Create one pool row (frame + left/right labels). Created hidden — packed by _populate_pool."""
         parent = self._panel_content[panel_key]
-        frame = ctk.CTkFrame(parent, fg_color="transparent")
-        left = ctk.CTkLabel(frame, text="", font=(FONT_FAMILY, 11),
-                             text_color=COLOR_TEXT, anchor="w")
-        right = ctk.CTkLabel(frame, text="", font=(FONT_FAMILY, 11),
-                              text_color=COLOR_TEXT, anchor="e")
-        left.pack(side="left")
-        right.pack(side="right")
+        frame = ctk.CTkFrame(parent, fg_color="transparent", height=22)
+        frame.pack_propagate(False)
+        left = ctk.CTkLabel(
+            frame, text="", font=FONT_SMALL,
+            text_color=COLOR_TEXT, anchor="w",
+        )
+        right = ctk.CTkLabel(
+            frame, text="", font=FONT_MONO_DATA,
+            text_color=COLOR_TEXT, anchor="e",
+        )
+        left.pack(side="left", padx=(SPACE_SM, 0))
+        right.pack(side="right", padx=(0, SPACE_SM))
+
+        # Hover handlers — subtle bg tint
+        def _on_enter(_e):
+            frame.configure(fg_color=COLOR_SURFACE_HIGH)
+
+        def _on_leave(_e):
+            frame.configure(fg_color="transparent")
+
+        for w in (frame, left, right):
+            w.bind("<Enter>", _on_enter)
+            w.bind("<Leave>", _on_leave)
+
         return {"frame": frame, "left": left, "right": right}
 
     def _build_panel_pool(self, panel_key: str, size: int, empty_text: str) -> None:
@@ -227,7 +291,7 @@ class DashboardScreen(ctk.CTkFrame):
         parent = self._panel_content[panel_key]
         self._panel_empty[panel_key] = ctk.CTkLabel(
             parent, text=empty_text, text_color=COLOR_TEXT_DIM,
-            font=(FONT_FAMILY, 11),
+            font=FONT_SMALL,
         )
         self._panel_rows[panel_key] = [
             self._make_pool_row(panel_key) for _ in range(size)
@@ -369,7 +433,7 @@ class DashboardScreen(ctk.CTkFrame):
         # ── Top 5 Late ──
         self._populate_pool(
             "late", data["top5_late"],
-            lambda r: (r["nama"], f"{r['total_terlambat']} mnt", COLOR_ACCENT),
+            lambda r: (r["nama"], f"{r['total_terlambat']} mnt", COLOR_WARN),
         )
 
         # ── Top 5 Teladan (medals require index → wrap with enumerate) ──
@@ -378,7 +442,7 @@ class DashboardScreen(ctk.CTkFrame):
         self._populate_pool(
             "teladan", teladan_indexed,
             lambda iv: (f"{medals[iv[0]]} {iv[1]['nama']}",
-                        f"skor {iv[1]['score']}", COLOR_OK),
+                        f"skor {iv[1]['score']}", COLOR_SUCCESS),
         )
 
         # ── Coaching ──
@@ -391,7 +455,7 @@ class DashboardScreen(ctk.CTkFrame):
         self._populate_pool(
             "dept", data["dept_rows"],
             lambda r: (f"{r['dept']} ({r['pegawai_count']})",
-                       f"{r['total_terlambat']} mnt", COLOR_ACCENT),
+                       f"{r['total_terlambat']} mnt", COLOR_WARN),
         )
 
         # ── Hari Rawan ──
