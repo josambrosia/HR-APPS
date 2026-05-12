@@ -47,96 +47,94 @@ class SplashScreen(ctk.CTkToplevel):
     # ─────────────────────────────────────────────── Layout
 
     def _build_content(self):
+        """S2 — Centered Brand Block: big icon → BRAND NAME (prominent) →
+        tagline → progress bar → small app/version line at bottom.
+        """
         outer = ctk.CTkFrame(self, fg_color="transparent")
-        outer.pack(expand=True, fill="both", padx=50, pady=40)
+        outer.pack(expand=True, fill="both", padx=30, pady=30)
 
-        # ── TOP ROW: icon card + app name/version stack ──
-        top = ctk.CTkFrame(outer, fg_color="transparent")
-        top.pack(anchor="w", pady=(0, 24))
+        # Inner centered stack (vertical centering via expand)
+        inner = ctk.CTkFrame(outer, fg_color="transparent")
+        inner.pack(expand=True)
 
-        icon = self._make_icon_card(top)
-        icon.pack(side="left", padx=(0, 16))
+        # ── BIG ICON CARD (80×80) ──
+        icon = self._make_icon_card(inner, size=80)
+        icon.pack(pady=(0, 18))
 
-        text_col = ctk.CTkFrame(top, fg_color="transparent")
-        text_col.pack(side="left", anchor="w")
+        # ── BRAND NAME — prominent, 19pt mono bold ──
         ctk.CTkLabel(
-            text_col, text="HR Absensi",
-            font=("Segoe UI", 22, "bold"),
+            inner, text=APP_BRAND_NAME,
+            font=("Consolas", 19, "bold"),
             text_color=self.TEXT_COLOR,
             fg_color="transparent",
-        ).pack(anchor="w")
+        ).pack(pady=(0, 4))
+
+        # ── TAGLINE — magenta accent ──
         ctk.CTkLabel(
-            text_col, text=f"v{APP_VERSION}",
-            font=("Consolas", 13, "bold"),
+            inner,
+            text=f"// {APP_TAGLINE.rstrip('.').lower()}",
+            font=("Consolas", 12),
             text_color=self.ACCENT_COLOR,
             fg_color="transparent",
-        ).pack(anchor="w")
+        ).pack(pady=(0, 22))
 
-        # ── TAGLINE ──
-        ctk.CTkLabel(
-            outer,
-            text=f"// {APP_TAGLINE.rstrip('.').lower()}",
-            font=("Consolas", 13),
-            text_color=self.DIM_COLOR,
-            fg_color="transparent",
-        ).pack(anchor="w", pady=(0, 20))
-
-        # ── STATUS TEXT ──
-        ctk.CTkLabel(
-            outer, text="Loading data & screens...",
-            font=("Consolas", 11),
-            text_color=self.DIMMER_COLOR,
-            fg_color="transparent",
-        ).pack(anchor="w", pady=(0, 8))
-
-        # ── PROGRESS BAR (CTkProgressBar — clean native rendering) ──
+        # ── PROGRESS BAR — fixed width 320, centered ──
         self._progress = ctk.CTkProgressBar(
-            outer,
-            height=6, corner_radius=3,
+            inner,
+            width=320, height=6, corner_radius=3,
             progress_color=self.ACCENT_COLOR,
             fg_color=self.PROGRESS_BG,
         )
-        self._progress.pack(fill="x", pady=(0, 24))
+        self._progress.pack(pady=(0, 14))
         self._progress.set(0)
 
-        # ── BRAND CREDIT (right-aligned, below progress) ──
+        # ── APP NAME + VERSION — small, dim, mono ──
         ctk.CTkLabel(
-            outer, text=APP_BRAND_NAME,
-            font=("Consolas", 10),
-            text_color=self.DIMMER_COLOR,
+            inner, text=f"HR Absensi · v{APP_VERSION}",
+            font=("Consolas", 11),
+            text_color=self.DIM_COLOR,
             fg_color="transparent",
-        ).pack(anchor="e")
+        ).pack()
 
     # ─────────────────────────────────────────────── Icon
 
-    def _make_icon_card(self, parent):
-        """Render 56×56 brand icon card with 'j' glyph + magenta cursor strip.
+    def _make_icon_card(self, parent, size: int = 56):
+        """Render brand icon card at the given square size.
 
-        Proportions derived from assets/brand/icon-04E.svg (256×256 viewBox
-        scaled by 56/256 ≈ 0.219×):
-          - corner radius   56 × 0.219 ≈ 12  → use 10 (CTk visual)
-          - 'j' font size   152 × 0.219 ≈ 33 → 32 (round)
-          - magenta strip   x=142 y=78 w=56 h=108 → x≈31 y≈17 w≈12 h≈24
+        Base proportions are calibrated at size=56 ('j' font 32, strip
+        11×22 at place(33,17)). All values scale linearly with the
+        size/56 ratio so the same visual identity holds at 56, 80, etc.
+        Derived from assets/brand/icon-04E.svg (256×256 viewBox).
         """
+        ratio = size / 56
+        radius = int(10 * ratio)
+        j_font = int(32 * ratio)
+        j_x = int(10 * ratio)
+        j_y = int(4 * ratio)
+        strip_x = int(33 * ratio)
+        strip_y = int(17 * ratio)
+        strip_w = int(11 * ratio)
+        strip_h = int(22 * ratio)
+
         card = ctk.CTkFrame(
-            parent, width=56, height=56,
-            corner_radius=10, fg_color=self.ICON_BG,
+            parent, width=size, height=size,
+            corner_radius=radius, fg_color=self.ICON_BG,
         )
         card.pack_propagate(False)
 
         # "j" character — top-left positioned, scaled font
         ctk.CTkLabel(
             card, text="j",
-            font=("Consolas", 32, "bold"),
+            font=("Consolas", j_font, "bold"),
             text_color=self.TEXT_COLOR,
             fg_color="transparent",
-        ).place(x=10, y=4)
+        ).place(x=j_x, y=j_y)
 
-        # Magenta cursor strip (small filled frame)
+        # Magenta cursor strip
         ctk.CTkFrame(
-            card, width=11, height=22,
+            card, width=strip_w, height=strip_h,
             corner_radius=0, fg_color=self.ACCENT_COLOR,
-        ).place(x=33, y=17)
+        ).place(x=strip_x, y=strip_y)
 
         return card
 

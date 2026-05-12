@@ -72,27 +72,57 @@ class HRApp(ctk.CTk):
                 fg_color="transparent", hover_color="#334155",
             ).pack(fill="x", padx=8, pady=2)
 
-        # ── Footer: version + brand credit, pinned to sidebar bottom ──
+        # ── Footer: BRAND stacked emphasis + version + tagline ──
+        # SB2 mockup: "Josaphat Tech" (white bold) / "Solution" (magenta bold)
+        # → version mono / tagline mono. Brand readable at glance.
         from src.config import APP_VERSION, APP_TAGLINE, APP_BRAND_NAME
+        from src.ui.theme import COLOR_TEXT
+
+        # Brand magenta is the JTS accent (#EC4899) — NOT app's COLOR_ACCENT
+        # which is orange. Hardcoded here to keep the brand link explicit
+        # (hybrid theme approach: app=purple/orange, brand-marks=magenta).
+        BRAND_MAGENTA = "#EC4899"
+
+        # Split brand name into 2 lines on the last word for the stacked layout.
+        # "Josaphat Tech Solution" → ["Josaphat Tech", "Solution"]
+        brand_parts = APP_BRAND_NAME.rsplit(" ", 1)
+        brand_line1 = brand_parts[0] if len(brand_parts) == 2 else APP_BRAND_NAME
+        brand_line2 = brand_parts[1] if len(brand_parts) == 2 else ""
+
         footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=8, pady=(10, 14))
+
         # Thin separator above the footer block
         sep = ctk.CTkFrame(footer, fg_color=COLOR_TEXT_DIM, height=1)
-        sep.pack(fill="x", pady=(0, 8))
+        sep.pack(fill="x", pady=(0, 10))
+
+        # Brand line 1: "Josaphat Tech" — white bold
+        ctk.CTkLabel(
+            footer, text=brand_line1,
+            font=(FONT_FAMILY, 13, "bold"),
+            text_color=COLOR_TEXT, anchor="w",
+        ).pack(fill="x")
+
+        # Brand line 2: "Solution" — magenta bold (visual accent)
+        if brand_line2:
+            ctk.CTkLabel(
+                footer, text=brand_line2,
+                font=(FONT_FAMILY, 13, "bold"),
+                text_color=BRAND_MAGENTA, anchor="w",
+            ).pack(fill="x", pady=(0, 6))
+
+        # Version (mono, dim)
         ctk.CTkLabel(
             footer, text=f"v{APP_VERSION}",
-            font=(FONT_FAMILY, 11, "bold"),
+            font=("Consolas", 10),
             text_color=COLOR_TEXT_DIM, anchor="w",
         ).pack(fill="x")
-        ctk.CTkLabel(
-            footer, text=APP_BRAND_NAME,
-            font=(FONT_FAMILY, 9),
-            text_color=COLOR_TEXT_DIM, anchor="w",
-        ).pack(fill="x")
+
+        # Tagline (mono, dim, smaller)
         ctk.CTkLabel(
             footer,
             text=f"// {APP_TAGLINE.rstrip('.').lower()}",
-            font=("Consolas", 9),
+            font=("Consolas", 8),
             text_color=COLOR_TEXT_DIM, anchor="w",
         ).pack(fill="x")
 
