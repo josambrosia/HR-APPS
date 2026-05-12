@@ -89,7 +89,7 @@ class PrintOptionsDialog(ctk.CTkToplevel):
         # Sections
         ctk.CTkLabel(
             self, text="BAGIAN", font=FONT_LABEL,
-            text_color=COLOR_ACCENT,
+            text_color=COLOR_TEXT_MUTED,
         ).pack(anchor="w", padx=SPACE_XL, pady=(SPACE_XS, SPACE_XS))
         self._check_vars: dict[str, ctk.BooleanVar] = {}
         for key, label in SECTION_DEFS:
@@ -108,7 +108,7 @@ class PrintOptionsDialog(ctk.CTkToplevel):
         # Theme
         ctk.CTkLabel(
             self, text="TEMA", font=FONT_LABEL,
-            text_color=COLOR_ACCENT,
+            text_color=COLOR_TEXT_MUTED,
         ).pack(anchor="w", padx=SPACE_XL, pady=(SPACE_LG, SPACE_XS))
         self._theme_var = ctk.StringVar(value=self._theme_state)
         for key, label in THEME_DEFS:
