@@ -13,14 +13,17 @@ from src.db.connection import get_connection
 from src.db.settings import get_setting, set_setting
 from src.ui.components.toast import show_success_toast
 from src.ui.theme import (
-    FONT_FAMILY, COLOR_PANEL, COLOR_PANEL_OPEN, COLOR_PANEL_RESOLVED,
-    COLOR_OK, COLOR_TEXT, COLOR_TEXT_DIM,
+    COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
+    COLOR_BORDER,
+    COLOR_ACCENT, COLOR_ACCENT_HOVER,
+    COLOR_INFO, COLOR_SUCCESS,
+    COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
+    FONT_DISPLAY, FONT_SUBHEAD,
+    FONT_BODY_BOLD, FONT_SMALL,
+    FONT_MONO_SMALL,
+    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
+    RADIUS_SM, RADIUS_MD,
 )
-
-
-# JTS brand magenta — used to highlight active month (links visually
-# to logo cursor strip + sidebar Solution accent + splash progress).
-BRAND_MAGENTA = "#EC4899"
 
 
 class ActiveMonthScreen(ctk.CTkFrame):
@@ -37,18 +40,17 @@ class ActiveMonthScreen(ctk.CTkFrame):
 
     def _build_header(self):
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", pady=(0, 16))
+        header.grid(row=0, column=0, sticky="ew", pady=(0, SPACE_LG))
         ctk.CTkLabel(
-            header, text="Riwayat Bulan",
-            font=(FONT_FAMILY, 24, "bold"),
+            header, text="Pilih Bulan Aktif",
+            font=FONT_DISPLAY,
             text_color=COLOR_TEXT,
         ).pack(side="left")
 
     def _build_list(self):
-        # Scroll area gets a panel-resolved tint so the area visually extends
-        # full-height even when fewer cards than viewport (panel "sampai bawah").
+        # Scroll area uses COLOR_BG (matches app bg, no purple panel)
         self.scroll = ctk.CTkScrollableFrame(
-            self, fg_color=COLOR_PANEL_RESOLVED, corner_radius=8,
+            self, fg_color=COLOR_BG, corner_radius=RADIUS_MD,
         )
         self.scroll.grid(row=1, column=0, sticky="nsew")
         self._render_cards()
@@ -68,86 +70,91 @@ class ActiveMonthScreen(ctk.CTkFrame):
             self._render_card(m)
 
     def _render_empty_state(self):
-        empty = ctk.CTkFrame(self.scroll, fg_color=COLOR_PANEL, corner_radius=8)
-        empty.pack(fill="x", pady=8, padx=4)
+        empty = ctk.CTkFrame(
+            self.scroll, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER,
+            corner_radius=RADIUS_MD,
+        )
+        empty.pack(fill="x", pady=SPACE_SM, padx=SPACE_XS)
         ctk.CTkLabel(
             empty, text="Belum ada data.",
-            font=(FONT_FAMILY, 14, "bold"), text_color=COLOR_TEXT,
-        ).pack(anchor="w", padx=16, pady=(16, 4))
+            font=FONT_SUBHEAD, text_color=COLOR_TEXT,
+        ).pack(anchor="w", padx=SPACE_LG, pady=(SPACE_LG, SPACE_XS))
         ctk.CTkLabel(
             empty, text="Import fingerprint dulu via menu Import.",
-            font=(FONT_FAMILY, 11), text_color=COLOR_TEXT_DIM,
-        ).pack(anchor="w", padx=16, pady=(0, 16))
+            font=FONT_SMALL, text_color=COLOR_TEXT_DIM,
+        ).pack(anchor="w", padx=SPACE_LG, pady=(0, SPACE_LG))
 
     def _render_card(self, m: dict):
         is_active = m["year_month"] == self._current_month
-        bg = COLOR_PANEL_OPEN if is_active else COLOR_PANEL
 
-        # Active card wraps the inner content with a 4px magenta accent bar on
-        # the left edge. Inactive cards have no accent bar.
-        if is_active:
-            wrapper = ctk.CTkFrame(self.scroll, fg_color="transparent")
-            wrapper.pack(fill="x", pady=6, padx=4)
-            accent = ctk.CTkFrame(
-                wrapper, width=4, fg_color=BRAND_MAGENTA, corner_radius=2,
-            )
-            accent.pack(side="left", fill="y", padx=(0, 0))
-            card = ctk.CTkFrame(wrapper, fg_color=bg, corner_radius=8)
-            card.pack(side="left", fill="both", expand=True, padx=(2, 0))
-        else:
-            card = ctk.CTkFrame(self.scroll, fg_color=bg, corner_radius=8)
-            card.pack(fill="x", pady=6, padx=4)
+        # Card construction with semantic border
+        border_color = COLOR_ACCENT if is_active else COLOR_BORDER
+        card = ctk.CTkFrame(
+            self.scroll, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=border_color,
+            corner_radius=RADIUS_MD,
+        )
+        card.pack(fill="x", pady=SPACE_XS, padx=SPACE_XS)
 
-        # ── Title row: month name + (active) SEDANG AKTIF badge on right ──
+        # ── Title row: month name + AKTIF badge on right (if active) ──
         title_row = ctk.CTkFrame(card, fg_color="transparent")
-        title_row.pack(fill="x", padx=16, pady=(12, 4))
+        title_row.pack(fill="x", padx=SPACE_LG, pady=(SPACE_MD, SPACE_XS))
         ctk.CTkLabel(
             title_row, text=month_label(m["year_month"]),
-            font=(FONT_FAMILY, 16, "bold"), text_color=COLOR_TEXT,
+            font=FONT_SUBHEAD, text_color=COLOR_TEXT,
         ).pack(side="left")
         if is_active:
             # Solid magenta pill badge — readable from across the screen
             ctk.CTkLabel(
-                title_row, text=" ✓ SEDANG AKTIF ",
-                font=(FONT_FAMILY, 10, "bold"),
-                text_color="#FFFFFF",
-                fg_color=BRAND_MAGENTA,
-                corner_radius=4,
+                title_row, text=" AKTIF ",
+                font=FONT_MONO_SMALL,
+                text_color=COLOR_BG,
+                fg_color=COLOR_ACCENT,
+                corner_radius=RADIUS_SM,
             ).pack(side="right")
 
-        # ── Stats line ──
+        # ── Stats line (mono small + muted) ──
         stats = (f"{m['hari_count']} hari · "
                  f"{m['records_count']} records · "
                  f"{m['open_issues_count']} issue open")
         ctk.CTkLabel(
             card, text=stats,
-            font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_DIM,
-        ).pack(anchor="w", padx=16, pady=(0, 8))
+            font=FONT_MONO_SMALL, text_color=COLOR_TEXT_MUTED,
+        ).pack(anchor="w", padx=SPACE_LG, pady=(0, SPACE_SM))
 
         # ── Buttons row ──
         btn_row = ctk.CTkFrame(card, fg_color="transparent")
-        btn_row.pack(fill="x", padx=12, pady=(0, 12))
+        btn_row.pack(fill="x", padx=SPACE_MD, pady=(0, SPACE_MD))
         if is_active:
-            # Disabled-style — current active month, no action needed
+            # Active: emerald disabled-style "Sedang Aktif"
             ctk.CTkButton(
-                btn_row, text="✓ Sedang Dipakai", width=160,
-                fg_color=COLOR_TEXT_DIM, text_color=COLOR_PANEL,
+                btn_row, text="✓ Sedang Aktif", width=160,
+                fg_color="transparent",
+                border_width=1, border_color=COLOR_SUCCESS,
+                text_color=COLOR_SUCCESS,
+                font=FONT_BODY_BOLD,
                 state="disabled",
-                font=(FONT_FAMILY, 12, "bold"),
-            ).pack(side="left", padx=4)
+            ).pack(side="left", padx=SPACE_XS)
         else:
-            # Primary action: select this month as the active one
+            # Inactive: magenta primary Pilih
             ctk.CTkButton(
                 btn_row, text="✓ Pilih", width=100,
-                fg_color=BRAND_MAGENTA, text_color="#FFFFFF",
-                font=(FONT_FAMILY, 12, "bold"),
+                fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+                text_color=COLOR_BG,
+                font=FONT_BODY_BOLD,
                 command=lambda ym=m["year_month"]: self._on_pick(ym),
-            ).pack(side="left", padx=4)
+            ).pack(side="left", padx=SPACE_XS)
+        # Generate button: cyan secondary (both states)
         ctk.CTkButton(
-            btn_row, text="📄 Generate Laporan", width=180,
-            fg_color=COLOR_OK, text_color="#1E104E",
+            btn_row, text="Generate", width=160,
+            fg_color="transparent",
+            border_width=1, border_color=COLOR_INFO,
+            text_color=COLOR_INFO,
+            hover_color=COLOR_SURFACE_HIGH,
+            font=FONT_BODY_BOLD,
             command=lambda ym=m["year_month"]: self._on_generate(ym),
-        ).pack(side="left", padx=4)
+        ).pack(side="left", padx=SPACE_XS)
 
     def _on_pick(self, year_month: str):
         """Make this month the active one + navigate to Dashboard."""
