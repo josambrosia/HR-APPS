@@ -12,6 +12,11 @@ positioned via `.place()` to mirror the proportions of `icon-04E.svg`.
 import customtkinter as ctk
 
 from src.config import APP_VERSION, APP_TAGLINE, APP_BRAND_NAME
+from src.ui.theme import (
+    COLOR_BG, COLOR_SURFACE,
+    COLOR_ACCENT,
+    COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_DISABLED,
+)
 
 
 class SplashScreen(ctk.CTkToplevel):
@@ -20,13 +25,13 @@ class SplashScreen(ctk.CTkToplevel):
     PROGRESS_MS = 2000     # total animation duration
     PROGRESS_STEPS = 100   # number of update calls (20ms per step)
 
-    BG_COLOR = "#0A0A0A"
-    ICON_BG = "#1a1a1a"        # slight contrast vs splash bg → rounded card visible
-    ACCENT_COLOR = "#EC4899"   # JTS magenta
-    TEXT_COLOR = "#FFFFFF"
-    DIM_COLOR = "#A3A3A3"
-    DIMMER_COLOR = "#525252"
-    PROGRESS_BG = "#1a1a1a"
+    BG_COLOR = COLOR_BG
+    ICON_BG = COLOR_SURFACE       # slight contrast vs splash bg → rounded card visible
+    ACCENT_COLOR = COLOR_ACCENT   # JTS magenta
+    TEXT_COLOR = COLOR_TEXT
+    DIM_COLOR = COLOR_TEXT_DIM
+    DIMMER_COLOR = COLOR_TEXT_DISABLED
+    PROGRESS_BG = COLOR_SURFACE
 
     def __init__(self, parent=None):
         super().__init__(parent)

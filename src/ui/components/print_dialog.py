@@ -4,8 +4,15 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from src.ui.theme import (
-    COLOR_PANEL, COLOR_ACCENT, COLOR_OK, COLOR_TEXT, COLOR_TEXT_DIM,
     FONT_FAMILY,
+    COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
+    COLOR_BORDER,
+    COLOR_ACCENT, COLOR_ACCENT_HOVER,
+    COLOR_INFO,
+    COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
+    FONT_HEADING, FONT_BODY, FONT_BODY_BOLD, FONT_LABEL,
+    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG, SPACE_XL,
+    RADIUS_LG, RADIUS_MD,
 )
 
 
@@ -43,7 +50,7 @@ class PrintOptionsDialog(ctk.CTkToplevel):
         self.title("Pilih Opsi Cetak")
         self.geometry("620x680")
         self.resizable(False, False)
-        self.configure(fg_color=COLOR_PANEL)
+        self.configure(fg_color=COLOR_BG)
         self.transient(parent)
 
         # Center on parent
@@ -72,57 +79,70 @@ class PrintOptionsDialog(ctk.CTkToplevel):
         # Header
         ctk.CTkLabel(
             self, text="Opsi Cetak Dashboard",
-            font=(FONT_FAMILY, 16, "bold"), text_color=COLOR_TEXT,
-        ).pack(anchor="w", padx=20, pady=(16, 8))
+            font=FONT_HEADING, text_color=COLOR_TEXT,
+        ).pack(anchor="w", padx=SPACE_XL, pady=(SPACE_LG, SPACE_SM))
         ctk.CTkLabel(
             self, text="Pilih bagian yang akan dicetak dan tema desainnya.",
-            font=(FONT_FAMILY, 11), text_color=COLOR_TEXT_DIM,
-        ).pack(anchor="w", padx=20, pady=(0, 12))
+            font=FONT_BODY, text_color=COLOR_TEXT_DIM,
+        ).pack(anchor="w", padx=SPACE_XL, pady=(0, SPACE_MD))
 
         # Sections
         ctk.CTkLabel(
-            self, text="BAGIAN", font=(FONT_FAMILY, 10, "bold"),
+            self, text="BAGIAN", font=FONT_LABEL,
             text_color=COLOR_ACCENT,
-        ).pack(anchor="w", padx=20, pady=(4, 4))
+        ).pack(anchor="w", padx=SPACE_XL, pady=(SPACE_XS, SPACE_XS))
         self._check_vars: dict[str, ctk.BooleanVar] = {}
         for key, label in SECTION_DEFS:
             var = ctk.BooleanVar(value=self._sections_state[key])
             self._check_vars[key] = var
             cb = ctk.CTkCheckBox(
-                self, text=label, variable=var, font=(FONT_FAMILY, 12),
+                self, text=label, variable=var,
+                font=FONT_BODY,
                 text_color=COLOR_TEXT,
+                fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+                border_color=COLOR_BORDER,
+                checkbox_width=18, checkbox_height=18,
             )
-            cb.pack(anchor="w", padx=28, pady=2)
+            cb.pack(anchor="w", padx=SPACE_XL + SPACE_SM, pady=2)
 
         # Theme
         ctk.CTkLabel(
-            self, text="TEMA", font=(FONT_FAMILY, 10, "bold"),
+            self, text="TEMA", font=FONT_LABEL,
             text_color=COLOR_ACCENT,
-        ).pack(anchor="w", padx=20, pady=(16, 4))
+        ).pack(anchor="w", padx=SPACE_XL, pady=(SPACE_LG, SPACE_XS))
         self._theme_var = ctk.StringVar(value=self._theme_state)
         for key, label in THEME_DEFS:
             rb = ctk.CTkRadioButton(
                 self, text=label, value=key, variable=self._theme_var,
-                font=(FONT_FAMILY, 12), text_color=COLOR_TEXT,
+                font=FONT_BODY,
+                text_color=COLOR_TEXT,
+                fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+                border_color=COLOR_BORDER,
             )
-            rb.pack(anchor="w", padx=28, pady=2)
+            rb.pack(anchor="w", padx=SPACE_XL + SPACE_SM, pady=2)
 
         # Buttons
         btn_row = ctk.CTkFrame(self, fg_color="transparent")
-        btn_row.pack(fill="x", padx=20, pady=(24, 24), side="bottom")
+        btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_XL, SPACE_XL), side="bottom")
+        # Cancel = cyan secondary (transparent + cyan border + cyan text).
         ctk.CTkButton(
             btn_row, text="Batal", command=self._on_cancel,
-            fg_color="transparent", hover_color=COLOR_PANEL,
-            border_width=1, border_color=COLOR_TEXT_DIM,
-            text_color=COLOR_TEXT,
+            fg_color="transparent",
+            hover_color=COLOR_SURFACE_HIGH,
+            border_width=1, border_color=COLOR_INFO,
+            text_color=COLOR_INFO,
             width=170, height=44,
-            font=(FONT_FAMILY, 14, "bold"),
-        ).pack(side="right", padx=(12, 0))
+            font=FONT_BODY_BOLD,
+            corner_radius=RADIUS_MD,
+        ).pack(side="right", padx=(SPACE_MD, 0))
+        # Cetak = magenta primary CTA.
         ctk.CTkButton(
             btn_row, text="📄 Cetak", command=self._on_ok,
-            fg_color=COLOR_OK, text_color="#1E104E",
+            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+            text_color=COLOR_BG,
             width=190, height=44,
-            font=(FONT_FAMILY, 14, "bold"),
+            font=FONT_BODY_BOLD,
+            corner_radius=RADIUS_MD,
         ).pack(side="right")
 
     def _on_ok(self):
