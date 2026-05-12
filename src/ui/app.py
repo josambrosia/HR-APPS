@@ -12,7 +12,13 @@ class HRApp(ctk.CTk):
         super().__init__()
         self.title("HR Absensi App")
         self.geometry("1180x720")
-        self.minsize(1024, 640)
+        self.minsize(800, 540)  # smaller minsize triggers scrollbar earlier
+        # Set window icon (taskbar + title bar)
+        try:
+            from src.config import BRAND_ICON_ICO
+            self.iconbitmap(str(BRAND_ICON_ICO))
+        except Exception:
+            pass  # icon optional; don't block app start
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -41,8 +47,13 @@ class HRApp(ctk.CTk):
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_propagate(False)
 
-        ctk.CTkLabel(self.sidebar, text="HR ABSENSI",
-                     font=(FONT_FAMILY, 16, "bold")).pack(pady=(20, 10))
+        # Header: small JTS icon + "HR ABSENSI" wordmark
+        header_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        header_frame.pack(pady=(20, 10), fill="x", padx=8)
+        self._load_sidebar_icon(header_frame)
+        ctk.CTkLabel(header_frame, text="HR ABSENSI",
+                     font=(FONT_FAMILY, 16, "bold")
+                     ).pack(side="left", padx=(4, 0))
 
         nav_items = [
             ("📊 Dashboard", "Dashboard"),
@@ -61,9 +72,69 @@ class HRApp(ctk.CTk):
                 fg_color="transparent", hover_color="#334155",
             ).pack(fill="x", padx=8, pady=2)
 
+        # ── Footer: version + brand credit, pinned to sidebar bottom ──
+        from src.config import APP_VERSION, APP_TAGLINE, APP_BRAND_NAME
+        footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        footer.pack(side="bottom", fill="x", padx=8, pady=(10, 14))
+        # Thin separator above the footer block
+        sep = ctk.CTkFrame(footer, fg_color=COLOR_TEXT_DIM, height=1)
+        sep.pack(fill="x", pady=(0, 8))
+        ctk.CTkLabel(
+            footer, text=f"v{APP_VERSION}",
+            font=(FONT_FAMILY, 11, "bold"),
+            text_color=COLOR_TEXT_DIM, anchor="w",
+        ).pack(fill="x")
+        ctk.CTkLabel(
+            footer, text=APP_BRAND_NAME,
+            font=(FONT_FAMILY, 9),
+            text_color=COLOR_TEXT_DIM, anchor="w",
+        ).pack(fill="x")
+        ctk.CTkLabel(
+            footer,
+            text=f"// {APP_TAGLINE.rstrip('.').lower()}",
+            font=("Consolas", 9),
+            text_color=COLOR_TEXT_DIM, anchor="w",
+        ).pack(fill="x")
+
+    def _load_sidebar_icon(self, parent):
+        """Render a small JTS icon (32x32) at the start of the sidebar header.
+
+        Tries cairosvg first (cleanest rasterization from the SVG), falls
+        back to loading the .ico file directly via Pillow.
+        """
+        try:
+            from src.config import BRAND_ICON_SVG
+            from PIL import Image
+            import io
+            try:
+                import cairosvg
+                png_bytes = cairosvg.svg2png(
+                    url=str(BRAND_ICON_SVG),
+                    output_width=32, output_height=32,
+                )
+                pil = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+            except Exception:
+                # Fallback: use the .ico file (multi-res) at 32px via PIL
+                from src.config import BRAND_ICON_ICO
+                pil = Image.open(str(BRAND_ICON_ICO))
+                pil = pil.resize((32, 32), Image.LANCZOS).convert("RGBA")
+            ctk_img = ctk.CTkImage(light_image=pil, dark_image=pil, size=(32, 32))
+            ctk.CTkLabel(parent, image=ctk_img, text="").pack(side="left")
+            # Keep reference so image isn't garbage collected
+            self._sidebar_icon_ref = ctk_img
+        except Exception:
+            # Icon optional; sidebar still works without it
+            pass
+
     def _build_content_area(self):
-        self.content = ctk.CTkFrame(self, fg_color="transparent")
-        self.content.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        # Outer scrollable container — kicks in when window shrinks below content
+        self._content_outer = ctk.CTkScrollableFrame(
+            self, fg_color="transparent", corner_radius=0,
+        )
+        self._content_outer.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
+        # Inner content area where screens grid into; preserves existing API
+        self.content = ctk.CTkFrame(self._content_outer, fg_color="transparent")
+        self.content.pack(fill="both", expand=True, padx=20, pady=20)
         self.content.grid_rowconfigure(0, weight=1)
         self.content.grid_columnconfigure(0, weight=1)
 
