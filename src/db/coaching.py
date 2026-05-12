@@ -5,7 +5,9 @@ a given week. Absence of a row = "Belum coached". Notes are optional.
 """
 import sqlite3
 from datetime import datetime, UTC
-from typing import Optional
+from typing import List, Optional
+
+from src.config import COACHING_EXCLUDED
 
 
 def mark_coached(
@@ -83,12 +85,14 @@ def list_coaching_for_week(
     week_start: str,
     week_end: str,
     threshold_minutes: int = 75,
-):
+) -> List[sqlite3.Row]:
     """Return pegawai over the lateness threshold in given week, with status.
 
-    Lateness aggregation mirrors src/core/insights.py:
+    Lateness aggregation mirrors src/core/insights.py — uses the same
+    `COACHING_EXCLUDED` tuple from `src.config` for work-justified categories
+    so the two stay in lockstep:
       - Requires masuk IS NOT NULL (employee must have clocked in)
-      - Excludes work-justified categories (tugas_lapangan, tugas_paparan, terlambat_kerja)
+      - Excludes work-justified categories
 
     LEFT JOIN with coaching_sessions to flag is_coached.
 
@@ -99,14 +103,13 @@ def list_coaching_for_week(
       - coached_at (str ISO datetime, or NULL)
       - is_coached (1 or 0)
     """
-    return conn.execute(
-        """
+    placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
+    sql = f"""
         WITH terlambat AS (
             SELECT
                 ar.employee_id,
                 SUM(CASE
-                    WHEN ar.reason_category IN ('tugas_lapangan', 'tugas_paparan', 'terlambat_kerja')
-                        THEN 0
+                    WHEN ar.reason_category IN ({placeholders}) THEN 0
                     WHEN ar.masuk IS NULL THEN 0
                     ELSE COALESCE(ar.terlambat_menit, 0)
                 END) AS total_terlambat
@@ -130,6 +133,9 @@ def list_coaching_for_week(
                 AND cs.week_start = ?
          WHERE t.total_terlambat > ?
          ORDER BY t.total_terlambat DESC, e.nama ASC
-        """,
-        (week_start, week_end, week_start, week_start, threshold_minutes),
-    ).fetchall()
+    """
+    params = (
+        *COACHING_EXCLUDED, week_start, week_end,
+        week_start, week_start, threshold_minutes,
+    )
+    return conn.execute(sql, params).fetchall()
