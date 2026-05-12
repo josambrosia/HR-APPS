@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 130" width="480" height="130" role="img" aria-label="Josaphat Tech Solution typing animation">
+  <title>Josaphat Tech Solution — Typing Reveal Animation</title>
+  <desc>Animated wordmark: 'josaphat' types out letter by letter with magenta cursor following, then blinks. Loops every 4 seconds.</desc>
+  <style>
+    .word { font: 700 44px 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace; fill: #FFFFFF; }
+    .tag  { font: 500 16px 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace; fill: #A3A3A3; letter-spacing: 0.5px; }
+  </style>
+  <defs>
+    <clipPath id="typingMask">
+      <rect x="0" y="0" height="130" width="0">
+        <animate attributeName="width"
+                 values="0; 280; 280; 0; 0"
+                 keyTimes="0; 0.5; 0.85; 0.95; 1"
+                 dur="4s"
+                 repeatCount="indefinite"/>
+      </rect>
+    </clipPath>
+  </defs>
+  <rect width="480" height="130" fill="#0A0A0A"/>
+  <g clip-path="url(#typingMask)">
+    <text x="36" y="70" class="word" textLength="216" lengthAdjust="spacingAndGlyphs">josaphat</text>
+  </g>
+  <rect y="36" width="20" height="40" fill="#EC4899">
+    <animate attributeName="x"
+             values="36; 260; 260; 36; 36"
+             keyTimes="0; 0.5; 0.85; 0.95; 1"
+             dur="4s"
+             repeatCount="indefinite"/>
+    <animate attributeName="opacity"
+             values="1; 0; 1"
+             dur="0.7s"
+             repeatCount="indefinite"/>
+  </rect>
+  <text x="36" y="102" class="tag">// from concept to code</text>
+</svg>

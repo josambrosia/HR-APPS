@@ -2,7 +2,9 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.0.1"
+APP_TAGLINE = "From Concept to Code."
+APP_BRAND_NAME = "Josaphat Tech Solution"
 
 
 def _resource_root() -> Path:
@@ -35,7 +37,17 @@ USER_DATA_ROOT = _user_data_root()
 DATA_DIR = USER_DATA_ROOT / "data"
 DB_PATH = DATA_DIR / "hr.db"
 TEMPLATES_DIR = RESOURCE_ROOT / "src" / "reports" / "templates"
-TEMPLATE_LAPORAN_BULANAN = RESOURCE_ROOT / "templates" / "laporan_bulanan_template.xlsx"
+# Template path UPDATED for folder consolidation (was: RESOURCE_ROOT / "templates" / ...)
+TEMPLATE_LAPORAN_BULANAN = RESOURCE_ROOT / "assets" / "templates" / "laporan_bulanan_template.xlsx"
+
+# Brand assets (Josaphat Tech Solution — see docs/superpowers/specs/2026-05-12-josaphat-tech-brand-design.md)
+BRAND_DIR = RESOURCE_ROOT / "assets" / "brand"
+BRAND_ICON_SVG = BRAND_DIR / "icon-04E.svg"
+BRAND_ICON_ICO = BRAND_DIR / "icon-04E.ico"
+BRAND_LOCKUP_DARK_SVG = BRAND_DIR / "lockup-04E-dark.svg"
+BRAND_LOCKUP_LIGHT_SVG = BRAND_DIR / "lockup-04E-light.svg"
+BRAND_ANIMATION_SVG = BRAND_DIR / "animation-02-typing-04E.svg"
+BRAND_ANIMATION_GIF = BRAND_DIR / "animation-02-typing-04E.gif"
 
 # Defaults
 DEFAULT_SCHEDULE_START = "08.00"

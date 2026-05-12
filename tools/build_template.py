@@ -1,4 +1,4 @@
-"""One-time script to create templates/laporan_bulanan_template.xlsx
+"""One-time script to create assets/templates/laporan_bulanan_template.xlsx
 from the reference Laporan Bulanan April.xlsx.
 
 Keeps rows 1-2 (headers) and rows 3-4 (one sample data row + one sample
@@ -24,8 +24,8 @@ def main():
         print(f"ERROR: Reference file not found: {ref}", file=sys.stderr)
         sys.exit(1)
 
-    out = Path("templates/laporan_bulanan_template.xlsx")
-    out.parent.mkdir(exist_ok=True)
+    out = Path("assets/templates/laporan_bulanan_template.xlsx")
+    out.parent.mkdir(exist_ok=True, parents=True)
 
     wb = load_workbook(ref)
     ws = wb.active
