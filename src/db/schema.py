@@ -39,6 +39,17 @@ CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS coaching_sessions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    week_start  TEXT    NOT NULL,
+    coached_at  TEXT    NOT NULL,
+    notes       TEXT,
+    UNIQUE (employee_id, week_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_coaching_week ON coaching_sessions(week_start);
 """
 
 DEFAULT_SETTINGS = {
