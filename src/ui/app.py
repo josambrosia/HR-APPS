@@ -51,6 +51,7 @@ class HRApp(ctk.CTk):
             ("📋 Summary", "Summary"),
             ("📤 Export", "Export"),
             ("🗓 Riwayat Bulan", "Months"),
+            ("🎯 Coaching", "Coaching"),
             ("⚙ Settings", "Settings"),
         ]
         for label, screen in nav_items:
@@ -88,6 +89,9 @@ class HRApp(ctk.CTk):
         elif name == "Months":
             from src.ui.screens.months import MonthsScreen
             MonthsScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "Coaching":
+            from src.ui.screens.coaching import CoachingScreen
+            CoachingScreen(self.content).grid(row=0, column=0, sticky="nsew")
         elif name == "Settings":
             from src.ui.screens.settings import SettingsScreen
             SettingsScreen(self.content).grid(row=0, column=0, sticky="nsew")
