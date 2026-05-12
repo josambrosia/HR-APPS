@@ -40,13 +40,6 @@ COLOR_SUCCESS       = "#10B981"   # Emerald — Teladan VALUE, Sudah, success
 COLOR_WARN          = "#F43F5E"   # Rose — late data, Belum, warning
 COLOR_ERROR         = "#DC2626"   # Red (dark) — errors, destructive
 
-# === LEGACY ALIASES (transitional — removed in Phase 6a Commit 7) ===
-COLOR_PANEL          = COLOR_SURFACE          # alias (every screen)
-COLOR_OK             = COLOR_SUCCESS           # alias (was gold)
-COLOR_ERR            = COLOR_ERROR             # alias
-COLOR_PANEL_OPEN     = "#1F1F1F"               # Issues OPEN row tint
-COLOR_PANEL_RESOLVED = "#141414"               # Issues RESOLVED row tint
-
 # === ROW TINTS (4% saturation over COLOR_SURFACE for subtle differentiation) ===
 COLOR_ROW_TINT_OPEN     = "#1A1518"  # subtle rose tint — Issues OPEN rows
 COLOR_ROW_TINT_RESOLVED = "#13181B"  # subtle emerald tint — Issues RESOLVED rows
