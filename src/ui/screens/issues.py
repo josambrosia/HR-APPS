@@ -227,10 +227,16 @@ class IssuesScreen(ctk.CTkFrame):
         )
 
         # Unresolve button — only shown when row is currently resolved
-        # (reason_category is not None). Lay out below Save in _lay_out_form.
+        # (reason_category is not None). Anchored to the BOTTOM of the panel
+        # (well separated from Save) to reduce accidental clicks on a
+        # destructive action.
         self.unresolve_btn = ctk.CTkButton(
             self.right, text="↶ Batalkan Resolve", command=self._on_unresolve,
             fg_color=COLOR_ERR, text_color="#1E104E", width=300,
+        )
+        # Thin separator above the unresolve button for visual grouping.
+        self.unresolve_sep = ctk.CTkFrame(
+            self.right, fg_color=COLOR_TEXT_DIM, height=1,
         )
         self._row_is_resolved = current is not None
 
@@ -238,22 +244,32 @@ class IssuesScreen(ctk.CTkFrame):
         self._lay_out_form(initial_cat=current)
 
     def _lay_out_form(self, initial_cat: str | None):
-        """(Re)pack detail widgets, Save button, and (if resolved) unresolve button.
+        """(Re)pack detail widgets and Save button at top of panel; unresolve
+        button + separator pinned to the bottom (only if row is resolved).
 
-        Order:  cat_combo -> (detail_label -> detail_entry)? -> save_btn -> [unresolve_btn?]
+        Top→bottom flow:
+            cat_combo → (detail_label → detail_entry)? → save_btn
+            ...empty space...
+            unresolve_sep → unresolve_btn  (only if resolved)
         """
-        # Always re-pack from the bottom so Save lands last (and unresolve below that)
         self.detail_label.pack_forget()
         self.detail_entry.pack_forget()
         self.save_btn.pack_forget()
         self.unresolve_btn.pack_forget()
+        self.unresolve_sep.pack_forget()
 
         if initial_cat and initial_cat in REASON_NEEDS_DETAIL:
             self.detail_label.pack(anchor="w", padx=16)
             self.detail_entry.pack(anchor="w", padx=16, pady=(4, 12))
         self.save_btn.pack(anchor="w", padx=16, pady=(12, 4))
+
         if self._row_is_resolved:
-            self.unresolve_btn.pack(anchor="w", padx=16, pady=(0, 12))
+            # Pack unresolve button FIRST with side="bottom" so it lands at
+            # the very bottom; then the separator above it.
+            self.unresolve_btn.pack(side="bottom", anchor="w",
+                                     padx=16, pady=(0, 12))
+            self.unresolve_sep.pack(side="bottom", fill="x",
+                                     padx=16, pady=(12, 4))
 
     def _on_cat_change(self, _):
         label = self.cat_var.get()
