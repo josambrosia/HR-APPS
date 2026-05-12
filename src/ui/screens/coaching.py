@@ -193,7 +193,10 @@ class CoachingScreen(ctk.CTkFrame):
             iid = str(r["employee_id"])
             self._row_cache[iid] = r
             is_coached = bool(r["is_coached"])
-            status_text = "✓ Sudah" if is_coached else "○ Belum"
+            # Traffic-light style for high-glance readability:
+            # 🟢 SUDAH (done) / 🟠 BELUM (pending). Combined with row tag
+            # tints, status is recognizable from across the table.
+            status_text = "🟢 SUDAH" if is_coached else "🟠 BELUM"
             tag = "sudah" if is_coached else "belum"
             self.tree.insert(
                 "", "end", iid=iid,
@@ -250,30 +253,12 @@ class CoachingScreen(ctk.CTkFrame):
         # COLOR_OK (gold) for Sudah, COLOR_ACCENT (orange) for Belum — see
         # palette note in _render_stats for why we avoid COLOR_WARN here.
         status_color = COLOR_OK if is_coached else COLOR_ACCENT
-        status_lines = ["Status: " + ("✓ Sudah Coaching" if is_coached else "○ Belum Coaching")]
+        status_lines = ["Status: " + ("🟢 SUDAH COACHING" if is_coached else "🟠 BELUM COACHING")]
         if is_coached and row.get("coached_at"):
             status_lines.append(f"Tercatat: {row['coached_at']}")
         ctk.CTkLabel(self.right, text="\n".join(status_lines), justify="left",
                      font=(FONT_FAMILY, 11), text_color=status_color
                      ).pack(anchor="w", padx=16, pady=(0, 12))
-
-        # Big primary toggle button — replaces the inline AKSI column which
-        # users found too small/cramped inside the Treeview.
-        if is_coached:
-            toggle_btn = ctk.CTkButton(
-                self.right, text="↶ Batalkan Tandai",
-                fg_color=COLOR_ERR, text_color="#1E104E", width=300, height=40,
-                font=(FONT_FAMILY, 13, "bold"),
-                command=lambda r=row: self._toggle_from_panel(r),
-            )
-        else:
-            toggle_btn = ctk.CTkButton(
-                self.right, text="✓ Sudah Coaching",
-                fg_color=COLOR_OK, text_color="#1E104E", width=300, height=40,
-                font=(FONT_FAMILY, 13, "bold"),
-                command=lambda r=row: self._toggle_from_panel(r),
-            )
-        toggle_btn.pack(anchor="w", padx=16, pady=(0, 16))
 
         ctk.CTkLabel(self.right, text="Catatan (opsional):",
                      font=(FONT_FAMILY, 11), text_color=COLOR_TEXT_DIM
@@ -294,10 +279,33 @@ class CoachingScreen(ctk.CTkFrame):
                 fg_color=COLOR_OK, text_color="#1E104E", width=300,
                 command=lambda: self._on_save_notes(row, notes_box.get("1.0", "end").strip()),
             )
-            save_btn.pack(anchor="w", padx=16, pady=8)
+            save_btn.pack(anchor="w", padx=16, pady=(8, 4))
         else:
-            notes_box.insert("1.0", "(Klik 'Sudah Coaching' di atas untuk aktifkan catatan)")
+            notes_box.insert("1.0", "(Klik tombol di bawah untuk aktifkan catatan)")
             notes_box.configure(state="disabled")
+
+        # Visual separator before the primary toggle button — sits at the
+        # very bottom of the panel per user UX preference.
+        sep = ctk.CTkFrame(self.right, fg_color=COLOR_TEXT_DIM, height=1)
+        sep.pack(fill="x", padx=16, pady=(12, 10))
+
+        # Big primary toggle button — replaces the inline AKSI column which
+        # users found too small/cramped inside the Treeview.
+        if is_coached:
+            toggle_btn = ctk.CTkButton(
+                self.right, text="↶ Batalkan Tandai",
+                fg_color=COLOR_ERR, text_color="#1E104E", width=300, height=40,
+                font=(FONT_FAMILY, 13, "bold"),
+                command=lambda r=row: self._toggle_from_panel(r),
+            )
+        else:
+            toggle_btn = ctk.CTkButton(
+                self.right, text="✓ Sudah Coaching",
+                fg_color=COLOR_OK, text_color="#1E104E", width=300, height=40,
+                font=(FONT_FAMILY, 13, "bold"),
+                command=lambda r=row: self._toggle_from_panel(r),
+            )
+        toggle_btn.pack(anchor="w", padx=16, pady=(0, 12))
 
     def _toggle_from_panel(self, row):
         """Toggle status from the right-panel button. Mirrors _toggle_row."""
