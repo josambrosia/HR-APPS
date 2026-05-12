@@ -47,6 +47,12 @@ COLOR_ERR            = COLOR_ERROR             # alias
 COLOR_PANEL_OPEN     = "#1F1F1F"               # Issues OPEN row tint
 COLOR_PANEL_RESOLVED = "#141414"               # Issues RESOLVED row tint
 
+# === ROW TINTS (4% saturation over COLOR_SURFACE for subtle differentiation) ===
+COLOR_ROW_TINT_OPEN     = "#1A1518"  # subtle rose tint — Issues OPEN rows
+COLOR_ROW_TINT_RESOLVED = "#13181B"  # subtle emerald tint — Issues RESOLVED rows
+COLOR_ROW_TINT_SUDAH    = "#1B2820"  # subtle emerald tint — Coaching SUDAH rows
+COLOR_ROW_TINT_BELUM    = "#281A20"  # subtle rose tint — Coaching BELUM rows
+
 # === SPACING SCALE (8pt grid) ===
 SPACE_XS  = 4
 SPACE_SM  = 8
