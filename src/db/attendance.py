@@ -182,3 +182,21 @@ def list_months_with_stats(conn: sqlite3.Connection):
          ORDER BY year_month DESC
         """
     ).fetchall()
+
+
+def unresolve_issue(conn: sqlite3.Connection, *, attendance_id: int) -> None:
+    """Clear resolve state on an attendance row.
+
+    Sets reason_category, reason_detail, resolved_at all to NULL. The row
+    becomes "Open" again. Used by the Issues 'Batalkan Resolve' button.
+    """
+    conn.execute(
+        """
+        UPDATE attendance_records
+           SET reason_category = NULL,
+               reason_detail = NULL,
+               resolved_at = NULL
+         WHERE id = ?
+        """,
+        (attendance_id,),
+    )
