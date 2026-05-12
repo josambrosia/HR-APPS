@@ -55,6 +55,22 @@ class HRApp(ctk.CTk):
                      font=(FONT_FAMILY, 16, "bold")
                      ).pack(side="left", padx=(4, 0))
 
+        # ── Active month indicator (clickable shortcut to Riwayat Bulan) ──
+        # Subtle magenta line under the header. User can see active month
+        # at a glance from any screen, no need to open Riwayat Bulan menu.
+        self._active_month_label = ctk.CTkLabel(
+            self.sidebar,
+            text=self._format_active_month_label(),
+            font=(FONT_FAMILY, 11, "bold"),
+            text_color="#EC4899",   # brand magenta
+            anchor="w",
+            cursor="hand2",
+        )
+        self._active_month_label.pack(fill="x", padx=12, pady=(0, 8))
+        self._active_month_label.bind(
+            "<Button-1>", lambda _e: self._show("Months"),
+        )
+
         nav_items = [
             ("📊 Dashboard", "Dashboard"),
             ("📥 Import", "Import"),
@@ -168,7 +184,39 @@ class HRApp(ctk.CTk):
         self.content.grid_rowconfigure(0, weight=1)
         self.content.grid_columnconfigure(0, weight=1)
 
+    def _format_active_month_label(self) -> str:
+        """Read current_month from DB, return '◆ Aktif: April 2026' or
+        a 'no month yet' fallback. Safe to call before DB is initialized
+        (returns empty string on any failure)."""
+        try:
+            from src.config import DB_PATH
+            from src.db.connection import get_connection
+            from src.db.settings import get_setting
+            from src.core.report_generator import month_label
+            with get_connection(DB_PATH) as conn:
+                ym = get_setting(conn, "current_month") or ""
+            if ym:
+                return f"◆ Aktif: {month_label(ym)}"
+            return "◆ Belum ada bulan aktif"
+        except Exception:
+            return ""
+
+    def _refresh_active_month_label(self):
+        """Re-read the active month from DB and update the sidebar label.
+        Called from _show() so navigation away from a screen that changed
+        current_month (e.g., Import auto-detect, Riwayat Bulan Pilih)
+        reflects the new value immediately."""
+        if hasattr(self, "_active_month_label"):
+            try:
+                self._active_month_label.configure(
+                    text=self._format_active_month_label(),
+                )
+            except Exception:
+                pass
+
     def _show(self, name: str):
+        # Refresh sidebar active-month indicator on every navigation
+        self._refresh_active_month_label()
         # Clear current content
         for child in self.content.winfo_children():
             child.destroy()
