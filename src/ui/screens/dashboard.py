@@ -14,7 +14,6 @@ from src.core.insights import (
 )
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.reports.html_renderer import render_dashboard_html
-from src.ui.components.kpi_card import KPICard
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.theme import (
     FONT_FAMILY, COLOR_OK, COLOR_WARN, COLOR_ACCENT, COLOR_PANEL,

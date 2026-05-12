@@ -13,6 +13,7 @@ from typing import Optional
 
 from openpyxl import load_workbook
 from openpyxl.cell import MergedCell
+from openpyxl.styles import PatternFill
 
 from src.config import TEMPLATE_LAPORAN_BULANAN, REASON_CATEGORIES
 from src.core.reason_mapper import render_alasan_ijin
@@ -28,6 +29,10 @@ JADWAL_END_MINUTES = 16 * 60
 
 # All reason categories except "na" (which means "we don't know yet" — not really an ijin)
 IJIN_CATEGORIES = tuple(c for c in REASON_CATEGORIES if c != "na")
+
+# Gray fill for Total Personal rows — matches reference Laporan Bulanan April.xlsx
+# (light gray #C0C0C0 distinguishes total rows from data rows visually).
+TOTAL_PERSONAL_FILL = PatternFill(fill_type="solid", fgColor="FFC0C0C0")
 
 
 @dataclass
@@ -210,6 +215,12 @@ def _write_total_row(ws, row_num: int, total: dict, styles: list):
     ws.cell(row=row_num, column=15, value=total["lupa_hari"])
     ws.cell(row=row_num, column=16, value=total["ijin_hari"])
     _apply_row_styles(ws, row_num, styles)
+    # Override fill to gray — template's row 4 sample is a data row (white),
+    # but the original Laporan Bulanan uses light gray for Total Personal rows.
+    for col in range(1, 18):
+        cell = ws.cell(row=row_num, column=col)
+        if not isinstance(cell, MergedCell):
+            cell.fill = TOTAL_PERSONAL_FILL
     # Re-merge A:H to match template's Total Personal layout
     ws.merge_cells(start_row=row_num, start_column=1, end_row=row_num, end_column=8)
 
