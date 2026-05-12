@@ -14,7 +14,7 @@ from src.db.settings import get_setting
 from src.ui.components.kpi_card import KPICard
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.theme import (
-    FONT_FAMILY, COLOR_OK, COLOR_WARN, COLOR_ACCENT,
+    FONT_FAMILY, COLOR_OK, COLOR_ACCENT,
     COLOR_PANEL, COLOR_TEXT, COLOR_TEXT_DIM,
 )
 
@@ -101,10 +101,14 @@ class CoachingScreen(ctk.CTkFrame):
         else:
             coverage = "—"
 
+        # Color palette note: COLOR_OK and COLOR_WARN share gold (#FFC85C) in
+        # the current theme. To keep Sudah/Belum visually distinct, use
+        # COLOR_ACCENT (orange = "needs attention") for Belum and a neutral
+        # text color for Total. Row tag tints provide more differentiation.
         cards = [
-            ("Total", str(total), COLOR_ACCENT),
+            ("Total", str(total), COLOR_TEXT),
             ("Sudah", str(sudah), COLOR_OK),
-            ("Belum", str(belum), COLOR_WARN),
+            ("Belum", str(belum), COLOR_ACCENT),
             ("Coverage", coverage, COLOR_OK if total == 0 or sudah == total else COLOR_TEXT),
         ]
         for i, (label, val, color) in enumerate(cards):
@@ -254,7 +258,9 @@ class CoachingScreen(ctk.CTkFrame):
                      ).pack(anchor="w", padx=16, pady=(16, 12))
 
         is_coached = bool(row["is_coached"])
-        status_color = COLOR_OK if is_coached else COLOR_WARN
+        # COLOR_OK (gold) for Sudah, COLOR_ACCENT (orange) for Belum — see
+        # palette note in _render_stats for why we avoid COLOR_WARN here.
+        status_color = COLOR_OK if is_coached else COLOR_ACCENT
         status_lines = ["Status: " + ("✓ Sudah Coaching" if is_coached else "○ Belum Coaching")]
         if is_coached and row.get("coached_at"):
             status_lines.append(f"Tercatat: {row['coached_at']}")
