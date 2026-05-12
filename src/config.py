@@ -36,6 +36,14 @@ DATA_DIR = USER_DATA_ROOT / "data"
 DB_PATH = DATA_DIR / "hr.db"
 TEMPLATES_DIR = RESOURCE_ROOT / "src" / "reports" / "templates"
 
+# Brand assets (Josaphat Tech Solution — see docs/superpowers/specs/2026-05-12-josaphat-tech-brand-design.md)
+BRAND_DIR = RESOURCE_ROOT / "assets" / "brand"
+BRAND_ICON_SVG = BRAND_DIR / "icon-04E.svg"
+BRAND_LOCKUP_DARK_SVG = BRAND_DIR / "lockup-04E-dark.svg"
+BRAND_LOCKUP_LIGHT_SVG = BRAND_DIR / "lockup-04E-light.svg"
+BRAND_ANIMATION_SVG = BRAND_DIR / "animation-02-typing-04E.svg"
+BRAND_ANIMATION_GIF = BRAND_DIR / "animation-02-typing-04E.gif"
+
 # Defaults
 DEFAULT_SCHEDULE_START = "08.00"
 DEFAULT_SCHEDULE_END = "16.00"

@@ -7,6 +7,12 @@ a = Analysis(
     binaries=[],
     datas=[
         ('src/reports/templates/dashboard.html.j2', 'src/reports/templates'),
+        # Brand assets (Josaphat Tech Solution) — readable at runtime via src.config.BRAND_*
+        ('assets/brand/icon-04E.svg', 'assets/brand'),
+        ('assets/brand/lockup-04E-dark.svg', 'assets/brand'),
+        ('assets/brand/lockup-04E-light.svg', 'assets/brand'),
+        ('assets/brand/animation-02-typing-04E.svg', 'assets/brand'),
+        ('assets/brand/animation-02-typing-04E.gif', 'assets/brand'),
     ],
     hiddenimports=['customtkinter', 'PIL'],
     hookspath=[],
