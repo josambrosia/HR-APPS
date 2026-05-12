@@ -1,4 +1,4 @@
-"""Riwayat Bulan screen — list all months in DB with stats and per-month actions."""
+"""Active Month screen — list all months in DB with stats and per-month actions."""
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
@@ -23,7 +23,7 @@ from src.ui.theme import (
 BRAND_MAGENTA = "#EC4899"
 
 
-class MonthsScreen(ctk.CTkFrame):
+class ActiveMonthScreen(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent, fg_color="transparent")
         self.grid_columnconfigure(0, weight=1)

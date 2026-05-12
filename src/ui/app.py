@@ -1,7 +1,16 @@
 import customtkinter as ctk
 from typing import Dict
 
-from src.ui.theme import FONT_FAMILY, COLOR_BG, COLOR_PANEL, COLOR_ACCENT, COLOR_TEXT, COLOR_TEXT_DIM
+from src.ui.theme import (
+    FONT_FAMILY,
+    COLOR_BG, COLOR_SIDEBAR, COLOR_SURFACE, COLOR_SURFACE_HIGH,
+    COLOR_BORDER, COLOR_ACCENT, COLOR_ACCENT_HOVER,
+    COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED, COLOR_TEXT_DISABLED,
+    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
+    FONT_BODY, FONT_BODY_BOLD, FONT_LABEL,
+    FONT_MONO_SMALL,
+    RADIUS_MD,
+)
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -43,61 +52,112 @@ class HRApp(ctk.CTk):
         return None
 
     def _build_sidebar(self):
-        self.sidebar = ctk.CTkFrame(self, width=200, corner_radius=0, fg_color=COLOR_PANEL)
+        self.sidebar = ctk.CTkFrame(
+            self, width=220, corner_radius=0, fg_color=COLOR_SIDEBAR,
+            border_width=0,
+        )
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_propagate(False)
 
-        # Header: small JTS icon + "HR ABSENSI" wordmark
+        # Header: JTS icon + "HR ABSENSI" wordmark + mono subtitle
         header_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        header_frame.pack(pady=(20, 10), fill="x", padx=8)
-        self._load_sidebar_icon(header_frame)
-        ctk.CTkLabel(header_frame, text="HR ABSENSI",
-                     font=(FONT_FAMILY, 16, "bold")
-                     ).pack(side="left", padx=(4, 0))
+        header_frame.pack(pady=(SPACE_LG, SPACE_MD), fill="x", padx=SPACE_LG)
+        self._load_sidebar_icon(header_frame)  # icon size 36
 
-        # ── Active month indicator (clickable shortcut to Riwayat Bulan) ──
-        # Subtle magenta line under the header. User can see active month
-        # at a glance from any screen, no need to open Riwayat Bulan menu.
-        self._active_month_label = ctk.CTkLabel(
+        title_stack = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_stack.pack(side="left", padx=(SPACE_SM, 0))
+        ctk.CTkLabel(
+            title_stack, text="HR ABSENSI",
+            font=(FONT_FAMILY, 14, "bold"),
+            text_color=COLOR_TEXT,
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            title_stack, text="attendance manager",
+            font=FONT_MONO_SMALL,
+            text_color=COLOR_TEXT_MUTED,
+        ).pack(anchor="w")
+
+        # ── Active month chip — clickable card with subtle magenta tint ──
+        self._active_month_chip = ctk.CTkFrame(
             self.sidebar,
-            text=self._format_active_month_label(),
-            font=(FONT_FAMILY, 11, "bold"),
-            text_color="#EC4899",   # brand magenta
-            anchor="w",
+            fg_color="#27101C",  # magenta 10% on dark bg
+            border_width=1,
+            border_color="#5A1E3A",  # magenta 25% on dark bg
+            corner_radius=RADIUS_MD,
             cursor="hand2",
         )
-        self._active_month_label.pack(fill="x", padx=12, pady=(0, 8))
-        self._active_month_label.bind(
-            "<Button-1>", lambda _e: self._show("Months"),
-        )
+        self._active_month_chip.pack(fill="x", padx=SPACE_LG, pady=(0, SPACE_MD))
 
-        nav_items = [
-            ("📊 Dashboard", "Dashboard"),
-            ("📥 Import", "Import"),
-            ("⚠ Issues", "Issues"),
-            ("📋 Summary", "Summary"),
-            ("📤 Export", "Export"),
-            ("🗓 Riwayat Bulan", "Months"),
-            ("🎯 Coaching", "Coaching"),
-            ("⚙ Settings", "Settings"),
+        # Label "BULAN AKTIF" uppercase
+        bulan_lbl = ctk.CTkLabel(
+            self._active_month_chip,
+            text="BULAN AKTIF",
+            font=FONT_LABEL,
+            text_color=COLOR_TEXT_MUTED,
+            anchor="w",
+        )
+        bulan_lbl.pack(fill="x", padx=SPACE_MD, pady=(SPACE_SM, 0))
+
+        # Value (active month display)
+        self._active_month_label = ctk.CTkLabel(
+            self._active_month_chip,
+            text=self._format_active_month_label(),
+            font=FONT_BODY_BOLD,
+            text_color=COLOR_ACCENT_HOVER,  # lighter magenta for value text
+            anchor="w",
+        )
+        self._active_month_label.pack(fill="x", padx=SPACE_MD, pady=(0, SPACE_SM))
+
+        # Make entire chip + children clickable
+        def _on_chip_click(_e):
+            self._show("ActiveMonth")
+
+        for widget in (self._active_month_chip, self._active_month_label, bulan_lbl):
+            widget.bind("<Button-1>", _on_chip_click)
+
+        # ── Sections (label + items) — categorized navigation ──
+        nav_groups = [
+            ("INSIGHT", [
+                ("📊", "Dashboard", "Dashboard"),
+            ]),
+            ("DATA MANAGEMENT", [
+                ("📥", "Import", "Import"),
+                ("📤", "Export", "Export"),
+                ("📆", "Active Month", "ActiveMonth"),
+            ]),
+            ("WORKFLOW", [
+                ("🚩", "Issues", "Issues"),
+                ("💬", "WhatsApp Assistant", "WhatsAppAssistant"),
+                ("🎯", "Coaching", "Coaching"),
+            ]),
+            ("SYSTEM", [
+                ("⚙", "Settings", "Settings"),
+            ]),
         ]
-        for label, screen in nav_items:
-            ctk.CTkButton(
-                self.sidebar, text=label, anchor="w",
-                command=lambda s=screen: self._show(s),
-                fg_color="transparent", hover_color="#334155",
-            ).pack(fill="x", padx=8, pady=2)
+
+        self._nav_items: dict[str, ctk.CTkFrame] = {}
+        self._active_nav_key: str = "Dashboard"  # default starting screen
+
+        for group_label, items in nav_groups:
+            # Section label
+            ctk.CTkLabel(
+                self.sidebar,
+                text=group_label,
+                font=FONT_LABEL,
+                text_color=COLOR_TEXT_DISABLED,
+                anchor="w",
+            ).pack(fill="x", padx=SPACE_LG, pady=(SPACE_SM, SPACE_XS))
+
+            # Nav items in group
+            for icon, label, screen_key in items:
+                item = self._build_nav_item(icon, label, screen_key)
+                item.pack(fill="x", pady=0)
+                self._nav_items[screen_key] = item
 
         # ── Footer: BRAND stacked emphasis + version + tagline ──
         # SB2 mockup: "Josaphat Tech" (white bold) / "Solution" (magenta bold)
         # → version mono / tagline mono. Brand readable at glance.
         from src.config import APP_VERSION, APP_TAGLINE, APP_BRAND_NAME
-        from src.ui.theme import COLOR_TEXT
-
-        # Brand magenta is the JTS accent (#EC4899) — NOT app's COLOR_ACCENT
-        # which is orange. Hardcoded here to keep the brand link explicit
-        # (hybrid theme approach: app=purple/orange, brand-marks=magenta).
-        BRAND_MAGENTA = "#EC4899"
 
         # Split brand name into 2 lines on the last word for the stacked layout.
         # "Josaphat Tech Solution" → ["Josaphat Tech", "Solution"]
@@ -109,7 +169,7 @@ class HRApp(ctk.CTk):
         footer.pack(side="bottom", fill="x", padx=8, pady=(10, 14))
 
         # Thin separator above the footer block
-        sep = ctk.CTkFrame(footer, fg_color=COLOR_TEXT_DIM, height=1)
+        sep = ctk.CTkFrame(footer, fg_color=COLOR_BORDER, height=1)
         sep.pack(fill="x", pady=(0, 10))
 
         # Brand line 1: "Josaphat Tech" — white bold
@@ -124,7 +184,7 @@ class HRApp(ctk.CTk):
             ctk.CTkLabel(
                 footer, text=brand_line2,
                 font=(FONT_FAMILY, 13, "bold"),
-                text_color=BRAND_MAGENTA, anchor="w",
+                text_color=COLOR_ACCENT, anchor="w",
             ).pack(fill="x", pady=(0, 6))
 
         # Version (mono, dim)
@@ -142,8 +202,101 @@ class HRApp(ctk.CTk):
             text_color=COLOR_TEXT_DIM, anchor="w",
         ).pack(fill="x")
 
+    def _build_nav_item(self, icon: str, label: str, screen_key: str) -> ctk.CTkFrame:
+        """Custom nav item with active state indicator (3px magenta left bar).
+
+        Frame layout: [left bar 3px] [icon + label content]
+        State stored visually — when this item becomes active, left bar shows
+        + bg tints. Click handled by binding on the entire frame.
+        """
+        frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=36)
+        frame.pack_propagate(False)
+
+        # Left active bar — created hidden, shown when active
+        left_bar = ctk.CTkFrame(
+            frame, fg_color=COLOR_ACCENT, width=3, corner_radius=0,
+        )
+        # Pack hidden initially; activate via _set_active_nav_item
+
+        # Inner content row; left bar (when active) packs to left via before=new._content
+        content = ctk.CTkFrame(frame, fg_color="transparent")
+        content.pack(side="left", fill="both", expand=True, padx=SPACE_LG)
+
+        icon_lbl = ctk.CTkLabel(
+            content, text=icon, font=FONT_BODY,
+            text_color=COLOR_TEXT_DIM, anchor="w", width=22,
+        )
+        icon_lbl.pack(side="left")
+
+        text_lbl = ctk.CTkLabel(
+            content, text=label, font=FONT_BODY,
+            text_color="#C0C0C0", anchor="w",
+        )
+        text_lbl.pack(side="left", padx=(SPACE_SM, 0))
+
+        # Store refs on frame for state updates
+        frame._left_bar = left_bar
+        frame._content = content
+        frame._icon_lbl = icon_lbl
+        frame._text_lbl = text_lbl
+        frame._screen_key = screen_key
+
+        # Click handler (bind on frame + children to catch all)
+        def _on_click(_e):
+            self._show(screen_key)
+
+        for widget in (frame, content, icon_lbl, text_lbl):
+            widget.bind("<Button-1>", _on_click)
+            widget.configure(cursor="hand2")
+
+        # Hover handlers
+        def _on_enter(_e):
+            if frame._screen_key != self._active_nav_key:
+                frame.configure(fg_color=COLOR_SURFACE)
+
+        def _on_leave(_e):
+            if frame._screen_key != self._active_nav_key:
+                frame.configure(fg_color="transparent")
+
+        for widget in (frame, content, icon_lbl, text_lbl):
+            widget.bind("<Enter>", _on_enter)
+            widget.bind("<Leave>", _on_leave)
+
+        return frame
+
+    def _set_active_nav_item(self, screen_key: str):
+        """Toggle visual active state on nav items.
+
+        Show left magenta bar + bg tint + bold text on newly active item.
+        Hide indicators on previously active item.
+        """
+        # Idempotent: no-op if already active (Important #2)
+        if screen_key == self._active_nav_key and screen_key in self._nav_items:
+            # Still re-apply visuals in case this is first activation after init
+            new = self._nav_items[screen_key]
+            new.configure(fg_color=COLOR_SURFACE_HIGH)
+            if not new._left_bar.winfo_ismapped():
+                new._left_bar.pack(side="left", fill="y", pady=SPACE_XS, before=new._content)
+            new._text_lbl.configure(text_color=COLOR_TEXT, font=FONT_BODY_BOLD)
+            return
+
+        prev = self._nav_items.get(self._active_nav_key)
+        if prev is not None:
+            prev.configure(fg_color="transparent")
+            prev._left_bar.pack_forget()
+            prev._text_lbl.configure(text_color="#C0C0C0", font=FONT_BODY)
+
+        new = self._nav_items.get(screen_key)
+        if new is not None:
+            new.configure(fg_color=COLOR_SURFACE_HIGH)
+            # before=new._content ensures bar packs to the LEFT of content
+            # (without this, pack manager appends bar to end of slave list)
+            new._left_bar.pack(side="left", fill="y", pady=SPACE_XS, before=new._content)
+            new._text_lbl.configure(text_color=COLOR_TEXT, font=FONT_BODY_BOLD)
+            self._active_nav_key = screen_key
+
     def _load_sidebar_icon(self, parent):
-        """Render a small JTS icon (32x32) at the start of the sidebar header.
+        """Render a JTS icon (36x36) at the start of the sidebar header.
 
         Tries cairosvg first (cleanest rasterization from the SVG), falls
         back to loading the .ico file directly via Pillow.
@@ -156,15 +309,16 @@ class HRApp(ctk.CTk):
                 import cairosvg
                 png_bytes = cairosvg.svg2png(
                     url=str(BRAND_ICON_SVG),
-                    output_width=32, output_height=32,
+                    output_width=64, output_height=64,
                 )
                 pil = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+                pil = pil.resize((36, 36), Image.LANCZOS)
             except Exception:
-                # Fallback: use the .ico file (multi-res) at 32px via PIL
+                # Fallback: use the .ico file (multi-res) at 36px via PIL
                 from src.config import BRAND_ICON_ICO
                 pil = Image.open(str(BRAND_ICON_ICO))
-                pil = pil.resize((32, 32), Image.LANCZOS).convert("RGBA")
-            ctk_img = ctk.CTkImage(light_image=pil, dark_image=pil, size=(32, 32))
+                pil = pil.resize((36, 36), Image.LANCZOS).convert("RGBA")
+            ctk_img = ctk.CTkImage(light_image=pil, dark_image=pil, size=(36, 36))
             ctk.CTkLabel(parent, image=ctk_img, text="").pack(side="left")
             # Keep reference so image isn't garbage collected
             self._sidebar_icon_ref = ctk_img
@@ -185,9 +339,7 @@ class HRApp(ctk.CTk):
         self.content.grid_columnconfigure(0, weight=1)
 
     def _format_active_month_label(self) -> str:
-        """Read current_month from DB, return '◆ Aktif: April 2026' or
-        a 'no month yet' fallback. Safe to call before DB is initialized
-        (returns empty string on any failure)."""
+        """Return short-form active month for chip value display."""
         try:
             from src.config import DB_PATH
             from src.db.connection import get_connection
@@ -196,8 +348,8 @@ class HRApp(ctk.CTk):
             with get_connection(DB_PATH) as conn:
                 ym = get_setting(conn, "current_month") or ""
             if ym:
-                return f"◆ Aktif: {month_label(ym)}"
-            return "◆ Belum ada bulan aktif"
+                return f"◆ {month_label(ym)}"
+            return "◆ Belum diset"
         except Exception:
             return ""
 
@@ -217,6 +369,8 @@ class HRApp(ctk.CTk):
     def _show(self, name: str):
         # Refresh sidebar active-month indicator on every navigation
         self._refresh_active_month_label()
+        # Update sidebar nav visual state
+        self._set_active_nav_item(name)
         # Clear current content
         for child in self.content.winfo_children():
             child.destroy()
@@ -229,15 +383,15 @@ class HRApp(ctk.CTk):
         elif name == "Issues":
             from src.ui.screens.issues import IssuesScreen
             IssuesScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Summary":
-            from src.ui.screens.summary import SummaryScreen
-            SummaryScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "WhatsAppAssistant":
+            from src.ui.screens.whatsapp_assistant import WhatsAppAssistantScreen
+            WhatsAppAssistantScreen(self.content).grid(row=0, column=0, sticky="nsew")
         elif name == "Export":
             from src.ui.screens.export import ExportScreen
             ExportScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Months":
-            from src.ui.screens.months import MonthsScreen
-            MonthsScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "ActiveMonth":
+            from src.ui.screens.active_month import ActiveMonthScreen
+            ActiveMonthScreen(self.content).grid(row=0, column=0, sticky="nsew")
         elif name == "Coaching":
             from src.ui.screens.coaching import CoachingScreen
             CoachingScreen(self.content).grid(row=0, column=0, sticky="nsew")

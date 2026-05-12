@@ -8,7 +8,7 @@ from src.core.issue_summary import render_summary_for_employee
 from src.ui.theme import FONT_FAMILY, COLOR_PANEL, COLOR_OK
 
 
-class SummaryScreen(ctk.CTkFrame):
+class WhatsAppAssistantScreen(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent, fg_color="transparent")
         self.grid_columnconfigure(0, weight=1)
