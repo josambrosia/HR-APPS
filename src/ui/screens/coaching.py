@@ -14,7 +14,7 @@ from src.db.settings import get_setting
 from src.ui.components.kpi_card import KPICard
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.theme import (
-    FONT_FAMILY, COLOR_OK, COLOR_ACCENT,
+    FONT_FAMILY, COLOR_OK, COLOR_ACCENT, COLOR_ERR,
     COLOR_PANEL, COLOR_TEXT, COLOR_TEXT_DIM,
 )
 
@@ -122,10 +122,10 @@ class CoachingScreen(ctk.CTkFrame):
         left.grid_columnconfigure(0, weight=1)
         left.grid_rowconfigure(0, weight=1)
 
-        cols = ["nama", "dept", "terlambat", "status", "aksi"]
-        widths = {"nama": 130, "dept": 100, "terlambat": 90, "status": 110, "aksi": 110}
+        cols = ["nama", "dept", "terlambat", "status"]
+        widths = {"nama": 150, "dept": 110, "terlambat": 100, "status": 130}
         labels = {"nama": "Nama", "dept": "Dept", "terlambat": "Terlambat",
-                  "status": "Status", "aksi": "Aksi"}
+                  "status": "Status"}
 
         self.tree = ttk.Treeview(
             left, columns=cols, show="headings",
@@ -138,7 +138,8 @@ class CoachingScreen(ctk.CTkFrame):
         self.tree.tag_configure("belum", background="#3F2A2C", foreground=COLOR_TEXT)
         self.tree.tag_configure("sudah", background="#2A3F30", foreground=COLOR_TEXT)
         self.tree.grid(row=0, column=0, sticky="nsew")
-        self.tree.bind("<Button-1>", self._on_tree_click)
+        # Selection event drives the right-panel; toggle is done via the
+        # big button in the panel (inline AKSI column was too small/cramped).
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
 
         right = ctk.CTkFrame(self, fg_color=COLOR_PANEL, corner_radius=8)
@@ -151,7 +152,7 @@ class CoachingScreen(ctk.CTkFrame):
             w.destroy()
         ctk.CTkLabel(
             self.right,
-            text="Pilih baris untuk lihat detail\natau klik kolom Aksi untuk\nubah status coaching.",
+            text="Pilih baris pegawai\nuntuk tandai sudah coaching\natau tulis catatan.",
             justify="center",
             font=(FONT_FAMILY, 12), text_color=COLOR_TEXT_DIM
         ).pack(pady=80, padx=16)
@@ -193,28 +194,16 @@ class CoachingScreen(ctk.CTkFrame):
             self._row_cache[iid] = r
             is_coached = bool(r["is_coached"])
             status_text = "✓ Sudah" if is_coached else "○ Belum"
-            aksi_text = "⊖ Batalkan" if is_coached else "⊕ Tandai"
             tag = "sudah" if is_coached else "belum"
             self.tree.insert(
                 "", "end", iid=iid,
                 values=(
                     r["nama"], r["dept"] or "-",
                     f"{r['total_terlambat']} mnt",
-                    status_text, aksi_text,
+                    status_text,
                 ),
                 tags=(tag,),
             )
-
-    def _on_tree_click(self, event):
-        region = self.tree.identify_region(event.x, event.y)
-        column = self.tree.identify_column(event.x)
-        row_iid = self.tree.identify_row(event.y)
-        if region != "cell" or not row_iid:
-            return
-        # Aksi column is the 5th column → "#5"
-        if column == "#5":
-            self._toggle_row(row_iid)
-            return "break"  # prevent selection event
 
     def _toggle_row(self, iid: str):
         row = self._row_cache.get(iid)
@@ -268,6 +257,24 @@ class CoachingScreen(ctk.CTkFrame):
                      font=(FONT_FAMILY, 11), text_color=status_color
                      ).pack(anchor="w", padx=16, pady=(0, 12))
 
+        # Big primary toggle button — replaces the inline AKSI column which
+        # users found too small/cramped inside the Treeview.
+        if is_coached:
+            toggle_btn = ctk.CTkButton(
+                self.right, text="↶ Batalkan Tandai",
+                fg_color=COLOR_ERR, text_color="#1E104E", width=300, height=40,
+                font=(FONT_FAMILY, 13, "bold"),
+                command=lambda r=row: self._toggle_from_panel(r),
+            )
+        else:
+            toggle_btn = ctk.CTkButton(
+                self.right, text="✓ Sudah Coaching",
+                fg_color=COLOR_OK, text_color="#1E104E", width=300, height=40,
+                font=(FONT_FAMILY, 13, "bold"),
+                command=lambda r=row: self._toggle_from_panel(r),
+            )
+        toggle_btn.pack(anchor="w", padx=16, pady=(0, 16))
+
         ctk.CTkLabel(self.right, text="Catatan (opsional):",
                      font=(FONT_FAMILY, 11), text_color=COLOR_TEXT_DIM
                      ).pack(anchor="w", padx=16)
@@ -289,8 +296,13 @@ class CoachingScreen(ctk.CTkFrame):
             )
             save_btn.pack(anchor="w", padx=16, pady=8)
         else:
-            notes_box.insert("1.0", "(Tandai Sudah Coaching dulu untuk simpan catatan)")
+            notes_box.insert("1.0", "(Klik 'Sudah Coaching' di atas untuk aktifkan catatan)")
             notes_box.configure(state="disabled")
+
+    def _toggle_from_panel(self, row):
+        """Toggle status from the right-panel button. Mirrors _toggle_row."""
+        iid = str(row["employee_id"])
+        self._toggle_row(iid)
 
     def _on_save_notes(self, row, text: str):
         start, _end, _num = self._active_range()
