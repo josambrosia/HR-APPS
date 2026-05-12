@@ -59,9 +59,11 @@ class CoachingScreen(ctk.CTkFrame):
             background="#2C1B47", foreground=COLOR_TEXT_DIM,
             relief="flat", font=(FONT_FAMILY, 10, "bold"),
         )
+        # Selection bg uses COLOR_TEXT_DIM (muted lavender) — avoids conflict
+        # with the orange "Belum" status indicator (COLOR_ACCENT was confusing).
         style.map(
             "Coaching.Treeview",
-            background=[("selected", COLOR_ACCENT)],
+            background=[("selected", COLOR_TEXT_DIM)],
             foreground=[("selected", "#1E104E")],
         )
 

@@ -57,9 +57,12 @@ class IssuesScreen(ctk.CTkFrame):
             background="#2C1B47", foreground=COLOR_TEXT_DIM,
             relief="flat", font=(FONT_FAMILY, 10, "bold"),
         )
+        # Selection bg uses COLOR_TEXT_DIM (muted lavender) for both tables —
+        # avoids conflict between Open table's selection orange and the
+        # accent semantic used elsewhere (e.g., Coaching "Belum" indicator).
         style.map(
             "Open.Treeview",
-            background=[("selected", COLOR_ACCENT)],
+            background=[("selected", COLOR_TEXT_DIM)],
             foreground=[("selected", "#1E104E")],
         )
         # Resolved table — subtly cooler/darker panel
@@ -75,7 +78,7 @@ class IssuesScreen(ctk.CTkFrame):
         )
         style.map(
             "Resolved.Treeview",
-            background=[("selected", COLOR_OK)],
+            background=[("selected", COLOR_TEXT_DIM)],
             foreground=[("selected", "#1E104E")],
         )
 
