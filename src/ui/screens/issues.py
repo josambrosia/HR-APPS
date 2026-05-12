@@ -7,6 +7,7 @@ from src.db.connection import get_connection
 from src.db.settings import get_setting
 from src.db.attendance import (
     set_reason, list_issues_for_period, count_issues_for_period,
+    unresolve_issue,
 )
 from src.core.insights import resolution_rate
 from src.core.reason_mapper import REASON_LABELS, REASON_NEEDS_DETAIL, render_alasan_ijin
@@ -222,23 +223,34 @@ class IssuesScreen(ctk.CTkFrame):
             fg_color=COLOR_OK, text_color="#1E104E", width=300,
         )
 
+        # Unresolve button — only shown when row is currently resolved
+        # (reason_category is not None). Lay out below Save in _lay_out_form.
+        self.unresolve_btn = ctk.CTkButton(
+            self.right, text="↶ Batalkan Resolve", command=self._on_unresolve,
+            fg_color=COLOR_ERR, text_color="#1E104E", width=300,
+        )
+        self._row_is_resolved = current is not None
+
         # Initial layout (Save below the optional detail)
         self._lay_out_form(initial_cat=current)
 
     def _lay_out_form(self, initial_cat: str | None):
-        """(Re)pack detail widgets and Save button in correct order.
+        """(Re)pack detail widgets, Save button, and (if resolved) unresolve button.
 
-        Order:  cat_combo  ->  (detail_label  ->  detail_entry)?  ->  save_btn
+        Order:  cat_combo -> (detail_label -> detail_entry)? -> save_btn -> [unresolve_btn?]
         """
-        # Always re-pack from the bottom so Save lands last
+        # Always re-pack from the bottom so Save lands last (and unresolve below that)
         self.detail_label.pack_forget()
         self.detail_entry.pack_forget()
         self.save_btn.pack_forget()
+        self.unresolve_btn.pack_forget()
 
         if initial_cat and initial_cat in REASON_NEEDS_DETAIL:
             self.detail_label.pack(anchor="w", padx=16)
             self.detail_entry.pack(anchor="w", padx=16, pady=(4, 12))
-        self.save_btn.pack(anchor="w", padx=16, pady=12)
+        self.save_btn.pack(anchor="w", padx=16, pady=(12, 4))
+        if self._row_is_resolved:
+            self.unresolve_btn.pack(anchor="w", padx=16, pady=(0, 12))
 
     def _on_cat_change(self, _):
         label = self.cat_var.get()
@@ -259,6 +271,23 @@ class IssuesScreen(ctk.CTkFrame):
         with get_connection(DB_PATH) as conn:
             set_reason(conn, attendance_id=self.selected_id,
                        category=cat, detail=detail)
+        self._reload()
+        self._build_panel_empty()
+        self.selected_id = None
+
+    def _on_unresolve(self):
+        if self.selected_id is None:
+            return
+        confirmed = messagebox.askyesno(
+            "Konfirmasi",
+            "Batalkan resolve?\n\n"
+            "Kategori dan detail alasan akan dihapus.\n"
+            "Issue akan kembali ke status Open.",
+        )
+        if not confirmed:
+            return
+        with get_connection(DB_PATH) as conn:
+            unresolve_issue(conn, attendance_id=self.selected_id)
         self._reload()
         self._build_panel_empty()
         self.selected_id = None
