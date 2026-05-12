@@ -27,18 +27,25 @@ class WeekNavBar(ctk.CTkFrame):
         current_month: str,
         on_change: Callable[[str], None],
         initial: str = "semua",
+        include_all: bool = True,
     ):
         super().__init__(parent, fg_color="transparent")
         self._on_change = on_change
         self._buttons: Dict[str, ctk.CTkButton] = {}
         self._active = initial
 
-        self._make_pill("semua", "Semua")
+        if include_all:
+            self._make_pill("semua", "Semua")
         if current_month:
             for num, start, end in weeks_in_month(current_month):
                 s_day = start.split("-")[2]
                 e_day = end.split("-")[2]
                 self._make_pill(f"minggu_{num}", f"Minggu {num} ({s_day}-{e_day})")
+
+        # If the requested initial isn't actually rendered (e.g., "semua" with
+        # include_all=False), fall back to the first available pill.
+        if self._active not in self._buttons and self._buttons:
+            self._active = next(iter(self._buttons.keys()))
 
         self._refresh_styles()
 
