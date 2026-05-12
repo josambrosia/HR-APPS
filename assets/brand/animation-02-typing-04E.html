@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Josaphat Tech Solution — Typing Animation (04E)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1f1f1f; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', Consolas, monospace; }
+  .stage { background: #0A0A0A; padding: 28px 36px 22px; border-radius: 14px; box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
+  .word-line { font-weight: 700; font-size: 44px; color: #FFFFFF; line-height: 1; display: flex; align-items: center; gap: 6px; }
+  .typed { display: inline-block; overflow: hidden; white-space: nowrap; vertical-align: bottom; animation: type-reveal 4s steps(8, end) infinite; }
+  .cursor { display: inline-block; width: 18px; height: 40px; background: #EC4899; vertical-align: -3px; animation: cursor-blink 0.5s steps(2) infinite; }
+  .tagline { margin-top: 14px; font-weight: 500; font-size: 16px; color: #A3A3A3; letter-spacing: 0.5px; }
+
+  @keyframes type-reveal {
+    0%, 5%   { width: 0;     }
+    45%, 85% { width: 220px; }
+    95%, 100%{ width: 0;     }
+  }
+  @keyframes cursor-blink {
+    0%, 50%      { opacity: 1; }
+    50.01%, 100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="word-line"><span class="typed">josaphat</span><span class="cursor"></span></div>
+    <div class="tagline">// from concept to code</div>
+  </div>
+</body>
+</html>

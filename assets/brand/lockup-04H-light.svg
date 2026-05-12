@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 130" width="480" height="130" role="img" aria-label="Josaphat Tech Solution — From Concept to Code">
+  <title>Josaphat Tech Solution</title>
+  <desc>Wordmark for light backgrounds: navy 'josaphat' with green cursor and tagline.</desc>
+  <style>
+    .word { font: 700 44px 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace; fill: #0F172A; }
+    .tag  { font: 500 16px 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace; fill: #475569; letter-spacing: 0.5px; }
+  </style>
+  <text x="36" y="70" class="word" textLength="216" lengthAdjust="spacingAndGlyphs">josaphat</text>
+  <rect x="260" y="36" width="20" height="40" fill="#10B981"/>
+  <text x="36" y="102" class="tag">// from concept to code</text>
+</svg>

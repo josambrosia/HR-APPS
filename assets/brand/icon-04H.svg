@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Josaphat Tech Solution app icon">
+  <title>Josaphat Tech Solution — App Icon (Navy/Green)</title>
+  <style>
+    .j { font: 700 152px 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace; fill: #FFFFFF; }
+  </style>
+  <rect width="256" height="256" rx="56" ry="56" fill="#0F172A"/>
+  <text x="58" y="186" class="j">j</text>
+  <rect x="142" y="78" width="56" height="108" fill="#10B981"/>
+</svg>
