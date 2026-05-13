@@ -28,6 +28,9 @@ def main():
         splash.destroy()
         app.deiconify()
         app.state("zoomed")   # maximize after reveal
+        # Re-apply icon after window state changes (some Windows builds drop
+        # the iconbitmap setting through withdraw → deiconify → zoomed)
+        app._apply_brand_icon()
 
     app.after(SPLASH_MIN_MS, _reveal)
     app.mainloop()

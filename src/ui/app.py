@@ -23,11 +23,7 @@ class HRApp(ctk.CTk):
         self.geometry("1180x720")
         self.minsize(800, 540)  # smaller minsize triggers scrollbar earlier
         # Set window icon (taskbar + title bar)
-        try:
-            from src.config import BRAND_ICON_ICO
-            self.iconbitmap(str(BRAND_ICON_ICO))
-        except Exception:
-            pass  # icon optional; don't block app start
+        self._apply_brand_icon()
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -50,6 +46,31 @@ class HRApp(ctk.CTk):
                 return "break"
             current = getattr(current, "master", None)
         return None
+
+    def _apply_brand_icon(self):
+        """Apply JTS brand icon via iconbitmap + iconphoto.
+
+        iconphoto with default=True applies the icon as the default for
+        all Toplevels (splash, dialogs, etc.) and survives withdraw/deiconify
+        cycles better than iconbitmap alone on Windows. Both APIs are called
+        for defense-in-depth — if one fails (e.g., PIL missing, file missing),
+        the other may still succeed.
+        """
+        try:
+            from src.config import BRAND_ICON_ICO
+            self.iconbitmap(str(BRAND_ICON_ICO))
+        except Exception:
+            pass
+        try:
+            from src.config import BRAND_ICON_ICO
+            from PIL import Image, ImageTk
+            pil = Image.open(str(BRAND_ICON_ICO))
+            photo = ImageTk.PhotoImage(pil)
+            self.iconphoto(True, photo)
+            # Keep reference to prevent GC — Tk doesn't hold one for iconphoto.
+            self._brand_icon_ref = photo
+        except Exception:
+            pass
 
     def _build_sidebar(self):
         self.sidebar = ctk.CTkFrame(
@@ -327,14 +348,13 @@ class HRApp(ctk.CTk):
             pass
 
     def _build_content_area(self):
-        # Outer scrollable container — kicks in when window shrinks below content
-        self._content_outer = ctk.CTkScrollableFrame(
-            self, fg_color="transparent", corner_radius=0,
-        )
-        self._content_outer.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
-        # Inner content area where screens grid into; preserves existing API
-        self.content = ctk.CTkFrame(self._content_outer, fg_color="transparent")
-        self.content.pack(fill="both", expand=True, padx=20, pady=20)
+        # Regular frame — CTkScrollableFrame was breaking viewport-fill expansion
+        # in screens with content smaller than viewport. Each individual screen
+        # handles its own scrolling needs internally (Treeviews scroll, Active
+        # Month uses CTkScrollableFrame for card list, WhatsApp uses one for
+        # employee list). HRApp.minsize prevents too-small windows from clipping.
+        self.content = ctk.CTkFrame(self, fg_color="transparent")
+        self.content.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
         self.content.grid_rowconfigure(0, weight=1)
         self.content.grid_columnconfigure(0, weight=1)
 
