@@ -24,8 +24,19 @@ def _describe_kind(masuk, keluar) -> str:
     return "anomali"
 
 
-def render_summary_for_employee(conn: sqlite3.Connection, employee_id: int) -> str:
+def render_summary_for_employee(
+    conn: sqlite3.Connection,
+    employee_id: int,
+    year_month: str | None = None,
+) -> str:
     """Build a list-style WA-ready summary for an employee's open issues.
+
+    Args:
+        conn: SQLite connection.
+        employee_id: Target employee ID.
+        year_month: Optional 'YYYY-MM' filter. When provided, restricts issues
+            to that month only (typically the active month from settings).
+            When None, returns all open issues (legacy behavior, used by tests).
 
     Returns empty string if no open issues — caller decides what to do.
     Format:
@@ -39,15 +50,29 @@ def render_summary_for_employee(conn: sqlite3.Connection, employee_id: int) -> s
     if not emp:
         return ""
 
-    issues = conn.execute(
-        """
-        SELECT tanggal, hari, masuk, keluar
-          FROM attendance_records
-         WHERE employee_id = ? AND has_issue = 1 AND reason_category IS NULL
-         ORDER BY tanggal
-        """,
-        (employee_id,),
-    ).fetchall()
+    if year_month:
+        from src.core.week_utils import full_month_range
+        start, end = full_month_range(year_month)
+        issues = conn.execute(
+            """
+            SELECT tanggal, hari, masuk, keluar
+              FROM attendance_records
+             WHERE employee_id = ? AND has_issue = 1 AND reason_category IS NULL
+               AND tanggal BETWEEN ? AND ?
+             ORDER BY tanggal
+            """,
+            (employee_id, start, end),
+        ).fetchall()
+    else:
+        issues = conn.execute(
+            """
+            SELECT tanggal, hari, masuk, keluar
+              FROM attendance_records
+             WHERE employee_id = ? AND has_issue = 1 AND reason_category IS NULL
+             ORDER BY tanggal
+            """,
+            (employee_id,),
+        ).fetchall()
 
     if not issues:
         return ""

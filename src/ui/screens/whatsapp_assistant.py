@@ -5,7 +5,9 @@ from tkinter import messagebox
 
 from src.config import DB_PATH
 from src.db.connection import get_connection
+from src.db.settings import get_setting
 from src.core.issue_summary import render_summary_for_employee
+from src.core.week_utils import full_month_range
 from src.ui.theme import (
     FONT_MONO,
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
@@ -30,6 +32,7 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
         # Track the currently displayed employee so the WA Web button can
         # be rebuilt per selection (employees may or may not have phone).
         self._current_employee_id: int | None = None
+        self._current_month: str = ""
         self._build()
         self._reload()
 
@@ -60,15 +63,30 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
         for w in self.list_frame.winfo_children():
             w.destroy()
         with get_connection(DB_PATH) as conn:
+            current_month = get_setting(conn, "current_month") or ""
+            if not current_month:
+                # No active month — show empty state and bail.
+                ctk.CTkLabel(
+                    self.list_frame,
+                    text="(belum ada bulan aktif — pilih di Active Month)",
+                    font=FONT_BODY,
+                    text_color=COLOR_TEXT_MUTED,
+                ).pack(pady=20)
+                self._current_month = ""
+                return
+            self._current_month = current_month
+            start, end = full_month_range(current_month)
             rows = conn.execute(
                 """
                 SELECT e.id, e.nama, COUNT(*) AS open_cnt
                   FROM attendance_records ar
                   JOIN employees e ON ar.employee_id = e.id
                  WHERE ar.has_issue = 1 AND ar.reason_category IS NULL
+                   AND ar.tanggal BETWEEN ? AND ?
                  GROUP BY e.id
                  ORDER BY e.nama
-                """
+                """,
+                (start, end),
             ).fetchall()
         if not rows:
             ctk.CTkLabel(self.list_frame, text="(tidak ada open issue)",
@@ -128,7 +146,7 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
         for w in self.right.winfo_children():
             w.destroy()
         with get_connection(DB_PATH) as conn:
-            text = render_summary_for_employee(conn, emp_id)
+            text = render_summary_for_employee(conn, emp_id, year_month=self._current_month or None)
             row = conn.execute(
                 "SELECT phone FROM employees WHERE id = ?", (emp_id,)
             ).fetchone()
