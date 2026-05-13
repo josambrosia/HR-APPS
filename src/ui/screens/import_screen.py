@@ -30,6 +30,42 @@ from src.ui.theme import (
 )
 
 
+def _filter_excel_paths(files) -> list:
+    """Parse windnd-delivered paths into Path list, keeping only .xls/.xlsx.
+
+    windnd may deliver bytes or str depending on force_unicode flag; this
+    handles both. Returns empty list if none are Excel files. Pure function
+    for unit-testability.
+    """
+    paths = []
+    for f in files or []:
+        try:
+            p = Path(f.decode("utf-8") if isinstance(f, bytes) else f)
+        except Exception:
+            continue
+        if p.suffix.lower() in (".xls", ".xlsx"):
+            paths.append(p)
+    return paths
+
+
+def _log_dnd_crash(exc: Exception) -> None:
+    """Append a one-line crash record to ~/.hr-absensi-crash.log.
+
+    The packaged .exe is windowed (runw.exe bootloader) — stderr is /dev/null
+    so any silent exception in the windnd callback would otherwise be invisible.
+    This persists at least a one-line breadcrumb for diagnosis.
+    """
+    try:
+        log_path = Path.home() / ".hr-absensi-crash.log"
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(
+                f"[{datetime.now().isoformat()}] DnD: "
+                f"{type(exc).__name__}: {exc}\n"
+            )
+    except Exception:
+        pass  # logging must never raise back to caller
+
+
 _MONTH_ID = {
     1: "Januari", 2: "Februari", 3: "Maret", 4: "April",
     5: "Mei", 6: "Juni", 7: "Juli", 8: "Agustus",
@@ -223,24 +259,23 @@ class ImportScreen(ctk.CTkFrame):
 
         _bind_hover_recursive(zone)
 
-        # R1 — register windnd hook for drag-and-drop file support
+        # R1 — register windnd hook for drag-and-drop file support.
+        # IMPORTANT: windnd dispatches the callback synchronously from inside
+        # the Win32 WNDPROC for WM_DROPFILES. Doing Tk/DB work directly inside
+        # the callback causes re-entrant message processing and crashes the
+        # app. We defer the real handler to the next Tk idle cycle via after(0).
         try:
             import windnd
 
             def _on_drop(files):
-                if not files:
-                    return
-                paths = []
-                for f in files:
-                    try:
-                        p = Path(f.decode("utf-8") if isinstance(f, bytes) else f)
-                    except Exception:
-                        continue
-                    if p.suffix.lower() in (".xls", ".xlsx"):
-                        paths.append(p)
-                if not paths:
-                    return
-                self._handle_dropped_paths(paths)
+                try:
+                    paths = _filter_excel_paths(files)
+                    if not paths:
+                        return
+                    self.after(0, lambda p=paths: self._handle_dropped_paths(p))
+                except Exception as e:
+                    # Last-resort logger: .exe is windowed, stderr goes nowhere.
+                    _log_dnd_crash(e)
 
             windnd.hook_dropfiles(zone, func=_on_drop, force_unicode=True)
         except ImportError:
