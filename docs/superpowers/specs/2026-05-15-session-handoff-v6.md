@@ -14,12 +14,16 @@ Export, history list di kedua screen, plus 8 R-items (drag-drop,
 smart filename, conflict resolution, progress modal, folder memory,
 bulk import, preview, save destination).
 
-**Branch state:**
-- Local: `claude/nifty-jemison-706792` ahead of `origin/v5` by 9 commits
-  (spec + plan + 7 implementation phases)
-- Base: `origin/v5` (post-JTS overhaul)
+**Branch state (final):**
+- `origin/v5` = `origin/v6` = `48b568f` (cumulative: JTS overhaul + Import+Export refresh)
+- Local working branch: `claude/nifty-jemison-706792` (alive in worktree, pushed to origin)
+- PR URL available: https://github.com/josambrosia/HR-APPS/pull/new/claude/nifty-jemison-706792
 
 **Test suite:** 120 passing (was 98 at v5).
+
+**Production .exe:** `dist/HR-Absensi/HR-Absensi.exe` (May 13 17:47, 14.37 MB, v6 with Import+Export refresh).
+Backup chain: `.bak` (May 13 08:44 = v5 post-fix) · `.bak.old` (May 13 08:28 = v5 initial).
+Smoke test status: user verified the v6 build runs.
 
 ---
 
