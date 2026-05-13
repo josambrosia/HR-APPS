@@ -1,385 +1,220 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<title>HR Dashboard — {{ period_label }}</title>
+<title>HR Dashboard · {{ period_label }}</title>
 <style>
-  :root {
-    --indigo:    #1E104E;
-    --purple:    #452E5A;
-    --orange:    #FF653F;
-    --gold:      #FFC85C;
-    --cream:     #FAF6F0;
-    --ink:       #2D1B4A;
-    --ink-dim:   #6B5B8C;
-    --paper:     #FFFFFF;
-    --shadow:    0 2px 8px rgba(30, 16, 78, 0.08);
-    --shadow-lg: 0 4px 16px rgba(30, 16, 78, 0.12);
-  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  @page{size:A4;margin:14mm}
+  body{font-family:'Segoe UI','Inter',sans-serif;background:#fff;color:#171717;font-size:11px;line-height:1.45}
+  .doc{padding:8px 12px}
 
-  * { box-sizing: border-box; }
+  /* Header */
+  .b-head{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:16px;border-bottom:2px solid #ec4899;margin-bottom:22px;position:relative}
+  .b-head::after{content:"";position:absolute;left:0;bottom:-5px;width:60px;height:8px;background:#22d3ee}
+  .b-head .badge{display:inline-block;background:#ec4899;color:#fff;font-size:9px;font-weight:700;padding:3px 10px;border-radius:3px;letter-spacing:1.5px;margin-bottom:8px}
+  .b-head h1{font-size:26px;font-weight:700;color:#171717;letter-spacing:-.5px}
+  .b-head .meta{text-align:right;font-family:Consolas,monospace;font-size:10px;color:#737373}
+  .b-head .meta .lg{color:#22d3ee;font-size:14px;font-weight:700;letter-spacing:.5px;margin-bottom:2px;font-family:'Segoe UI'}
 
-  body {
-    font-family: -apple-system, "Segoe UI", "Inter", Roboto, Arial, sans-serif;
-    margin: 0; padding: 0;
-    background: linear-gradient(135deg, #FAF6F0 0%, #F5EDFF 100%);
-    color: var(--ink);
-    min-height: 100vh;
-  }
+  /* KPI strip */
+  .b-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
+  .b-kpi .k{background:#fafafa;border:1px solid #e5e5e5;padding:14px 16px;border-radius:6px;position:relative;overflow:hidden}
+  .b-kpi .k::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#ec4899}
+  .b-kpi .k.cyan::before{background:#22d3ee}
+  .b-kpi .k.violet::before{background:#a855f7}
+  .b-kpi .k.emerald::before{background:#10b981}
+  .b-kpi .k .l{font-size:9.5px;color:#737373;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:600}
+  .b-kpi .k .n{font-family:Consolas,monospace;font-size:28px;color:#171717;font-weight:700;line-height:1}
+  .b-kpi .k .n .u{font-size:14px;color:#737373;font-weight:500;margin-left:3px}
+  .b-kpi .k .delta{font-size:10px;color:#525252;margin-top:4px}
 
-  .container { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
+  /* Sections */
+  .b-section{margin-bottom:22px;break-inside:avoid}
+  .b-section h2{font-size:11px;color:#171717;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #e5e5e5;font-weight:700}
+  .b-section h2::before{content:"// ";color:#ec4899}
+  .b-twocol{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 
-  /* HERO HEADER */
-  .hero {
-    background: linear-gradient(135deg, var(--indigo) 0%, var(--purple) 70%, var(--orange) 130%);
-    color: white;
-    border-radius: 18px;
-    padding: 28px 32px;
-    margin-bottom: 24px;
-    box-shadow: var(--shadow-lg);
-    position: relative;
-    overflow: hidden;
-  }
-  .hero::before {
-    content: ""; position: absolute; top: -60px; right: -60px;
-    width: 200px; height: 200px;
-    background: radial-gradient(circle, rgba(255, 200, 92, 0.25) 0%, transparent 70%);
-    border-radius: 50%;
-  }
-  .hero h1 {
-    font-size: 28px; font-weight: 800;
-    margin: 0 0 8px; letter-spacing: -0.5px;
-    position: relative;
-  }
-  .hero .subtitle {
-    font-size: 14px; opacity: 0.85;
-    margin: 0; position: relative;
-  }
-  .hero .period-chip {
-    display: inline-block; margin-top: 12px;
-    background: rgba(255, 255, 255, 0.18);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 200, 92, 0.4);
-    padding: 6px 14px; border-radius: 20px;
-    font-size: 13px; font-weight: 600;
-    position: relative;
-  }
+  /* Tables */
+  .b-table{width:100%;border-collapse:collapse;font-size:11px}
+  .b-table th{text-align:left;font-size:9.5px;color:#737373;text-transform:uppercase;letter-spacing:.8px;padding:7px 6px;background:#fafafa;border-bottom:1px solid #ec4899}
+  .b-table td{padding:7px 6px;border-bottom:1px solid #f5f5f5}
+  .b-table .num{font-family:Consolas,monospace;text-align:right;color:#ec4899;font-weight:600}
+  .b-table .cyan{color:#22d3ee;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+  .b-table .rank{font-family:Consolas,monospace;color:#737373;width:30px}
 
-  /* KPI GRID */
-  .kpi-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 14px; margin-bottom: 24px;
-  }
-  .kpi {
-    background: var(--paper); border-radius: 14px; padding: 18px;
-    box-shadow: var(--shadow);
-    border-left: 4px solid transparent;
-    position: relative;
-  }
-  .kpi.accent-orange { border-left-color: var(--orange); }
-  .kpi.accent-purple { border-left-color: var(--purple); }
-  .kpi.accent-gold   { border-left-color: var(--gold); }
-  .kpi .icon { font-size: 26px; margin-bottom: 4px; }
-  .kpi .label {
-    font-size: 11px; color: var(--ink-dim);
-    text-transform: uppercase; letter-spacing: 0.5px;
-    font-weight: 600; margin: 2px 0;
-  }
-  .kpi .value { font-size: 28px; font-weight: 800; color: var(--ink); }
-  .kpi .unit { font-size: 14px; font-weight: 500; color: var(--ink-dim); }
+  /* Pills */
+  .b-pill{display:inline-block;background:#fdf2f8;color:#ec4899;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:600;margin:2px}
+  .b-pill.violet{background:#f5f3ff;color:#7c3aed}
 
-  /* SECTION CARDS */
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-  .card {
-    background: var(--paper); border-radius: 14px; padding: 18px 22px;
-    box-shadow: var(--shadow);
-  }
-  .card h2 {
-    font-size: 15px; font-weight: 700;
-    margin: 0 0 14px; display: flex; align-items: center; gap: 8px;
-  }
-  .card.late h2     { color: var(--orange); }
-  .card.teladan h2  { color: #B58B00; }
-  .card.coaching h2 { color: var(--orange); }
-  .card.rank h2     { color: var(--purple); }
+  /* Pola Jam Masuk */
+  .b-jam{background:#fafafa;border-radius:8px;padding:14px 16px}
+  .b-jam .jh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+  .b-jam .jh .total{font-family:Consolas;font-size:10px;color:#737373}
+  .b-jam .jh .total b{color:#ec4899}
+  .b-bar-row{display:grid;grid-template-columns:100px 1fr 50px;gap:10px;align-items:center;font-size:10.5px;padding:3px 0}
+  .b-bar-row .lbl{font-family:Consolas;color:#525252;font-size:10px}
+  .b-bar-row .lbl.early,.b-bar-row .lbl.ontime{color:#10b981}
+  .b-bar-row .lbl.mod{color:#a855f7}
+  .b-bar-row .lbl.severe,.b-bar-row .lbl.chronic{color:#ec4899}
+  .b-bar-track{height:14px;background:#fff;border:1px solid #e5e5e5;border-radius:7px;overflow:hidden}
+  .b-bar-fill{height:100%;border-radius:7px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:9.5px;font-weight:600;white-space:nowrap;overflow:hidden}
+  .b-bar-fill.early,.b-bar-fill.ontime{background:linear-gradient(90deg,#10b981,#34d399)}
+  .b-bar-fill.mild{background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#171717}
+  .b-bar-fill.mod{background:linear-gradient(90deg,#a855f7,#c084fc)}
+  .b-bar-fill.severe{background:linear-gradient(90deg,#ec4899,#f472b6)}
+  .b-bar-fill.chronic{background:linear-gradient(90deg,#be123c,#e11d48)}
+  .b-bar-row .v{font-family:Consolas;font-weight:700;text-align:right;color:#171717}
+  .b-jam-divider{border-top:1px dashed #e5e5e5;margin:8px 0;text-align:center;font-size:9px;color:#a3a3a3;text-transform:uppercase;letter-spacing:1px;padding-top:6px}
+  .b-jam-insight{margin-top:12px;padding:10px 12px;background:#fff;border-left:3px solid #ec4899;border-radius:0 6px 6px 0;font-size:11px;color:#525252}
+  .b-jam-insight b{color:#171717}
 
-  /* MEDAL LIST (Top 5) */
-  .medal-list { list-style: none; margin: 0; padding: 0; }
-  .medal-list li {
-    display: flex; align-items: center; gap: 12px;
-    padding: 9px 0; border-bottom: 1px solid #F0EAF7;
-  }
-  .medal-list li:last-child { border-bottom: none; }
-  .medal-list .rank {
-    width: 28px; height: 28px; flex-shrink: 0;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 18px; font-weight: 700;
-    border-radius: 50%; background: #F0EAF7; color: var(--purple);
-  }
-  .medal-list .name { flex: 1; font-weight: 600; color: var(--ink); }
-  .medal-list .dept { font-size: 11px; color: var(--ink-dim); margin-left: 4px; }
-  .medal-list .value {
-    font-weight: 700; padding: 3px 10px; border-radius: 12px;
-    font-size: 12px;
-  }
-  .medal-list.late .value { background: #FFE0D6; color: #B23A1A; }
-  .medal-list.teladan .value { background: #FFF1CC; color: #8A6800; }
+  /* Footer */
+  .b-footer{margin-top:22px;padding-top:12px;border-top:1px solid #e5e5e5;display:flex;justify-content:space-between;font-size:9.5px;color:#737373;font-family:Consolas,monospace}
+  .b-footer .jts{color:#ec4899;letter-spacing:1.5px;text-transform:uppercase;font-weight:700}
 
-  /* COACHING FLAGS */
-  .flag {
-    background: linear-gradient(90deg, #FFE8DA, #FFF6E0);
-    border-left: 4px solid var(--orange);
-    padding: 12px 16px; border-radius: 8px;
-    margin: 8px 0;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  .flag .who { font-weight: 700; color: var(--ink); }
-  .flag .stats { font-size: 12px; color: var(--ink-dim); }
-  .empty-state {
-    text-align: center; padding: 18px; color: var(--ink-dim);
-    font-style: italic; font-size: 13px;
-  }
+  /* Page 2 header */
+  .b-rank-head{padding-bottom:10px;border-bottom:2px solid #ec4899;margin-bottom:14px;position:relative}
+  .b-rank-head::after{content:"";position:absolute;left:0;bottom:-5px;width:40px;height:8px;background:#22d3ee}
+  .b-rank-head h2{font-size:18px;color:#171717}
+  .b-rank-head .sub{font-size:10px;color:#737373;text-transform:uppercase;letter-spacing:1.5px;margin-top:6px;font-family:Consolas}
 
-  /* RANKING TABLE */
-  table {
-    width: 100%; border-collapse: collapse; font-size: 13px;
-    background: var(--paper); border-radius: 12px; overflow: hidden;
-  }
-  thead th {
-    background: var(--purple); color: white; font-weight: 700;
-    text-align: left; padding: 10px 14px;
-    font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;
-  }
-  tbody tr:nth-child(odd) { background: #FBF7FF; }
-  tbody td {
-    padding: 9px 14px;
-    border-bottom: 1px solid #EFE5F9;
-  }
-  tbody td:first-child { font-weight: 600; }
-  .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 10px;
-    font-size: 11px; font-weight: 600;
-  }
-  .badge.late { background: #FFE0D6; color: #B23A1A; }
-
-  /* FOOTER */
-  footer {
-    margin-top: 30px; padding-top: 16px;
-    border-top: 1px solid #E0D5F0;
-    font-size: 11px; color: var(--ink-dim);
-    text-align: center;
-  }
-
-  /* PRINT TIP BANNER (hidden on print) */
-  .print-tip {
-    background: linear-gradient(90deg, #FFF6E0, #FFE8DA);
-    border-radius: 10px; padding: 10px 16px; margin-bottom: 16px;
-    font-size: 12px; color: var(--ink-dim);
-    border: 1px solid #FFD9A8;
-  }
-  .print-tip strong { color: var(--ink); }
-
-  /* PRINT */
-  @media print {
-    body { background: white; }
-    .container { padding: 8px 16px; max-width: 100%; }
-    .hero {
-      border-radius: 8px;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    .kpi, .card { box-shadow: none; border: 1px solid #EEE; }
-    .print-tip { display: none; }
-    h2 { page-break-after: avoid; }
-    table { page-break-inside: auto; }
-    tr { page-break-inside: avoid; }
-  }
+  /* Print */
+  .page-break{break-before:page;page-break-before:always}
+  .empty-state{padding:14px;background:#fafafa;border:1px dashed #e5e5e5;border-radius:6px;text-align:center;color:#737373;font-size:11px}
 </style>
 </head>
 <body>
-  <div class="container">
 
-    <div class="hero">
-      <h1>&#128202; Dashboard Insights HR</h1>
-      <p class="subtitle">Ringkasan kehadiran &amp; coaching</p>
-      <div class="period-chip">&#128197; {{ period_label }}</div>
+<div class="doc">
+  {# === HEADER === #}
+  <div class="b-head">
+    <div>
+      <div class="badge">WEEKLY REPORT</div>
+      <h1>HR Absensi Dashboard</h1>
+      <div style="font-size:11px;color:#737373;margin-top:4px">{{ ranking|length }} karyawan</div>
     </div>
-
-    <div class="print-tip">
-      &#128161; <strong>Tip:</strong> Untuk hasil PDF terbaik, aktifkan <em>"Background graphics"</em> di opsi Print browser.
+    <div class="meta">
+      <div class="lg">{{ period_label }}</div>
+      <div>{{ period_start }} — {{ period_end }}</div>
+      <div>Gen: {{ generated_at }}</div>
     </div>
+  </div>
 
-    {% if sections.kpi %}
-    <div class="kpi-grid">
-      <div class="kpi accent-orange">
-        <div class="icon">&#9201;&#65039;</div>
-        <div class="label">Total Terlambat</div>
-        <div class="value">{{ kpi.total_terlambat }} <span class="unit">mnt</span></div>
-      </div>
-      <div class="kpi accent-purple">
-        <div class="icon">&#128683;</div>
-        <div class="label">Hari Absen</div>
-        <div class="value">{{ kpi.total_absen }}</div>
-      </div>
-      <div class="kpi accent-gold">
-        <div class="icon">&#9888;&#65039;</div>
-        <div class="label">Butuh Coaching</div>
-        <div class="value">{{ kpi.coaching_count }}</div>
-      </div>
-    </div>
-    {% endif %}
+  {# === KPI === #}
+  {% if sections.kpi %}
+  <div class="b-kpi">
+    <div class="k"><div class="l">Total Terlambat</div><div class="n">{{ kpi.total_terlambat }}</div><div class="delta">kejadian</div></div>
+    <div class="k cyan"><div class="l">Rata-rata / Kejadian</div><div class="n">{{ '%.0f' % kpi.avg_min }}<span class="u">min</span></div><div class="delta">{{ kpi.total_min }} menit &divide; {{ kpi.total_terlambat }}</div></div>
+    <div class="k violet"><div class="l">Coaching</div><div class="n">{{ kpi.coaching_count }}</div><div class="delta">&ge; {{ coaching_threshold }} min</div></div>
+    <div class="k emerald"><div class="l">Teladan</div><div class="n">{{ kpi.teladan_count }}</div><div class="delta">hadir penuh</div></div>
+  </div>
+  {% endif %}
 
-    {% if sections.top5_late or sections.top5_teladan %}
-    <div class="row">
-      {% if sections.top5_late %}
-      <div class="card late">
-        <h2>&#128293; Top 5 Paling Terlambat</h2>
-        {% if top5_late %}
-        <ul class="medal-list late">
-          {% set medals = ['&#129351;', '&#129352;', '&#129353;', '4', '5'] %}
-          {% for r in top5_late %}
-            <li>
-              <span class="rank">{{ medals[loop.index0] }}</span>
-              <span class="name">{{ r.nama }}<span class="dept"> &middot; {{ r.dept or '-' }}</span></span>
-              <span class="value">{{ r.total_terlambat }} mnt</span>
-            </li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <div class="empty-state">Tidak ada keterlambatan periode ini. &#128077;</div>
-        {% endif %}
-      </div>
-      {% endif %}
+  {# === TOP 5 === #}
+  {% if sections.top5_late %}
+  <div class="b-section">
+    <h2>Top 5 Paling Terlambat</h2>
+    {% if top5_late %}
+    <table class="b-table">
+      <thead><tr><th>#</th><th>Nama</th><th>Dept</th><th style="text-align:right">Menit</th><th style="text-align:right">Kejadian</th></tr></thead>
+      <tbody>
+        {% for r in top5_late %}
+        <tr><td class="rank">{{ '%02d' % loop.index }}</td><td>{{ r.nama }}</td><td class="cyan">{{ r.dept }}</td><td class="num">{{ r.total_terlambat }}</td><td class="num">{{ r.hari_telat }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="empty-state">Tidak ada keterlambatan di periode ini.</div>{% endif %}
+  </div>
+  {% endif %}
 
-      {% if sections.top5_teladan %}
-      <div class="card teladan">
-        <h2>&#127942; Top 5 Karyawan Teladan</h2>
-        {% if top5_teladan %}
-        <ul class="medal-list teladan">
-          {% set medals = ['&#129351;', '&#129352;', '&#129353;', '4', '5'] %}
-          {% for r in top5_teladan %}
-            <li>
-              <span class="rank">{{ medals[loop.index0] }}</span>
-              <span class="name">{{ r.nama }}<span class="dept"> &middot; {{ r.dept or '-' }}</span></span>
-              <span class="value">skor {{ r.score }}</span>
-            </li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <div class="empty-state">Belum ada data cukup untuk menentukan teladan.</div>
-        {% endif %}
-      </div>
-      {% endif %}
+  {# === TELADAN + COACHING === #}
+  <div class="b-twocol">
+    {% if sections.top5_teladan %}
+    <div class="b-section">
+      <h2>Karyawan Teladan</h2>
+      {% if teladan %}
+        {% for r in teladan %}<span class="b-pill violet">{{ r.nama }} &middot; {{ r.dept }}</span>{% endfor %}
+        <div style="font-size:10px;color:#737373;margin-top:8px">Hadir penuh tanpa terlambat</div>
+      {% else %}<div class="empty-state">Belum ada teladan periode ini.</div>{% endif %}
     </div>
     {% endif %}
 
     {% if sections.coaching %}
-    <div class="card coaching">
-      <h2>&#9888; Butuh Coaching (lebih dari {{ coaching_threshold }} mnt / periode)</h2>
+    <div class="b-section">
+      <h2>Butuh Coaching</h2>
       {% if coaching %}
-        {% for r in coaching %}
-          <div class="flag">
-            <div class="who">&#127919; {{ r.nama }} <span style="color:var(--ink-dim);font-weight:500;">&middot; {{ r.dept or '-' }}</span></div>
-            <div class="stats">{{ r.total_terlambat }} mnt &middot; {{ r.hari_telat }} hari telat</div>
+        {% for r in coaching %}<span class="b-pill">{{ r.nama }} &middot; {{ r.total_terlambat }}m</span>{% endfor %}
+        <div style="font-size:10px;color:#737373;margin-top:8px">Threshold &ge; {{ coaching_threshold }} menit / periode</div>
+      {% else %}<div class="empty-state">Tidak ada kandidat coaching.</div>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# === POLA JAM MASUK === #}
+  {% if sections.pola_jam_masuk %}
+  <div class="b-section">
+    <h2>Pola Jam Masuk</h2>
+    {% set jam_total = jam_masuk|sum(attribute='count') %}
+    {% set jam_max_list = jam_masuk|map(attribute='count')|list %}
+    {% set jam_max = jam_max_list|max if jam_max_list else 0 %}
+    <div class="b-jam">
+      <div class="jh">
+        <div style="font-weight:600;color:#171717;font-size:11px">Distribusi waktu kedatangan &middot; {{ jam_total }} sesi present</div>
+        <div class="total">absen tidak termasuk</div>
+      </div>
+      {% if jam_total == 0 %}<div class="empty-state">Tidak ada data jam masuk.</div>{% else %}
+        {% for b in jam_masuk %}
+          {% if b.band == '08:00' %}<div class="b-jam-divider">— ambang tepat waktu —</div>{% endif %}
+          <div class="b-bar-row">
+            <span class="lbl {{ b.severity }}">{{ b.band }}</span>
+            <div class="b-bar-track"><div class="b-bar-fill {{ b.severity }}" style="width:{% if jam_max > 0 %}{{ (b.count * 100 / jam_max)|round(0)|int }}{% else %}0{% endif %}%">{% if b.count > 0 %}{{ b.count }}{% endif %}</div></div>
+            <span class="v">{{ b.count }}</span>
           </div>
         {% endfor %}
-      {% else %}
-        <div class="empty-state">Tidak ada karyawan yang perlu coaching periode ini. &#10003;</div>
       {% endif %}
     </div>
-    {% endif %}
-
-    {% if sections.departemen or sections.hari_rawan %}
-    <div class="row">
-      {% if sections.departemen %}
-      <div class="card" style="grid-column: span 1;">
-        <h2 style="color: var(--orange);">&#127962; Ranking Departemen</h2>
-        {% if ranking_departemen %}
-        <table>
-          <thead>
-            <tr>
-              <th>Departemen</th>
-              <th>Pegawai</th>
-              <th>Terlambat</th>
-            </tr>
-          </thead>
-          <tbody>
-          {% for r in ranking_departemen %}
-            <tr>
-              <td><strong>{{ r.dept }}</strong></td>
-              <td>{{ r.pegawai_count }}</td>
-              <td>{% if r.total_terlambat > 0 %}<span class="badge late">{{ r.total_terlambat }} mnt</span>{% else %}<span style="color:var(--ink-dim);">0</span>{% endif %}</td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="empty-state">Belum ada data departemen.</div>
-        {% endif %}
-      </div>
-      {% endif %}
-
-      {% if sections.hari_rawan %}
-      <div class="card">
-        <h2 style="color: var(--orange);">&#128197; Hari Paling Rawan</h2>
-        {% if hari_paling_rawan %}
-        <table>
-          <thead>
-            <tr>
-              <th>Hari</th>
-              <th>Hari Telat</th>
-              <th>Total Hari</th>
-            </tr>
-          </thead>
-          <tbody>
-          {% for r in hari_paling_rawan %}
-            <tr>
-              <td><strong>{{ r.hari }}</strong></td>
-              <td>{{ r.terlambat_count }}</td>
-              <td>{{ r.total_rows }}</td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="empty-state">Belum ada data harian.</div>
-        {% endif %}
-      </div>
-      {% endif %}
-    </div>
-    {% endif %}
-
-    {% if sections.ranking %}
-    <div class="card rank" style="margin-top:16px;">
-      <h2>&#128203; Ranking Keterlambatan Lengkap</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Nama</th>
-            <th>Dept</th>
-            <th>Terlambat</th>
-            <th>Hari Telat</th>
-            <th>Tidak Hadir</th>
-          </tr>
-        </thead>
-        <tbody>
-        {% for r in ranking %}
-          <tr>
-            <td>{{ r.nama }}</td>
-            <td>{{ r.dept or '-' }}</td>
-            <td>{% if r.total_terlambat > 0 %}<span class="badge late">{{ r.total_terlambat }} mnt</span>{% else %}<span style="color:var(--ink-dim);">0</span>{% endif %}</td>
-            <td>{{ r.hari_telat }}</td>
-            <td>{{ r.tidak_hadir }}</td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
-
-    <footer>
-      Generated by HR Absensi App &middot; {{ generated_at }}
-    </footer>
   </div>
+  {% endif %}
+
+  <div class="b-footer">
+    <span>// page 1/2 &middot; confidential</span>
+    <span class="jts">[jts] josaphat tech solution</span>
+  </div>
+
+  {# === PAGE BREAK === #}
+  <div class="page-break"></div>
+
+  {# === RANKING LENGKAP (mandatory) === #}
+  <div class="b-rank-head">
+    <h2>Ranking Lengkap &middot; {{ ranking|length }} Karyawan</h2>
+    <div class="sub">// {{ period_label }} &middot; sort by total menit terlambat</div>
+  </div>
+  {% if ranking %}
+  <table class="b-table">
+    <thead><tr><th>#</th><th>Nama</th><th>Dept</th><th style="text-align:right">Menit</th><th style="text-align:right">Kejadian</th><th style="text-align:right">Tidak Hadir</th></tr></thead>
+    <tbody>
+      {% for r in ranking %}
+        {% set is_teladan = r.total_terlambat == 0 and r.hari_telat == 0 and r.absent_count == 0 %}
+        <tr {% if is_teladan %}style="background:#f0fdf4"{% endif %}>
+          <td class="rank">{{ '%02d' % loop.index }}</td>
+          <td {% if is_teladan %}style="color:#10b981;font-weight:700"{% endif %}>{{ r.nama }}</td>
+          <td class="cyan">{{ r.dept }}</td>
+          <td class="num" {% if is_teladan %}style="color:#10b981"{% endif %}>{{ r.total_terlambat }}</td>
+          <td class="num" {% if is_teladan %}style="color:#10b981"{% endif %}>{{ r.hari_telat }}</td>
+          <td class="num" {% if r.absent_count >= 1 and not is_teladan %}style="color:#a855f7"{% elif is_teladan %}style="color:#10b981"{% endif %}>{{ r.absent_count }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div style="font-size:10px;color:#737373;margin-top:8px">Highlight emerald = karyawan teladan &middot; Highlight violet pada kolom absen = perlu perhatian khusus (&ge;1 hari tidak hadir).</div>
+  {% else %}<div class="empty-state">Tidak ada data karyawan di periode ini.</div>{% endif %}
+
+  <div class="b-footer">
+    <span>// page 2/2 &middot; confidential</span>
+    <span class="jts">[jts] josaphat tech solution</span>
+  </div>
+</div>
+
 </body>
 </html>
