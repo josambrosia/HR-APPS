@@ -6,17 +6,31 @@ from src.config import COACHING_EXCLUDED
 
 def terlambat_ranking(
     conn: sqlite3.Connection, start: str, end: str
-) -> List[sqlite3.Row]:
-    """All employees ranked by total_terlambat DESC.
+) -> List[dict]:
+    """Ranking lengkap karyawan untuk periode tertentu, urut by severity.
 
     A row contributes to terlambat aggregations only if the employee
     actually clocked in (`masuk IS NOT NULL`). Truly absent days
     (both masuk AND keluar NULL on Hari Kerja) are counted separately
-    as `tidak_hadir`.
+    as `tidak_hadir` (alias: `absent_count`).
+
+    Each returned dict has keys:
+        id, nama, no_staff, dept,
+        total_terlambat (sum of terlambat_menit > 0, excluding work-justified
+                         reason_category in COACHING_EXCLUDED),
+        hari_telat (count of late events, excluding work-justified),
+        tidak_hadir (Hari Kerja days where masuk AND keluar both NULL),
+        absent_count (alias of tidak_hadir — additive new field for
+                      "Ranking Lengkap" print panel),
+        issue_count (has_issue=1 row count).
+
+    Sort: total_terlambat DESC, absent_count DESC, hari_telat DESC, nama ASC.
+    Includes employees who only have absences (no late events) so the
+    "Ranking Lengkap" print panel shows ALL active employees of the period.
     """
     placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
     sql = f"""
-        SELECT e.id, e.nama, e.dept,
+        SELECT e.id, e.nama, e.no_staff, e.dept,
                SUM(CASE WHEN ar.reason_category IN ({placeholders}) THEN 0
                         WHEN ar.masuk IS NULL THEN 0
                         ELSE COALESCE(ar.terlambat_menit, 0) END) AS total_terlambat,
@@ -33,10 +47,33 @@ def terlambat_ranking(
           JOIN employees e ON ar.employee_id = e.id
          WHERE ar.tanggal BETWEEN ? AND ?
          GROUP BY e.id
-         ORDER BY total_terlambat DESC
     """
     params = (*COACHING_EXCLUDED, *COACHING_EXCLUDED, start, end)
-    return conn.execute(sql, params).fetchall()
+    rows = conn.execute(sql, params).fetchall()
+
+    result = [
+        {
+            "id": r["id"],
+            "nama": r["nama"],
+            "no_staff": r["no_staff"] or "",
+            "dept": r["dept"] or "",
+            "total_terlambat": r["total_terlambat"] or 0,
+            "hari_telat": r["hari_telat"] or 0,
+            "tidak_hadir": r["tidak_hadir"] or 0,
+            "absent_count": r["tidak_hadir"] or 0,
+            "issue_count": r["issue_count"] or 0,
+        }
+        for r in rows
+    ]
+
+    # Sort: total_terlambat DESC, absent_count DESC, hari_telat DESC, nama ASC
+    result.sort(key=lambda r: (
+        -r["total_terlambat"],
+        -r["absent_count"],
+        -r["hari_telat"],
+        r["nama"],
+    ))
+    return result
 
 
 def top_n_terlambat(

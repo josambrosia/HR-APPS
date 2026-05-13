@@ -323,3 +323,57 @@ def test_pola_jam_masuk_severity_labels(temp_db_path):
     assert severity['08:16-08:30'] == 'mod'
     assert severity['08:31-09:00'] == 'severe'
     assert severity['>09:00'] == 'chronic'
+
+
+def test_terlambat_ranking_includes_absent_count(temp_db_path):
+    """terlambat_ranking output dict includes 'absent_count' per emp,
+    AND emp who only absent (no late) still appear in result.
+    """
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "A")
+        b = _add_emp(conn, "2", "B")
+        c = _add_emp(conn, "3", "C")
+        # A: 1 late (10 min) + 1 absent
+        _add_att(conn, a, "2026-04-13", "Senin", "08.10", "17.00", 10)
+        _add_att(conn, a, "2026-04-14", "Selasa", None, None, None)
+        # B: on time, no absent
+        _add_att(conn, b, "2026-04-13", "Senin", "08.00", "17.00", 0)
+        # C: only absent (no late events)
+        _add_att(conn, c, "2026-04-13", "Senin", None, None, None)
+        _add_att(conn, c, "2026-04-14", "Selasa", None, None, None)
+
+        result = terlambat_ranking(conn, "2026-04-01", "2026-04-30")
+        by_nama = {r["nama"]: r for r in result}
+        # A: has late events -> in result with absent_count=1
+        assert "A" in by_nama
+        assert by_nama["A"]["absent_count"] == 1
+        # C: only absent (no late) -> MUST appear so ranking lengkap shows all emp
+        assert "C" in by_nama
+        assert by_nama["C"]["absent_count"] == 2
+        assert by_nama["C"]["total_terlambat"] == 0
+
+
+def test_terlambat_ranking_sort_order(temp_db_path):
+    """Sort: total_terlambat DESC, absent_count DESC, hari_telat DESC, nama ASC"""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp_ids = {}
+        for i, n in enumerate(["A", "B", "C", "D", "E"], 1):
+            emp_ids[n] = _add_emp(conn, str(i), n)
+        # A: 100 min late, 0 absent -> should be #1
+        _add_att(conn, emp_ids["A"], "2026-04-13", "Senin", "09.40", "17.00", 100)
+        # B: 50 min late, 1 absent -> #2 (more absent breaks tie with C)
+        _add_att(conn, emp_ids["B"], "2026-04-13", "Senin", "08.50", "17.00", 50)
+        _add_att(conn, emp_ids["B"], "2026-04-14", "Selasa", None, None, None)
+        # C: 50 min late, 0 absent -> #3
+        _add_att(conn, emp_ids["C"], "2026-04-13", "Senin", "08.50", "17.00", 50)
+        # D: 0 late, 2 absent -> #4 (more absent than E)
+        _add_att(conn, emp_ids["D"], "2026-04-13", "Senin", None, None, None)
+        _add_att(conn, emp_ids["D"], "2026-04-14", "Selasa", None, None, None)
+        # E: 0 late, 0 absent (teladan) -> #5
+        _add_att(conn, emp_ids["E"], "2026-04-13", "Senin", "08.00", "17.00", 0)
+
+        result = terlambat_ranking(conn, "2026-04-01", "2026-04-30")
+        names_in_order = [r["nama"] for r in result]
+        assert names_in_order == ["A", "B", "C", "D", "E"]
