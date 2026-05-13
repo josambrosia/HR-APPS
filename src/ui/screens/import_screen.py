@@ -8,7 +8,7 @@ import customtkinter as ctk
 from src.config import DB_PATH
 from src.db.connection import get_connection
 from src.db.employees import upsert_employee, get_employee_by_no_staff
-from src.db.attendance import upsert_attendance, list_recent_imports
+from src.db.attendance import upsert_attendance, list_recent_imports, count_overlap
 from src.db.settings import set_setting, get_setting
 from src.parsers.fingerprint import parse_fingerprint_file
 from src.core.issue_detector import is_issue
@@ -102,7 +102,7 @@ def _format_relative_time(iso_dt: str) -> str:
 class ImportScreen(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent, fg_color="transparent")
-        self._pending_path: Path | None = None
+        self._pending_paths: list = []
         self._pending_rows: list = []
         self._build()
 
@@ -224,7 +224,11 @@ class ImportScreen(ctk.CTkFrame):
         return zone
 
     def _show_chip(self, filename: str, size_kb: int, parse_ms: int):
-        """Replace drop zone with file chip (file selected state)."""
+        """Replace drop zone with file chip (file selected state).
+
+        Label derives from self._pending_paths: 'FILES TERPILIH (N files)'
+        when multi-file, else 'FILE TERPILIH'.
+        """
         self.dropzone.pack_forget()
 
         for w in self.chip_frame.winfo_children():
@@ -239,8 +243,13 @@ class ImportScreen(ctk.CTkFrame):
 
         info = ctk.CTkFrame(self.chip_frame, fg_color="transparent")
         info.pack(side="left", fill="x", expand=True, pady=SPACE_MD)
+        is_multi = len(self._pending_paths) > 1
+        label_text = (
+            f"FILES TERPILIH ({len(self._pending_paths)} files)"
+            if is_multi else "FILE TERPILIH"
+        )
         ctk.CTkLabel(
-            info, text="FILE TERPILIH",
+            info, text=label_text,
             font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
             anchor="w",
         ).pack(fill="x")
@@ -386,23 +395,22 @@ class ImportScreen(ctk.CTkFrame):
         ).pack(anchor="w", pady=SPACE_SM)
 
     def _render_preview_cards(self, pegawai_count: int, date_range: str,
-                              issue_count: int, new_emp_count: int):
-        """Render the 4 preview metric cards in a grid."""
+                              issue_count: int, new_emp_count: int,
+                              overwrite_count: int = 0):
+        """Render the 5 preview metric cards in a grid."""
         for child in self.preview_frame.winfo_children():
             child.destroy()
 
-        self.preview_frame.grid_columnconfigure(0, weight=1)
-        self.preview_frame.grid_columnconfigure(1, weight=1)
-        self.preview_frame.grid_columnconfigure(2, weight=1)
-        self.preview_frame.grid_columnconfigure(3, weight=1)
+        for i in range(5):
+            self.preview_frame.grid_columnconfigure(i, weight=1)
 
-        # 4 KPI cards. Date range gets a smaller body-bold font because
-        # "2026-04-01 → 2026-04-30" doesn't fit at the default 22pt mono.
+        overwrite_color = COLOR_WARN if overwrite_count > 0 else COLOR_TEXT_MUTED
         cards = [
             ("Pegawai", str(pegawai_count), COLOR_TEXT, True, None),
             ("Range Tanggal", date_range, COLOR_INFO, False, FONT_BODY_BOLD),
             ("Issue Baru", str(issue_count), COLOR_WARN, True, None),
             ("Pegawai Baru", str(new_emp_count), COLOR_INFO, True, None),
+            ("Akan Menimpa", str(overwrite_count), overwrite_color, True, None),
         ]
         for col, (label, value, value_color, mono, value_font) in enumerate(cards):
             KPICard(
@@ -410,41 +418,54 @@ class ImportScreen(ctk.CTkFrame):
                 value_color=value_color, mono=mono, value_font=value_font,
             ).grid(row=0, column=col, sticky="nsew", padx=SPACE_XS, pady=0)
 
+        # Footnote when overwrite > 0
+        if overwrite_count > 0:
+            footnote = ctk.CTkLabel(
+                self.preview_frame,
+                text="* Alasan ijin yang sudah diinput tidak akan terhapus.",
+                font=FONT_MONO_SMALL, text_color=COLOR_TEXT_MUTED,
+                anchor="w",
+            )
+            footnote.grid(row=1, column=0, columnspan=5, sticky="w", pady=(SPACE_XS, 0))
+
     def _on_pick_file(self):
-        """Open file dialog, parse, render preview + chip."""
-        # R5 — remember last folder
+        """Open file dialog (multi-select OK), parse all, render preview + chip."""
         with get_connection(DB_PATH) as conn:
             initialdir = get_setting(conn, "last_import_folder") or str(Path.home() / "Documents")
 
-        path = filedialog.askopenfilename(
-            title="Pilih file fingerprint",
+        paths_tuple = filedialog.askopenfilenames(
+            title="Pilih file fingerprint (boleh multi-select)",
             initialdir=initialdir,
             filetypes=[("Excel", "*.xls *.xlsx"), ("All files", "*.*")],
         )
-        if not path:
+        if not paths_tuple:
             return
-        self._pending_path = Path(path)
+        paths = [Path(p) for p in paths_tuple]
 
-        # R5 — persist folder for next pick
         with get_connection(DB_PATH) as conn:
-            set_setting(conn, "last_import_folder", str(self._pending_path.parent))
+            set_setting(conn, "last_import_folder", str(paths[0].parent))
 
         t0 = time.perf_counter()
+        all_rows = []
         try:
-            self._pending_rows = parse_fingerprint_file(self._pending_path)
+            for p in paths:
+                all_rows.extend(parse_fingerprint_file(p))
         except Exception as e:
             messagebox.showerror("Error parsing", str(e))
-            self._pending_path = None
+            self._pending_paths = []
             self._pending_rows = []
             return
         parse_ms = int((time.perf_counter() - t0) * 1000)
 
-        if not self._pending_rows:
+        if not all_rows:
             messagebox.showwarning("File kosong",
-                "File tidak mengandung baris yang bisa diimpor.")
-            self._pending_path = None
+                "Tidak ada baris yang bisa diimpor dari file yang dipilih.")
+            self._pending_paths = []
             self._pending_rows = []
             return
+
+        self._pending_paths = paths
+        self._pending_rows = all_rows
 
         issue_count = sum(1 for r in self._pending_rows if is_issue(r))
         unique_emps = {r.no_staff for r in self._pending_rows}
@@ -456,19 +477,27 @@ class ImportScreen(ctk.CTkFrame):
             for no_staff in unique_emps:
                 if get_employee_by_no_staff(conn, no_staff) is None:
                     new_emp_count += 1
+            overlap = count_overlap(conn, self._pending_rows)
 
-        size_kb = self._pending_path.stat().st_size // 1024
-        self._show_chip(self._pending_path.name, size_kb, parse_ms)
+        if len(paths) == 1:
+            filename = paths[0].name
+            size_kb = paths[0].stat().st_size // 1024
+        else:
+            filename = f"{len(paths)} file dipilih"
+            size_kb = sum(p.stat().st_size for p in paths) // 1024
+
+        self._show_chip(filename, size_kb, parse_ms)
         self._render_preview_cards(
             pegawai_count=len(unique_emps),
             date_range=date_range,
             issue_count=issue_count,
             new_emp_count=new_emp_count,
+            overwrite_count=overlap["overwrite"],
         )
         self._update_banner()
 
     def _on_cancel(self):
-        self._pending_path = None
+        self._pending_paths = []
         self._pending_rows = []
         self._hide_chip()
         self._render_preview_placeholder()
@@ -503,7 +532,7 @@ class ImportScreen(ctk.CTkFrame):
         month_display = _format_month_id(mode_month) if mode_month else "-"
 
         self._pending_rows = []
-        self._pending_path = None
+        self._pending_paths = []
         self._hide_chip()
         self._render_preview_placeholder()
         self._update_banner()

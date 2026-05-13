@@ -2,6 +2,8 @@ import sqlite3
 from datetime import datetime, UTC
 from typing import Optional
 
+from src.db.employees import get_employee_by_no_staff
+
 
 def upsert_attendance(
     conn: sqlite3.Connection,
@@ -227,3 +229,34 @@ def list_recent_imports(
         (limit,),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def count_overlap(conn: sqlite3.Connection, pending_rows: list) -> dict:
+    """Count how many pending rows would overwrite existing DB rows.
+
+    Returns dict with keys 'new' (would insert) and 'overwrite' (would
+    replace existing row at (employee_id, tanggal) via upsert).
+
+    The existing upsert preserves reason_category/reason_detail/resolved_at,
+    so 'overwrite' is data-only — user input is not destroyed. UI should
+    surface this count so the user knows scope but not raise alarm.
+
+    Uses N+1 lookup pattern (employees + per-row attendance check).
+    Typical input < 200 rows, acceptable at SQLite speeds.
+    """
+    new_count = 0
+    overwrite_count = 0
+    for r in pending_rows:
+        emp = get_employee_by_no_staff(conn, r.no_staff)
+        if emp is None:
+            new_count += 1
+            continue
+        existing = conn.execute(
+            "SELECT 1 FROM attendance_records WHERE employee_id = ? AND tanggal = ?",
+            (emp["id"], r.tanggal),
+        ).fetchone()
+        if existing:
+            overwrite_count += 1
+        else:
+            new_count += 1
+    return {"new": new_count, "overwrite": overwrite_count}
