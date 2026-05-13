@@ -7,10 +7,6 @@ a = Analysis(
     binaries=[],
     datas=[
         ('src/reports/templates/dashboard.html.j2', 'src/reports/templates'),
-        ('src/reports/templates/dashboard_v1_editorial.html.j2', 'src/reports/templates'),
-        ('src/reports/templates/dashboard_v2_dark_glass.html.j2', 'src/reports/templates'),
-        ('src/reports/templates/dashboard_v3_infographic.html.j2', 'src/reports/templates'),
-        ('src/reports/templates/dashboard_v4_corporate.html.j2', 'src/reports/templates'),
         ('assets/templates/laporan_bulanan_template.xlsx', 'assets/templates'),
         # Brand assets (Josaphat Tech Solution) — readable at runtime via src.config.BRAND_*
         ('assets/brand/icon-04E.svg', 'assets/brand'),
