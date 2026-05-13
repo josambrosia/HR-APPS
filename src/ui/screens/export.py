@@ -1,4 +1,6 @@
 import os
+import tempfile
+import time
 from pathlib import Path
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
@@ -9,6 +11,7 @@ from src.db.settings import get_setting, set_setting
 from src.db.export_history import record_export, list_recent_exports
 from src.core.report_filler import fill_monthly_report
 from src.core.week_utils import full_month_range
+from src.core.filename_parser import detect_year_month_from_filename
 from src.ui.components.kpi_card import KPICard
 from src.ui.screens.import_screen import _format_month_id, _format_relative_time
 from src.ui.theme import (
@@ -30,6 +33,8 @@ class ExportScreen(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent, fg_color="transparent")
         self._selected: Path | None = None
+        self._filename_mismatch = False
+        self._detected_ym: str | None = None
         self._build()
 
     def _build(self):
@@ -60,6 +65,10 @@ class ExportScreen(ctk.CTkFrame):
         )
         self.banner_text.pack(side="left", fill="x", expand=True, pady=SPACE_SM)
         self._update_banner()
+
+        # ── R8: Save Destination dropdown ──
+        self.save_dest_frame = self._build_save_destination()
+        self.save_dest_frame.pack(fill="x", pady=(0, SPACE_MD))
 
         # ── Picker zone (initial state) ──
         self.picker_zone = self._build_picker_zone()
@@ -181,6 +190,16 @@ class ExportScreen(ctk.CTkFrame):
             width=80,
         ).pack(side="left", padx=(0, SPACE_XS))
         ctk.CTkButton(
+            actions, text="👁 Preview",
+            command=self._preview_file,
+            fg_color="transparent",
+            border_width=1, border_color=COLOR_INFO,
+            text_color=COLOR_INFO,
+            hover_color=COLOR_SURFACE_HIGH,
+            font=FONT_BODY_BOLD,
+            width=100,
+        ).pack(side="left", padx=(0, SPACE_XS))
+        ctk.CTkButton(
             actions, text="💾 Export",
             command=self._do_export,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
@@ -192,7 +211,7 @@ class ExportScreen(ctk.CTkFrame):
         self.chip_frame.pack(fill="x", pady=(0, SPACE_MD), before=self.preview_frame)
 
     def _update_banner(self):
-        """Refresh banner with current_month info + data summary."""
+        """Refresh banner with current_month info + data summary + R2 mismatch warn."""
         with get_connection(DB_PATH) as conn:
             current = get_setting(conn, "current_month") or ""
             emp = issues = unresolved = 0
@@ -210,6 +229,22 @@ class ExportScreen(ctk.CTkFrame):
                     emp = row["emp_count"] or 0
                     issues = row["issue_count"] or 0
                     unresolved = row["unresolved_count"] or 0
+
+        # R2 — filename mismatch state takes priority over standard cyan/rose
+        mismatch = getattr(self, "_filename_mismatch", False)
+        detected = getattr(self, "_detected_ym", None)
+        if mismatch and detected:
+            self.banner.configure(fg_color="#2A0A14", border_color="#5C1E2A")
+            self.banner_icon.configure(text="⚠", text_color=COLOR_WARN)
+            self.banner_text.configure(
+                text=(
+                    f"Mismatch: File mention '{_format_month_id(detected)}' "
+                    f"tapi bulan aktif '{_format_month_id(current)}'.\n"
+                    f"Data dari {_format_month_id(current)} akan dimasukkan ke template tersebut."
+                ),
+            )
+            return
+
         if current:
             self.banner.configure(fg_color="#08222B", border_color="#12454F")
             self.banner_icon.configure(text="📆", text_color=COLOR_INFO)
@@ -377,7 +412,138 @@ class ExportScreen(ctk.CTkFrame):
             ).pack(side="right")
         ctk.CTkFrame(self.history_frame, fg_color="transparent", height=SPACE_SM).pack()
 
+    def _build_save_destination(self):
+        """R8 — dropdown to choose where exported file is saved."""
+        frame = ctk.CTkFrame(self, fg_color="transparent")
+        ctk.CTkLabel(
+            frame, text="SIMPAN OUTPUT KE",
+            font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
+        ).pack(anchor="w", padx=SPACE_XS)
+
+        options = [
+            "Folder template (default)",
+            "Documents/HR Reports/",
+            "Pilih folder lain...",
+        ]
+        self.save_dest_var = ctk.StringVar(value=options[0])
+
+        # Restore from settings if previously set
+        with get_connection(DB_PATH) as conn:
+            mode = get_setting(conn, "export_save_mode") or "template_folder"
+        mode_to_label = {
+            "template_folder": options[0],
+            "hr_reports": options[1],
+            "custom": options[2],
+        }
+        self.save_dest_var.set(mode_to_label.get(mode, options[0]))
+
+        self.save_dest_menu = ctk.CTkOptionMenu(
+            frame,
+            values=options,
+            variable=self.save_dest_var,
+            command=self._on_save_dest_change,
+            fg_color=COLOR_SURFACE_HIGH,
+            button_color=COLOR_BORDER,
+            button_hover_color=COLOR_BORDER_STRONG,
+            text_color=COLOR_TEXT,
+            font=FONT_BODY,
+            width=280,
+        )
+        self.save_dest_menu.pack(anchor="w", padx=SPACE_XS, pady=(SPACE_XS, 0))
+        return frame
+
+    def _on_save_dest_change(self, value: str):
+        label_to_mode = {
+            "Folder template (default)": "template_folder",
+            "Documents/HR Reports/": "hr_reports",
+            "Pilih folder lain...": "custom",
+        }
+        mode = label_to_mode.get(value, "template_folder")
+        if mode == "custom":
+            chosen = filedialog.askdirectory(title="Pilih folder save destination")
+            if not chosen:
+                # Revert to previous value
+                with get_connection(DB_PATH) as conn:
+                    prev_mode = get_setting(conn, "export_save_mode") or "template_folder"
+                label_map = {
+                    "template_folder": "Folder template (default)",
+                    "hr_reports": "Documents/HR Reports/",
+                    "custom": "Pilih folder lain...",
+                }
+                self.save_dest_var.set(label_map[prev_mode])
+                return
+            with get_connection(DB_PATH) as conn:
+                set_setting(conn, "export_save_custom_path", chosen)
+                set_setting(conn, "export_save_mode", "custom")
+        else:
+            with get_connection(DB_PATH) as conn:
+                set_setting(conn, "export_save_mode", mode)
+
+    def _resolve_save_destination(self, template_path: Path) -> Path:
+        """Returns the directory to save export based on current save mode.
+
+        Falls back to template's parent folder on PermissionError or other
+        OSError (e.g., locked-down enterprise workstation, redirected roaming
+        profile). User sees a warning toast but export proceeds.
+        """
+        with get_connection(DB_PATH) as conn:
+            mode = get_setting(conn, "export_save_mode") or "template_folder"
+            custom = get_setting(conn, "export_save_custom_path") or ""
+        if mode == "hr_reports":
+            target = Path.home() / "Documents" / "HR Reports"
+            try:
+                target.mkdir(parents=True, exist_ok=True)
+                return target
+            except OSError as e:
+                messagebox.showwarning(
+                    "Folder HR Reports tidak bisa dibuat",
+                    f"Fallback ke folder template.\n\n{e}",
+                )
+                return template_path.parent
+        if mode == "custom" and custom:
+            custom_path = Path(custom)
+            if custom_path.exists():
+                return custom_path
+            # Custom path is stale — folder was deleted/moved. Fall back.
+            messagebox.showwarning(
+                "Folder custom tidak ditemukan",
+                f"Fallback ke folder template.\n\nFolder hilang: {custom}",
+            )
+            return template_path.parent
+        # default: template's parent
+        return template_path.parent
+
+    def _preview_file(self):
+        """R7 — generate the filled .xlsx in a fresh temp subdir and open with default viewer.
+
+        Uses timestamped subdir so repeated Preview clicks don't collide on Windows
+        file locks (Excel holds exclusive write lock when file is open).
+        """
+        if not self._selected:
+            return
+        tmp_dir = Path(tempfile.gettempdir()) / f"hr-preview-{int(time.time())}"
+        try:
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            with get_connection(DB_PATH) as conn:
+                out_path, _summary = fill_monthly_report(
+                    self._selected, conn, dry_run=False, out_dir=tmp_dir,
+                )
+        except Exception as e:
+            messagebox.showerror("Error generate preview", str(e))
+            return
+        try:
+            os.startfile(str(out_path))
+        except Exception as e:
+            messagebox.showwarning(
+                "Tidak bisa buka file",
+                f"File tergenerate di:\n{out_path}\n\nTapi gagal dibuka otomatis:\n{e}",
+            )
+
     def _pick(self):
+        # Reset state from any previous selection
+        self._filename_mismatch = False
+        self._detected_ym = None
+
         with get_connection(DB_PATH) as conn:
             initialdir = get_setting(conn, "last_export_template_folder") or str(Path.home() / "Documents")
 
@@ -389,6 +555,13 @@ class ExportScreen(ctk.CTkFrame):
         if not path:
             return
         self._selected = Path(path)
+
+        # R2 — smart filename detection: warn if file mentions different month
+        detected_ym = detect_year_month_from_filename(self._selected)
+        with get_connection(DB_PATH) as conn:
+            current_ym = get_setting(conn, "current_month") or ""
+        self._filename_mismatch = bool(detected_ym and current_ym and detected_ym != current_ym)
+        self._detected_ym = detected_ym
 
         with get_connection(DB_PATH) as conn:
             set_setting(conn, "last_export_template_folder", str(self._selected.parent))
@@ -416,9 +589,10 @@ class ExportScreen(ctk.CTkFrame):
         if not self._selected:
             return
         try:
+            out_dir = self._resolve_save_destination(self._selected)
             with get_connection(DB_PATH) as conn:
                 out_path, summary = fill_monthly_report(
-                    self._selected, conn, dry_run=False,
+                    self._selected, conn, dry_run=False, out_dir=out_dir,
                 )
                 ym = get_setting(conn, "current_month") or "?"
                 record_export(
