@@ -5,6 +5,7 @@ from src.db.attendance import upsert_attendance, set_reason
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag, karyawan_teladan,
     karyawan_teladan_top_n, ranking_departemen, hari_paling_rawan, resolution_rate,
+    avg_minutes_per_late_event,
 )
 
 
@@ -200,3 +201,46 @@ def test_terlambat_excludes_absent_days(temp_db_path):
         assert r["total_terlambat"] == 30  # NOT 30+99
         assert r["hari_telat"] == 1        # only day 1 counts
         assert r["tidak_hadir"] == 1       # day 2 counted as absent
+
+
+def test_avg_minutes_per_late_event_empty(temp_db_path):
+    """No late events -> returns 0.0"""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        result = avg_minutes_per_late_event(conn, "2026-04-01", "2026-04-30")
+        assert result == 0.0
+
+
+def test_avg_minutes_per_late_event_single(temp_db_path):
+    """One late event of 10 min -> returns 10.0"""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "A")
+        _add_att(conn, a, "2026-04-13", "Senin", "08.10", "17.00", 10)
+        result = avg_minutes_per_late_event(conn, "2026-04-01", "2026-04-30")
+        assert result == 10.0
+
+
+def test_avg_minutes_per_late_event_multi(temp_db_path):
+    """Three events 10+20+30 across 2 emp -> avg 20.0"""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "A")
+        b = _add_emp(conn, "2", "B")
+        _add_att(conn, a, "2026-04-13", "Senin",  "08.10", "17.00", 10)
+        _add_att(conn, a, "2026-04-14", "Selasa", "08.20", "17.00", 20)
+        _add_att(conn, b, "2026-04-13", "Senin",  "08.30", "17.00", 30)
+        result = avg_minutes_per_late_event(conn, "2026-04-01", "2026-04-30")
+        assert result == 20.0
+
+
+def test_avg_minutes_per_late_event_zero_excluded(temp_db_path):
+    """terlambat_menit=0 (on time) not counted as an event"""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "A")
+        b = _add_emp(conn, "2", "B")
+        _add_att(conn, a, "2026-04-13", "Senin", "08.10", "17.00", 10)
+        _add_att(conn, b, "2026-04-13", "Senin", "08.00", "17.00", 0)
+        result = avg_minutes_per_late_event(conn, "2026-04-01", "2026-04-30")
+        assert result == 10.0

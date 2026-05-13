@@ -175,3 +175,28 @@ def resolution_rate(
     total = row["total"] or 0
     rate = (resolved / total * 100) if total > 0 else 0.0
     return {"resolved": resolved, "total": total, "rate_pct": round(rate, 1)}
+
+
+def avg_minutes_per_late_event(
+    conn: sqlite3.Connection, period_start: str, period_end: str
+) -> float:
+    """Rata-rata menit terlambat per kejadian (total_min / count of late events).
+
+    Returns 0.0 jika tidak ada late events di periode tersebut.
+    Rows dengan terlambat_menit=0 atau NULL (= on time / absent) tidak
+    dihitung sebagai event.
+    """
+    row = conn.execute(
+        """
+        SELECT COALESCE(SUM(terlambat_menit), 0) AS total,
+               COUNT(*) AS cnt
+          FROM attendance_records
+         WHERE tanggal BETWEEN ? AND ?
+           AND tipe = 'Hari Kerja'
+           AND terlambat_menit IS NOT NULL
+           AND terlambat_menit > 0
+        """,
+        (period_start, period_end),
+    ).fetchone()
+    total, cnt = row[0], row[1]
+    return float(total) / cnt if cnt else 0.0
