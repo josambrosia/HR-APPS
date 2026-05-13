@@ -50,6 +50,20 @@ CREATE TABLE IF NOT EXISTS coaching_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_coaching_week ON coaching_sessions(week_start);
+
+CREATE TABLE IF NOT EXISTS export_history (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    out_path    TEXT NOT NULL,
+    template    TEXT NOT NULL,
+    year_month  TEXT NOT NULL,
+    filled      INTEGER NOT NULL,
+    na          INTEGER NOT NULL,
+    not_found   INTEGER NOT NULL,
+    created_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_export_history_created_at
+    ON export_history(created_at DESC);
 """
 
 DEFAULT_SETTINGS = {

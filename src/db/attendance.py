@@ -200,3 +200,30 @@ def unresolve_issue(conn: sqlite3.Connection, *, attendance_id: int) -> None:
         """,
         (attendance_id,),
     )
+
+
+def list_recent_imports(
+    conn: sqlite3.Connection, limit: int = 5,
+) -> list[dict]:
+    """Return recent fingerprint imports — distinct imported_from with metadata.
+
+    Each dict has keys: imported_from, imported_at, emp_count.
+    Sorted by imported_at DESC (latest first). Limit caller-provided.
+
+    Used by Import screen's 'Riwayat Import Terakhir' history list.
+    """
+    rows = conn.execute(
+        """
+        SELECT
+            imported_from,
+            MAX(imported_at) AS imported_at,
+            COUNT(DISTINCT employee_id) AS emp_count
+        FROM attendance_records
+        WHERE imported_from IS NOT NULL
+        GROUP BY imported_from
+        ORDER BY MAX(imported_at) DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]
