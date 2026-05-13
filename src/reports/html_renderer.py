@@ -1,3 +1,9 @@
+"""Render dashboard HTML print output.
+
+Produces a 2-page A4 HTML using the single "Light" theme template.
+Page 1: Executive summary (KPI strip + Top 5 + Teladan + Coaching + Pola Jam Masuk).
+Page 2: Ranking Lengkap (all employees with menit + kejadian + tidak hadir).
+"""
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -7,23 +13,21 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.config import DEFAULT_COACHING_THRESHOLD_MINUTES
 from src.core.insights import (
-    terlambat_ranking, top_n_terlambat, coaching_flag, karyawan_teladan_top_n,
-    ranking_departemen, hari_paling_rawan,
+    terlambat_ranking, top_n_terlambat, coaching_flag,
+    karyawan_teladan_top_n,
+    avg_minutes_per_late_event, pola_jam_masuk,
 )
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-
-TEMPLATE_NAMES = {
-    "default":     "dashboard.html.j2",
-    "editorial":   "dashboard_v1_editorial.html.j2",
-    "dark_glass":  "dashboard_v2_dark_glass.html.j2",
-    "infographic": "dashboard_v3_infographic.html.j2",
-    "corporate":   "dashboard_v4_corporate.html.j2",
-}
+TEMPLATE_FILE = "dashboard.html.j2"
 
 DEFAULT_SECTIONS = {
-    "kpi": True, "top5_late": True, "top5_teladan": True,
-    "coaching": True, "departemen": True, "hari_rawan": True, "ranking": True,
+    "kpi": True,
+    "top5_late": True,
+    "top5_teladan": True,
+    "coaching": True,
+    "pola_jam_masuk": True,
+    "ranking": True,  # mandatory — always rendered regardless of toggle
 }
 
 
@@ -42,52 +46,56 @@ def render_dashboard_html(
     period_label: str,
     out_dir: Path,
     threshold: int = DEFAULT_COACHING_THRESHOLD_MINUTES,
-    template_name: str = "default",
     sections: Optional[dict] = None,
 ) -> Path:
-    """Render dashboard HTML and write to out_dir. Returns the file path.
+    """Render the dashboard HTML print output and return its path.
 
-    template_name picks the theme; sections is a dict of booleans deciding
-    which content blocks to include.
+    `sections` is a dict of booleans keyed by section name (see DEFAULT_SECTIONS).
+    Missing keys default to True. The "ranking" section is always rendered even
+    if set to False — it's mandatory per design spec.
     """
     if sections is None:
         sections = DEFAULT_SECTIONS.copy()
-    tmpl_file = TEMPLATE_NAMES.get(template_name, TEMPLATE_NAMES["default"])
+    else:
+        sections = {**DEFAULT_SECTIONS, **sections}
+    sections["ranking"] = True  # enforce mandatory
 
     ranking = terlambat_ranking(conn, period_start, period_end)
     top5_late = top_n_terlambat(conn, period_start, period_end, n=5)
     coaching = coaching_flag(conn, period_start, period_end, threshold=threshold)
-    top5_teladan = karyawan_teladan_top_n(conn, period_start, period_end, n=5)
-    dept_rows = ranking_departemen(conn, period_start, period_end)
-    day_rows = hari_paling_rawan(conn, period_start, period_end)
+    # Show ALL teladan (hadir penuh + on time), not just top 5
+    teladan = karyawan_teladan_top_n(conn, period_start, period_end, n=None)
+    avg_min = avg_minutes_per_late_event(conn, period_start, period_end)
+    jam_masuk = pola_jam_masuk(conn, period_start, period_end)
 
-    total_terlambat = sum(r["total_terlambat"] for r in ranking)
-    total_absen = conn.execute(
-        """
-        SELECT COUNT(*) FROM attendance_records
-         WHERE tanggal BETWEEN ? AND ?
-           AND tipe = 'Hari Kerja' AND masuk IS NULL AND keluar IS NULL
-        """,
-        (period_start, period_end),
-    ).fetchone()[0]
+    # KPI tallies derived from ranking
+    total_terlambat = sum(r['hari_telat'] for r in ranking)
+    total_min = sum(r['total_terlambat'] for r in ranking)
+    teladan_count = sum(
+        1 for r in ranking
+        if r['total_terlambat'] == 0 and r['hari_telat'] == 0 and r['absent_count'] == 0
+    )
 
     env = _build_env()
-    tmpl = env.get_template(tmpl_file)
+    tmpl = env.get_template(TEMPLATE_FILE)
     html = tmpl.render(
         period_label=period_label,
+        period_start=period_start,
+        period_end=period_end,
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
         kpi={
             "total_terlambat": total_terlambat,
-            "total_absen": total_absen,
+            "total_min": total_min,
+            "avg_min": avg_min,
             "coaching_count": len(coaching),
+            "teladan_count": teladan_count,
         },
         top5_late=top5_late,
-        top5_teladan=top5_teladan,
+        teladan=teladan,
         coaching=coaching,
         coaching_threshold=threshold,
+        jam_masuk=jam_masuk,
         ranking=ranking,
-        ranking_departemen=dept_rows,
-        hari_paling_rawan=day_rows,
         sections=sections,
     )
 

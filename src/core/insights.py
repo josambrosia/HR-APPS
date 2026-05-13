@@ -119,10 +119,15 @@ def karyawan_teladan(
 
 
 def karyawan_teladan_top_n(
-    conn: sqlite3.Connection, start: str, end: str, n: int = 5
+    conn: sqlite3.Connection, start: str, end: str, n: Optional[int] = 5
 ) -> List[sqlite3.Row]:
-    """Top N best performers (lowest composite score)."""
+    """Top N best performers (lowest composite score).
+
+    If `n` is None, returns ALL teladan (no limit). Default n=5 preserves
+    backward compat with existing callers (UI dashboard, etc.).
+    """
     placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
+    limit_clause = "" if n is None else "LIMIT ?"
     sql = f"""
         SELECT e.id, e.nama, e.dept,
                SUM(CASE WHEN ar.reason_category IN ({placeholders}) THEN 0
@@ -139,9 +144,12 @@ def karyawan_teladan_top_n(
          GROUP BY e.id
          HAVING hari_kerja >= 3
          ORDER BY score ASC, e.nama ASC
-         LIMIT ?
+         {limit_clause}
     """
-    params = (*COACHING_EXCLUDED, start, end, n)
+    if n is None:
+        params = (*COACHING_EXCLUDED, start, end)
+    else:
+        params = (*COACHING_EXCLUDED, start, end, n)
     return conn.execute(sql, params).fetchall()
 
 
