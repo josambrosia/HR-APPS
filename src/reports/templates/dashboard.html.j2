@@ -37,6 +37,8 @@
 
   /* Tables */
   .b-table{width:100%;border-collapse:collapse;font-size:11px}
+  .b-table thead{display:table-header-group}
+  .b-table tr{break-inside:avoid;page-break-inside:avoid}
   .b-table th{text-align:left;font-size:9.5px;color:#737373;text-transform:uppercase;letter-spacing:.8px;padding:7px 6px;background:#fafafa;border-bottom:1px solid #ec4899}
   .b-table td{padding:7px 6px;border-bottom:1px solid #f5f5f5}
   .b-table .num{font-family:Consolas,monospace;text-align:right;color:#ec4899;font-weight:600}
@@ -51,7 +53,6 @@
   .b-jam{background:#fafafa;border-radius:8px;padding:14px 16px}
   .b-jam .jh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
   .b-jam .jh .total{font-family:Consolas;font-size:10px;color:#737373}
-  .b-jam .jh .total b{color:#ec4899}
   .b-bar-row{display:grid;grid-template-columns:100px 1fr 50px;gap:10px;align-items:center;font-size:10.5px;padding:3px 0}
   .b-bar-row .lbl{font-family:Consolas;color:#525252;font-size:10px}
   .b-bar-row .lbl.early,.b-bar-row .lbl.ontime{color:#10b981}
@@ -66,8 +67,6 @@
   .b-bar-fill.chronic{background:linear-gradient(90deg,#be123c,#e11d48)}
   .b-bar-row .v{font-family:Consolas;font-weight:700;text-align:right;color:#171717}
   .b-jam-divider{border-top:1px dashed #e5e5e5;margin:8px 0;text-align:center;font-size:9px;color:#a3a3a3;text-transform:uppercase;letter-spacing:1px;padding-top:6px}
-  .b-jam-insight{margin-top:12px;padding:10px 12px;background:#fff;border-left:3px solid #ec4899;border-radius:0 6px 6px 0;font-size:11px;color:#525252}
-  .b-jam-insight b{color:#171717}
 
   /* Footer */
   .b-footer{margin-top:22px;padding-top:12px;border-top:1px solid #e5e5e5;display:flex;justify-content:space-between;font-size:9.5px;color:#737373;font-family:Consolas,monospace}
