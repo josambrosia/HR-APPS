@@ -20,7 +20,11 @@ class FillSummary:
 
 
 def fill_monthly_report(
-    xlsx_path: Path, conn: sqlite3.Connection
+    xlsx_path: Path,
+    conn: sqlite3.Connection,
+    *,
+    dry_run: bool = False,
+    out_dir: Path | None = None,
 ) -> Tuple[Path, FillSummary]:
     """Open Laporan Bulanan, write Alasan Ijin column from DB, save as <stem> [filled].xlsx.
 
@@ -29,6 +33,19 @@ def fill_monthly_report(
     - Rows where employee+date not found in DB → leave as is (count not_found).
     - Rows where DB has has_issue=1 but no reason → write 'NA / Belum ada kabar'.
     - Rows with reason → render via reason_mapper.
+
+    Args:
+        xlsx_path: Path to source .xlsx template.
+        conn: SQLite connection.
+        dry_run: If True, perform matching + return summary but do NOT
+            save the .xlsx to disk. Used by Export UI for preview.
+        out_dir: If provided, save output there. Otherwise save next
+            to template (existing behavior).
+
+    Returns:
+        Tuple (out_path, summary). When dry_run=True, out_path is the
+        predicted output path (still computed for UI display) but no
+        file is written.
     """
     wb = load_workbook(xlsx_path)
     ws = wb.active
@@ -76,6 +93,8 @@ def fill_monthly_report(
             continue
         target.value = text
 
-    out_path = xlsx_path.with_name(f"{xlsx_path.stem} [filled].xlsx")
-    wb.save(out_path)
+    out_name = f"{xlsx_path.stem} [filled].xlsx"
+    out_path = (out_dir or xlsx_path.parent) / out_name
+    if not dry_run:
+        wb.save(out_path)
     return out_path, summary
