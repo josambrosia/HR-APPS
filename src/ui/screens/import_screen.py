@@ -13,6 +13,7 @@ from src.db.settings import set_setting, get_setting
 from src.parsers.fingerprint import parse_fingerprint_file
 from src.core.issue_detector import is_issue
 from src.ui.components.kpi_card import KPICard
+from src.ui.components.progress_modal import ProgressModal
 from src.ui.components.toast import show_success_toast
 from src.ui.theme import (
     FONT_FAMILY,
@@ -221,6 +222,32 @@ class ImportScreen(ctk.CTkFrame):
                 _bind_hover_recursive(child)
 
         _bind_hover_recursive(zone)
+
+        # R1 — register windnd hook for drag-and-drop file support
+        try:
+            import windnd
+
+            def _on_drop(files):
+                if not files:
+                    return
+                paths = []
+                for f in files:
+                    try:
+                        p = Path(f.decode("utf-8") if isinstance(f, bytes) else f)
+                    except Exception:
+                        continue
+                    if p.suffix.lower() in (".xls", ".xlsx"):
+                        paths.append(p)
+                if not paths:
+                    return
+                self._handle_dropped_paths(paths)
+
+            windnd.hook_dropfiles(zone, func=_on_drop, force_unicode=True)
+        except ImportError:
+            pass  # windnd not installed — drop zone still click-functional
+        except Exception:
+            pass  # registration failure — graceful degradation
+
         return zone
 
     def _show_chip(self, filename: str, size_kb: int, parse_ms: int):
@@ -441,7 +468,18 @@ class ImportScreen(ctk.CTkFrame):
         if not paths_tuple:
             return
         paths = [Path(p) for p in paths_tuple]
+        self._ingest_paths(paths, source="dipilih")
 
+    def _ingest_paths(self, paths: list, source: str = "dipilih") -> None:
+        """Parse + render chip + preview cards for a list of file paths.
+
+        Shared by _on_pick_file (file dialog) and _handle_dropped_paths
+        (drag-drop). Persists last folder, parses all files, computes
+        metrics, renders chip + preview + banner.
+
+        source: word inserted into multi-file label ("dipilih" / "di-drop")
+            to give visual feedback about how files arrived.
+        """
         with get_connection(DB_PATH) as conn:
             set_setting(conn, "last_import_folder", str(paths[0].parent))
 
@@ -458,8 +496,10 @@ class ImportScreen(ctk.CTkFrame):
         parse_ms = int((time.perf_counter() - t0) * 1000)
 
         if not all_rows:
-            messagebox.showwarning("File kosong",
-                "Tidak ada baris yang bisa diimpor dari file yang dipilih.")
+            messagebox.showwarning(
+                "File kosong",
+                "Tidak ada baris yang bisa diimpor dari file yang dipilih.",
+            )
             self._pending_paths = []
             self._pending_rows = []
             return
@@ -483,7 +523,7 @@ class ImportScreen(ctk.CTkFrame):
             filename = paths[0].name
             size_kb = paths[0].stat().st_size // 1024
         else:
-            filename = f"{len(paths)} file dipilih"
+            filename = f"{len(paths)} file {source}"
             size_kb = sum(p.stat().st_size for p in paths) // 1024
 
         self._show_chip(filename, size_kb, parse_ms)
@@ -495,6 +535,10 @@ class ImportScreen(ctk.CTkFrame):
             overwrite_count=overlap["overwrite"],
         )
         self._update_banner()
+
+    def _handle_dropped_paths(self, paths: list):
+        """Process files dropped via windnd hook — delegates to _ingest_paths."""
+        self._ingest_paths(paths, source="di-drop")
 
     def _on_cancel(self):
         self._pending_paths = []
@@ -511,8 +555,19 @@ class ImportScreen(ctk.CTkFrame):
         months = [r.tanggal[:7] for r in self._pending_rows if r.tanggal]
         mode_month = Counter(months).most_common(1)[0][0] if months else None
 
-        with get_connection(DB_PATH) as conn:
-            for r in self._pending_rows:
+        total_rows = len(self._pending_rows)
+        use_progress = total_rows > 50
+
+        if use_progress:
+            cm = ProgressModal(self.winfo_toplevel(), title="Memproses Import")
+        else:
+            from contextlib import nullcontext
+            cm = nullcontext()
+
+        with cm as progress, get_connection(DB_PATH) as conn:
+            if use_progress:
+                progress.update_progress(0.0, f"Inserting {total_rows} rows...")
+            for i, r in enumerate(self._pending_rows):
                 emp_id = upsert_employee(
                     conn, no_staff=r.no_staff, nama=r.nama, dept=r.dept
                 )
@@ -525,6 +580,11 @@ class ImportScreen(ctk.CTkFrame):
                     has_issue=1 if is_issue(r) else 0,
                     imported_from=r.source_file,
                 )
+                if use_progress and (i + 1) % 10 == 0:
+                    progress.update_progress(
+                        (i + 1) / total_rows,
+                        f"Inserting row {i+1}/{total_rows}...",
+                    )
             if mode_month:
                 set_setting(conn, "current_month", mode_month)
 

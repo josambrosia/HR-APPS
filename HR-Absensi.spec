@@ -20,7 +20,7 @@ a = Analysis(
         ('assets/brand/animation-02-typing-04E.gif', 'assets/brand'),
         ('assets/brand/icon-04E.ico', 'assets/brand'),
     ],
-    hiddenimports=['customtkinter', 'PIL'],
+    hiddenimports=['customtkinter', 'PIL', 'windnd'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
