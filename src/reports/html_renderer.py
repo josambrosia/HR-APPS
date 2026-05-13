@@ -14,7 +14,6 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from src.config import DEFAULT_COACHING_THRESHOLD_MINUTES
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
-    karyawan_teladan_top_n,
     avg_minutes_per_late_event, pola_jam_masuk,
 )
 
@@ -63,18 +62,19 @@ def render_dashboard_html(
     ranking = terlambat_ranking(conn, period_start, period_end)
     top5_late = top_n_terlambat(conn, period_start, period_end, n=5)
     coaching = coaching_flag(conn, period_start, period_end, threshold=threshold)
-    # Show ALL teladan (hadir penuh + on time), not just top 5
-    teladan = karyawan_teladan_top_n(conn, period_start, period_end, n=None)
+    # Teladan = perfect attendance (no late, no absent). Derived from ranking
+    # so KPI count and panel list always agree.
+    teladan = [
+        r for r in ranking
+        if r['total_terlambat'] == 0 and r['hari_telat'] == 0 and r['absent_count'] == 0
+    ]
     avg_min = avg_minutes_per_late_event(conn, period_start, period_end)
     jam_masuk = pola_jam_masuk(conn, period_start, period_end)
 
     # KPI tallies derived from ranking
     total_terlambat = sum(r['hari_telat'] for r in ranking)
     total_min = sum(r['total_terlambat'] for r in ranking)
-    teladan_count = sum(
-        1 for r in ranking
-        if r['total_terlambat'] == 0 and r['hari_telat'] == 0 and r['absent_count'] == 0
-    )
+    teladan_count = len(teladan)
 
     env = _build_env()
     tmpl = env.get_template(TEMPLATE_FILE)
