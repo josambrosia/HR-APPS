@@ -482,7 +482,7 @@ class DashboardScreen(ctk.CTkFrame):
             on_submit=self._do_print,
         )
 
-    def _do_print(self, sections, theme):
+    def _do_print(self, sections):
         from src.ui.browser_launcher import open_html_in_browser
         from src.ui.components.toast import show_success_toast
 
@@ -494,7 +494,7 @@ class DashboardScreen(ctk.CTkFrame):
                 html_path = render_dashboard_html(
                     conn, period_start=start, period_end=end,
                     period_label=label, out_dir=out_dir,
-                    template_name=theme, sections=sections,
+                    sections=sections,
                     threshold=dynamic_threshold,
                 )
         except Exception as e:
@@ -508,7 +508,7 @@ class DashboardScreen(ctk.CTkFrame):
                 title="Dashboard Dibuka",
                 message=(
                     f"Dashboard {label} dibuka di {browser_name}.\n"
-                    f"Tema: {theme} · Gunakan Ctrl+P untuk Save as PDF."
+                    f"Gunakan Ctrl+P untuk Save as PDF."
                 ),
             )
         else:
