@@ -610,3 +610,7 @@ class ExportScreen(ctk.CTkFrame):
 
         self._render_result_strip(out_path, summary)
         self._render_history()
+        # Reset mismatch flag — action already done, banner shouldn't say "akan dimasukkan"
+        self._filename_mismatch = False
+        self._detected_ym = None
+        self._update_banner()
