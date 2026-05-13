@@ -1,4 +1,6 @@
+import time
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
@@ -6,23 +8,24 @@ import customtkinter as ctk
 from src.config import DB_PATH
 from src.db.connection import get_connection
 from src.db.employees import upsert_employee, get_employee_by_no_staff
-from src.db.attendance import upsert_attendance
-from src.db.settings import set_setting
+from src.db.attendance import upsert_attendance, list_recent_imports
+from src.db.settings import set_setting, get_setting
 from src.parsers.fingerprint import parse_fingerprint_file
 from src.core.issue_detector import is_issue
 from src.ui.components.kpi_card import KPICard
 from src.ui.components.toast import show_success_toast
 from src.ui.theme import (
     FONT_FAMILY,
-    COLOR_BG, COLOR_SURFACE_HIGH,
-    COLOR_BORDER_STRONG,
+    COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
+    COLOR_BORDER, COLOR_BORDER_STRONG,
     COLOR_ACCENT, COLOR_ACCENT_HOVER,
     COLOR_INFO, COLOR_WARN,
-    COLOR_TEXT, COLOR_TEXT_MUTED,
+    COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
     FONT_DISPLAY, FONT_SUBHEAD,
-    FONT_BODY, FONT_BODY_BOLD, FONT_SMALL,
-    SPACE_XS, SPACE_SM, SPACE_LG,
-    RADIUS_LG,
+    FONT_BODY, FONT_BODY_BOLD, FONT_SMALL, FONT_LABEL,
+    FONT_MONO_DATA, FONT_MONO_SMALL,
+    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
+    RADIUS_SM, RADIUS_MD, RADIUS_LG,
 )
 
 
@@ -30,6 +33,11 @@ _MONTH_ID = {
     1: "Januari", 2: "Februari", 3: "Maret", 4: "April",
     5: "Mei", 6: "Juni", 7: "Juli", 8: "Agustus",
     9: "September", 10: "Oktober", 11: "November", 12: "Desember",
+}
+_MONTH_ID_SHORT = {
+    1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr",
+    5: "Mei", 6: "Jun", 7: "Jul", 8: "Ags",
+    9: "Sep", 10: "Okt", 11: "Nov", 12: "Des",
 }
 
 
@@ -40,6 +48,55 @@ def _format_month_id(month_str: str) -> str:
         return f"{_MONTH_ID[int(m_s)]} {year_s}"
     except (ValueError, KeyError):
         return month_str
+
+
+def _format_short_range(start_iso: str, end_iso: str) -> str:
+    """Compact Indonesian date range:
+        same month/year → '22 → 28 Apr 2026'
+        different month, same year → '30 Apr → 5 Mei 2026'
+        different year → '30 Des 2025 → 5 Jan 2026'
+    """
+    try:
+        s = datetime.strptime(start_iso, "%Y-%m-%d")
+        e = datetime.strptime(end_iso, "%Y-%m-%d")
+    except ValueError:
+        return f"{start_iso} → {end_iso}"
+    if s.year != e.year:
+        return f"{s.day} {_MONTH_ID_SHORT[s.month]} {s.year} → {e.day} {_MONTH_ID_SHORT[e.month]} {e.year}"
+    if s.month != e.month:
+        return f"{s.day} {_MONTH_ID_SHORT[s.month]} → {e.day} {_MONTH_ID_SHORT[e.month]} {e.year}"
+    return f"{s.day} → {e.day} {_MONTH_ID_SHORT[e.month]} {e.year}"
+
+
+def _format_relative_time(iso_dt: str) -> str:
+    """ISO datetime to 'Hari ini HH:MM' / 'Kemarin HH:MM' / 'MMM D HH:MM'.
+
+    Handles both ISO-UTC ('2026-05-13T08:19:47+00:00') and naive local
+    ('2026-05-13 08:19:47') formats — falls back to raw if unparseable.
+    """
+    if not iso_dt:
+        return "—"
+    # Try ISO format with timezone first
+    dt = None
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(iso_dt, fmt)
+            break
+        except (ValueError, TypeError):
+            continue
+    if dt is None:
+        return iso_dt
+    # Strip timezone for local comparison (display-only)
+    if dt.tzinfo is not None:
+        dt = dt.astimezone().replace(tzinfo=None)
+    now = datetime.now()
+    today = now.date()
+    if dt.date() == today:
+        return f"Hari ini {dt.strftime('%H:%M')}"
+    delta = today - dt.date()
+    if delta.days == 1:
+        return f"Kemarin {dt.strftime('%H:%M')}"
+    return f"{_MONTH_ID_SHORT[dt.month]} {dt.day} {dt.strftime('%H:%M')}"
 
 
 class ImportScreen(ctk.CTkFrame):
@@ -56,11 +113,57 @@ class ImportScreen(ctk.CTkFrame):
             font=FONT_DISPLAY, text_color=COLOR_TEXT,
         ).pack(anchor="w", pady=(0, SPACE_LG))
 
-        # ── Drop zone ──
-        # "#0F0F0F" — one-off, slightly lighter than COLOR_BG for contrast.
-        # CTk doesn't support dashed borders; we approximate with a solid
-        # COLOR_BORDER_STRONG 2px border + magenta hover state.
-        self.dropzone = ctk.CTkFrame(
+        # ── Active month banner ──
+        self.banner = ctk.CTkFrame(
+            self, fg_color="#08222B",  # cyan 8% on dark
+            border_width=1, border_color="#12454F",
+            corner_radius=RADIUS_MD,
+        )
+        self.banner.pack(fill="x", pady=(0, SPACE_MD))
+        self.banner_icon = ctk.CTkLabel(
+            self.banner, text="📆",
+            font=(FONT_FAMILY, 16),
+            text_color=COLOR_INFO,
+        )
+        self.banner_icon.pack(side="left", padx=(SPACE_MD, SPACE_SM), pady=SPACE_SM)
+        self.banner_text = ctk.CTkLabel(
+            self.banner, text="",
+            font=FONT_BODY,
+            text_color=COLOR_TEXT,
+            anchor="w", justify="left",
+        )
+        self.banner_text.pack(side="left", fill="x", expand=True, pady=SPACE_SM)
+        self._update_banner()
+
+        # ── Drop zone (shown only when no file pending) ──
+        self.dropzone = self._build_dropzone()
+        self.dropzone.pack(fill="x", pady=(0, SPACE_LG))
+
+        # ── File chip (shown only when file pending, hidden initially) ──
+        self.chip_frame = ctk.CTkFrame(
+            self, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER,
+            corner_radius=RADIUS_MD,
+        )
+        # Don't pack yet — populated by _show_chip()
+
+        # ── Preview cards (populated after file pick) ──
+        self.preview_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.preview_frame.pack(fill="x", pady=(0, SPACE_LG))
+        self._render_preview_placeholder()
+
+        # ── History list (always shown at bottom) ──
+        self.history_frame = ctk.CTkFrame(
+            self, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER,
+            corner_radius=RADIUS_MD,
+        )
+        self.history_frame.pack(fill="x", pady=(SPACE_LG, 0))
+        self._render_history()
+
+    def _build_dropzone(self):
+        """Build the large drop zone shown when no file is pending."""
+        zone = ctk.CTkFrame(
             self,
             fg_color="#0F0F0F",
             border_width=2,
@@ -68,11 +171,9 @@ class ImportScreen(ctk.CTkFrame):
             corner_radius=RADIUS_LG,
             height=200,
         )
-        self.dropzone.pack(fill="x", pady=(0, SPACE_LG))
-        self.dropzone.pack_propagate(False)
+        zone.pack_propagate(False)
 
-        # Inner content centered vertically
-        inner = ctk.CTkFrame(self.dropzone, fg_color="transparent")
+        inner = ctk.CTkFrame(zone, fg_color="transparent")
         inner.place(relx=0.5, rely=0.5, anchor="center")
 
         ctk.CTkLabel(
@@ -99,23 +200,19 @@ class ImportScreen(ctk.CTkFrame):
             font=FONT_BODY_BOLD,
         ).pack()
 
-        # Hover state — magenta border highlight (mimics drag affordance).
-        # Tk fires Leave when the pointer crosses into a child widget, then
-        # Enter again when it returns to the parent — causing flicker. We
-        # count nested Enter/Leave on every descendant so the highlight
-        # stays on as long as the pointer is anywhere inside the subtree.
+        # Hover state — nested counter prevents flicker when crossing children
         self._dropzone_pointer_inside = 0
 
         def _on_enter(_e):
             self._dropzone_pointer_inside += 1
             if self._dropzone_pointer_inside > 0:
-                self.dropzone.configure(border_color=COLOR_ACCENT)
+                zone.configure(border_color=COLOR_ACCENT)
 
         def _on_leave(_e):
             self._dropzone_pointer_inside -= 1
             if self._dropzone_pointer_inside <= 0:
-                self._dropzone_pointer_inside = 0  # guard underflow
-                self.dropzone.configure(border_color=COLOR_BORDER_STRONG)
+                self._dropzone_pointer_inside = 0
+                zone.configure(border_color=COLOR_BORDER_STRONG)
 
         def _bind_hover_recursive(widget):
             widget.bind("<Enter>", _on_enter, add="+")
@@ -123,38 +220,161 @@ class ImportScreen(ctk.CTkFrame):
             for child in widget.winfo_children():
                 _bind_hover_recursive(child)
 
-        _bind_hover_recursive(self.dropzone)
+        _bind_hover_recursive(zone)
+        return zone
 
-        # ── Preview cards (populated after file pick) ──
-        self.preview_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.preview_frame.pack(fill="x", pady=(0, SPACE_LG))
-        self._render_preview_placeholder()
+    def _show_chip(self, filename: str, size_kb: int, parse_ms: int):
+        """Replace drop zone with file chip (file selected state)."""
+        self.dropzone.pack_forget()
 
-        # ── Action row ──
-        action_row = ctk.CTkFrame(self, fg_color="transparent")
-        action_row.pack(fill="x")
+        for w in self.chip_frame.winfo_children():
+            w.destroy()
 
-        self.import_btn = ctk.CTkButton(
-            action_row, text="Konfirmasi Impor",
+        icon = ctk.CTkLabel(
+            self.chip_frame, text="📄",
+            font=(FONT_FAMILY, 24),
+            text_color=COLOR_TEXT,
+        )
+        icon.pack(side="left", padx=(SPACE_MD, SPACE_SM), pady=SPACE_MD)
+
+        info = ctk.CTkFrame(self.chip_frame, fg_color="transparent")
+        info.pack(side="left", fill="x", expand=True, pady=SPACE_MD)
+        ctk.CTkLabel(
+            info, text="FILE TERPILIH",
+            font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x")
+        ctk.CTkLabel(
+            info, text=filename,
+            font=FONT_MONO_DATA, text_color=COLOR_TEXT,
+            anchor="w",
+        ).pack(fill="x")
+        ctk.CTkLabel(
+            info, text=f"{size_kb} KB · diparsing dalam {parse_ms} ms",
+            font=FONT_MONO_SMALL, text_color=COLOR_TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x")
+
+        actions = ctk.CTkFrame(self.chip_frame, fg_color="transparent")
+        actions.pack(side="right", padx=SPACE_MD, pady=SPACE_MD)
+        ctk.CTkButton(
+            actions, text="↻ Ganti",
+            command=self._on_pick_file,
+            fg_color="transparent",
+            border_width=1, border_color=COLOR_BORDER_STRONG,
+            text_color=COLOR_TEXT_DIM,
+            hover_color=COLOR_SURFACE_HIGH,
+            font=FONT_BODY_BOLD,
+            width=80,
+        ).pack(side="left", padx=(0, SPACE_XS))
+        ctk.CTkButton(
+            actions, text="✕ Batal",
+            command=self._on_cancel,
+            fg_color="transparent",
+            border_width=1, border_color=COLOR_BORDER_STRONG,
+            text_color=COLOR_TEXT_DIM,
+            hover_color=COLOR_SURFACE_HIGH,
+            font=FONT_BODY_BOLD,
+            width=80,
+        ).pack(side="left", padx=(0, SPACE_XS))
+        ctk.CTkButton(
+            actions, text="✓ Konfirmasi",
             command=self._on_confirm,
-            state="disabled",
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
             text_color=COLOR_BG,
             font=FONT_BODY_BOLD,
-        )
-        self.import_btn.pack(side="right", padx=(SPACE_SM, 0))
+            width=120,
+        ).pack(side="left")
 
-        self.cancel_btn = ctk.CTkButton(
-            action_row, text="Batal",
-            command=self._on_cancel,
-            state="disabled",
-            fg_color="transparent",
-            border_width=1, border_color=COLOR_INFO,
-            text_color=COLOR_INFO,
-            hover_color=COLOR_SURFACE_HIGH,
-            font=FONT_BODY_BOLD,
+        self.chip_frame.pack(fill="x", pady=(0, SPACE_MD), before=self.preview_frame)
+
+    def _hide_chip(self):
+        """Return to no-file-pending state — drop zone visible, chip hidden."""
+        self.chip_frame.pack_forget()
+        # Re-pack dropzone before preview_frame so it lands above the (now placeholder) preview.
+        # before= is needed here because pack() defaults to appending at end of slave list.
+        self.dropzone.pack(fill="x", pady=(0, SPACE_LG), before=self.preview_frame)
+
+    def _update_banner(self):
+        """Refresh banner based on current state (active month + pending file)."""
+        with get_connection(DB_PATH) as conn:
+            current = get_setting(conn, "current_month") or ""
+        current_display = _format_month_id(current) if current else "(belum ada bulan aktif)"
+
+        if self._pending_rows:
+            months = [r.tanggal[:7] for r in self._pending_rows if r.tanggal]
+            if months:
+                pending_month = Counter(months).most_common(1)[0][0]
+                if current and pending_month != current:
+                    # ROSE warning state
+                    self.banner.configure(
+                        fg_color="#2A0A14",
+                        border_color="#5C1E2A",
+                    )
+                    self.banner_icon.configure(text="⚠", text_color=COLOR_WARN)
+                    self.banner_text.configure(
+                        text=(
+                            f"Bulan aktif akan diubah: "
+                            f"{current_display} → {_format_month_id(pending_month)} setelah konfirmasi impor."
+                        ),
+                    )
+                    return
+        # Default: CYAN info state
+        self.banner.configure(
+            fg_color="#08222B",
+            border_color="#12454F",
         )
-        self.cancel_btn.pack(side="right")
+        self.banner_icon.configure(text="📆", text_color=COLOR_INFO)
+        self.banner_text.configure(
+            text=(
+                f"Bulan aktif saat ini: {current_display}. "
+                f"File baru akan auto-detect bulan dan update jika berbeda."
+            ),
+        )
+
+    def _render_history(self):
+        """Render the 'Riwayat Import Terakhir' list at the bottom."""
+        for w in self.history_frame.winfo_children():
+            w.destroy()
+
+        ctk.CTkLabel(
+            self.history_frame, text="RIWAYAT IMPORT TERAKHIR",
+            font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=SPACE_MD, pady=(SPACE_SM, SPACE_XS))
+
+        with get_connection(DB_PATH) as conn:
+            items = list_recent_imports(conn, limit=5)
+
+        if not items:
+            ctk.CTkLabel(
+                self.history_frame, text="(belum ada riwayat impor)",
+                font=FONT_BODY, text_color=COLOR_TEXT_MUTED,
+                anchor="w",
+            ).pack(fill="x", padx=SPACE_MD, pady=(0, SPACE_SM))
+            return
+
+        for it in items:
+            row = ctk.CTkFrame(self.history_frame, fg_color="transparent")
+            row.pack(fill="x", padx=SPACE_MD, pady=2)
+            ctk.CTkLabel(
+                row, text=_format_relative_time(it["imported_at"]),
+                font=FONT_MONO_SMALL, text_color=COLOR_TEXT_MUTED,
+                anchor="w", width=120,
+            ).pack(side="left")
+            ctk.CTkLabel(
+                row, text=it["imported_from"],
+                font=FONT_MONO_DATA, text_color=COLOR_TEXT,
+                anchor="w",
+            ).pack(side="left", fill="x", expand=True, padx=(SPACE_SM, SPACE_SM))
+            ctk.CTkLabel(
+                row, text=f"✓ {it['emp_count']} emp",
+                font=FONT_MONO_SMALL, text_color=COLOR_TEXT_DIM,
+                fg_color="#0F2218",
+                corner_radius=RADIUS_SM,
+                anchor="e", width=70,
+            ).pack(side="right")
+        ctk.CTkFrame(self.history_frame, fg_color="transparent", height=SPACE_SM).pack()
 
     def _render_preview_placeholder(self):
         """Empty-state placeholder before file selection."""
@@ -191,52 +411,74 @@ class ImportScreen(ctk.CTkFrame):
             ).grid(row=0, column=col, sticky="nsew", padx=SPACE_XS, pady=0)
 
     def _on_pick_file(self):
+        """Open file dialog, parse, render preview + chip."""
+        # R5 — remember last folder
+        with get_connection(DB_PATH) as conn:
+            initialdir = get_setting(conn, "last_import_folder") or str(Path.home() / "Documents")
+
         path = filedialog.askopenfilename(
             title="Pilih file fingerprint",
+            initialdir=initialdir,
             filetypes=[("Excel", "*.xls *.xlsx"), ("All files", "*.*")],
         )
         if not path:
             return
         self._pending_path = Path(path)
+
+        # R5 — persist folder for next pick
+        with get_connection(DB_PATH) as conn:
+            set_setting(conn, "last_import_folder", str(self._pending_path.parent))
+
+        t0 = time.perf_counter()
         try:
             self._pending_rows = parse_fingerprint_file(self._pending_path)
         except Exception as e:
             messagebox.showerror("Error parsing", str(e))
+            self._pending_path = None
+            self._pending_rows = []
+            return
+        parse_ms = int((time.perf_counter() - t0) * 1000)
+
+        if not self._pending_rows:
+            messagebox.showwarning("File kosong",
+                "File tidak mengandung baris yang bisa diimpor.")
+            self._pending_path = None
+            self._pending_rows = []
             return
 
         issue_count = sum(1 for r in self._pending_rows if is_issue(r))
         unique_emps = {r.no_staff for r in self._pending_rows}
         dates = sorted({r.tanggal for r in self._pending_rows})
-        date_range = f"{dates[0]} → {dates[-1]}" if dates else "(empty)"
+        date_range = _format_short_range(dates[0], dates[-1]) if dates else "(empty)"
 
-        # Detect "new" employees not yet in DB
         new_emp_count = 0
         with get_connection(DB_PATH) as conn:
             for no_staff in unique_emps:
                 if get_employee_by_no_staff(conn, no_staff) is None:
                     new_emp_count += 1
 
+        size_kb = self._pending_path.stat().st_size // 1024
+        self._show_chip(self._pending_path.name, size_kb, parse_ms)
         self._render_preview_cards(
             pegawai_count=len(unique_emps),
             date_range=date_range,
             issue_count=issue_count,
             new_emp_count=new_emp_count,
         )
-        self.import_btn.configure(state="normal")
-        self.cancel_btn.configure(state="normal")
+        self._update_banner()
 
     def _on_cancel(self):
         self._pending_path = None
         self._pending_rows = []
+        self._hide_chip()
         self._render_preview_placeholder()
-        self.import_btn.configure(state="disabled")
-        self.cancel_btn.configure(state="disabled")
+        # history unchanged — cancel doesn't write to DB
+        self._update_banner()
 
     def _on_confirm(self):
         if not self._pending_rows:
             return
 
-        # Auto-detect mode month from imported dates
         months = [r.tanggal[:7] for r in self._pending_rows if r.tanggal]
         mode_month = Counter(months).most_common(1)[0][0] if months else None
 
@@ -260,12 +502,12 @@ class ImportScreen(ctk.CTkFrame):
         row_count = len(self._pending_rows)
         month_display = _format_month_id(mode_month) if mode_month else "-"
 
-        # Reset UI state before showing toast (so the toast is the last interaction)
-        self.import_btn.configure(state="disabled")
-        self.cancel_btn.configure(state="disabled")
         self._pending_rows = []
         self._pending_path = None
+        self._hide_chip()
         self._render_preview_placeholder()
+        self._update_banner()
+        self._render_history()
 
         show_success_toast(
             self.winfo_toplevel(),
