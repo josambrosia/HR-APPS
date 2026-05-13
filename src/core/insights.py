@@ -200,3 +200,64 @@ def avg_minutes_per_late_event(
     ).fetchone()
     total, cnt = row[0], row[1]
     return float(total) / cnt if cnt else 0.0
+
+
+_POLA_JAM_BANDS = [
+    ('<07:45',      'early'),
+    ('07:45-07:59', 'early'),
+    ('08:00',       'ontime'),
+    ('08:01-08:05', 'mild'),
+    ('08:06-08:15', 'mild'),
+    ('08:16-08:30', 'mod'),
+    ('08:31-09:00', 'severe'),
+    ('>09:00',      'chronic'),
+]
+
+
+def _classify_jam_masuk(masuk: str) -> str:
+    """Map HH:MM string to band label. Caller already filters masuk IS NOT NULL."""
+    if masuk < '07:45':    return '<07:45'
+    if masuk < '08:00':    return '07:45-07:59'
+    if masuk == '08:00':   return '08:00'
+    if masuk <= '08:05':   return '08:01-08:05'
+    if masuk <= '08:15':   return '08:06-08:15'
+    if masuk <= '08:30':   return '08:16-08:30'
+    if masuk <= '09:00':   return '08:31-09:00'
+    return '>09:00'
+
+
+def pola_jam_masuk(
+    conn: sqlite3.Connection, period_start: str, period_end: str
+) -> list[dict]:
+    """Distribusi 8-band waktu kedatangan untuk sesi present (masuk IS NOT NULL).
+
+    Returns: list of 8 dicts (chronological), even bands dengan count=0.
+        [{'band': '<07:45', 'count': int, 'severity': 'early'}, ...]
+
+    Severity mapping:
+        early   — datang sebelum 08:00
+        ontime  — 08:00 pas
+        mild    — 1-15 min terlambat (08:01-08:15)
+        mod     — 16-30 min terlambat (08:16-08:30)
+        severe  — 31-60 min terlambat (08:31-09:00)
+        chronic — > 60 min terlambat (>09:00)
+    """
+    rows = conn.execute(
+        """
+        SELECT masuk
+          FROM attendance_records
+         WHERE tanggal BETWEEN ? AND ?
+           AND tipe = 'Hari Kerja'
+           AND masuk IS NOT NULL
+        """,
+        (period_start, period_end),
+    ).fetchall()
+
+    counts = {band: 0 for band, _ in _POLA_JAM_BANDS}
+    for (masuk,) in rows:
+        counts[_classify_jam_masuk(masuk)] += 1
+
+    return [
+        {'band': band, 'count': counts[band], 'severity': severity}
+        for band, severity in _POLA_JAM_BANDS
+    ]

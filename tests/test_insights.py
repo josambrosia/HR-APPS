@@ -244,3 +244,82 @@ def test_avg_minutes_per_late_event_zero_excluded(temp_db_path):
         _add_att(conn, b, "2026-04-13", "Senin", "08.00", "17.00", 0)
         result = avg_minutes_per_late_event(conn, "2026-04-01", "2026-04-30")
         assert result == 10.0
+
+
+POLA_JAM_BANDS = ['<07:45', '07:45-07:59', '08:00', '08:01-08:05',
+                  '08:06-08:15', '08:16-08:30', '08:31-09:00', '>09:00']
+
+
+def test_pola_jam_masuk_8_bands_zero_fill(temp_db_path):
+    """Even with no data, returns all 8 bands with count=0, chronological order"""
+    from src.core.insights import pola_jam_masuk
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        result = pola_jam_masuk(conn, '2026-04-01', '2026-04-30')
+    assert len(result) == 8
+    assert [r['band'] for r in result] == POLA_JAM_BANDS
+    assert all(r['count'] == 0 for r in result)
+
+
+def test_pola_jam_masuk_boundaries(temp_db_path):
+    """Boundary times map to the correct band"""
+    from src.core.insights import pola_jam_masuk
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        cases = [
+            ('A', '07:44', '<07:45'),
+            ('B', '07:45', '07:45-07:59'),
+            ('C', '07:59', '07:45-07:59'),
+            ('D', '08:00', '08:00'),
+            ('E', '08:01', '08:01-08:05'),
+            ('F', '08:05', '08:01-08:05'),
+            ('G', '08:06', '08:06-08:15'),
+            ('H', '08:15', '08:06-08:15'),
+            ('I', '08:16', '08:16-08:30'),
+            ('J', '08:30', '08:16-08:30'),
+            ('K', '08:31', '08:31-09:00'),
+            ('L', '09:00', '08:31-09:00'),
+            ('M', '09:01', '>09:00'),
+        ]
+        for nama, t, _ in cases:
+            emp = _add_emp(conn, nama, nama)
+            h, m = int(t[:2]), int(t[3:])
+            delta = (h - 8) * 60 + m
+            _add_att(conn, emp, '2026-04-13', 'Senin', t, '17:00',
+                     max(0, delta))
+        result = pola_jam_masuk(conn, '2026-04-01', '2026-04-30')
+    counts = {r['band']: r['count'] for r in result}
+    expected = {b: sum(1 for _, _, exp in cases if exp == b) for b in POLA_JAM_BANDS}
+    assert counts == expected
+
+
+def test_pola_jam_masuk_absent_excluded(temp_db_path):
+    """Sesi absent (masuk IS NULL) tidak dihitung di distribusi"""
+    from src.core.insights import pola_jam_masuk
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, 'A', 'A')
+        b = _add_emp(conn, 'B', 'B')
+        _add_att(conn, a, '2026-04-13', 'Senin', None, None, None)
+        _add_att(conn, b, '2026-04-13', 'Senin', '08:00', '17:00', 0)
+        result = pola_jam_masuk(conn, '2026-04-01', '2026-04-30')
+    counts = {r['band']: r['count'] for r in result}
+    assert sum(counts.values()) == 1
+    assert counts['08:00'] == 1
+
+
+def test_pola_jam_masuk_severity_labels(temp_db_path):
+    """Each band has a severity tag for renderer/template"""
+    from src.core.insights import pola_jam_masuk
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        result = pola_jam_masuk(conn, '2026-04-01', '2026-04-30')
+    severity = {r['band']: r['severity'] for r in result}
+    assert severity['<07:45'] == 'early'
+    assert severity['07:45-07:59'] == 'early'
+    assert severity['08:00'] == 'ontime'
+    assert severity['08:01-08:05'] == 'mild'
+    assert severity['08:06-08:15'] == 'mild'
+    assert severity['08:16-08:30'] == 'mod'
+    assert severity['08:31-09:00'] == 'severe'
+    assert severity['>09:00'] == 'chronic'
