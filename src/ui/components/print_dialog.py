@@ -9,15 +9,14 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from src.ui.theme import (
-    FONT_FAMILY,
-    COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
+    COLOR_BG, COLOR_SURFACE_HIGH,
     COLOR_BORDER,
     COLOR_ACCENT, COLOR_ACCENT_HOVER,
     COLOR_INFO,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
     FONT_HEADING, FONT_BODY, FONT_BODY_BOLD, FONT_LABEL,
     SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG, SPACE_XL,
-    RADIUS_LG, RADIUS_MD,
+    RADIUS_MD,
 )
 
 
@@ -108,9 +107,17 @@ class PrintOptionsDialog(ctk.CTkToplevel):
             )
             cb.pack(anchor="w", padx=SPACE_XL + SPACE_SM, pady=2)
 
-        # Buttons (sticky at bottom via side="bottom")
+        # Buttons (sticky at bottom). Cetak packed first → lands far right (primary CTA).
         btn_row = ctk.CTkFrame(self, fg_color="transparent")
         btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG), side="bottom")
+        ctk.CTkButton(
+            btn_row, text="📄 Cetak", command=self._on_ok,
+            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+            text_color=COLOR_BG,
+            width=180, height=40,
+            font=FONT_BODY_BOLD,
+            corner_radius=RADIUS_MD,
+        ).pack(side="right")
         ctk.CTkButton(
             btn_row, text="Batal", command=self._on_cancel,
             fg_color="transparent",
@@ -120,15 +127,7 @@ class PrintOptionsDialog(ctk.CTkToplevel):
             width=160, height=40,
             font=FONT_BODY_BOLD,
             corner_radius=RADIUS_MD,
-        ).pack(side="right", padx=(SPACE_MD, 0))
-        ctk.CTkButton(
-            btn_row, text="📄 Cetak", command=self._on_ok,
-            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
-            text_color=COLOR_BG,
-            width=180, height=40,
-            font=FONT_BODY_BOLD,
-            corner_radius=RADIUS_MD,
-        ).pack(side="right")
+        ).pack(side="right", padx=(0, SPACE_MD))
 
     def _on_ok(self):
         sections = {k: v.get() for k, v in self._check_vars.items()}
