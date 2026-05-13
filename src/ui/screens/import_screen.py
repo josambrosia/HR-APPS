@@ -259,13 +259,16 @@ class ImportScreen(ctk.CTkFrame):
 
         _bind_hover_recursive(zone)
 
-        # R1 — register windnd hook for drag-and-drop file support.
-        # IMPORTANT: windnd dispatches the callback synchronously from inside
-        # the Win32 WNDPROC for WM_DROPFILES. Doing Tk/DB work directly inside
-        # the callback causes re-entrant message processing and crashes the
-        # app. We defer the real handler to the next Tk idle cycle via after(0).
+        # R1 — register drag-and-drop file hook.
+        # Uses in-house dnd_hook (NOT windnd) because windnd has a stack buffer
+        # overrun bug: passes byte-size instead of char-count to DragQueryFileW,
+        # which trips Windows __fastfail(0xc0000409) and bypasses Python
+        # exception handling. See src/ui/components/dnd_hook.py for details.
+        #
+        # The hook fires synchronously inside Win32 WNDPROC — we defer the real
+        # handler to the next Tk idle cycle to avoid re-entrant message-pump.
         try:
-            import windnd
+            from src.ui.components.dnd_hook import hook_dropfiles
 
             def _on_drop(files):
                 try:
@@ -274,14 +277,11 @@ class ImportScreen(ctk.CTkFrame):
                         return
                     self.after(0, lambda p=paths: self._handle_dropped_paths(p))
                 except Exception as e:
-                    # Last-resort logger: .exe is windowed, stderr goes nowhere.
                     _log_dnd_crash(e)
 
-            windnd.hook_dropfiles(zone, func=_on_drop, force_unicode=True)
-        except ImportError:
-            pass  # windnd not installed — drop zone still click-functional
+            hook_dropfiles(zone, _on_drop)
         except Exception:
-            pass  # registration failure — graceful degradation
+            pass  # registration failure — drop zone still click-functional
 
         return zone
 
