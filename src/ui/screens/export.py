@@ -432,6 +432,12 @@ class ExportScreen(ctk.CTkFrame):
             ).pack(fill="x", padx=SPACE_MD, pady=(0, SPACE_SM))
             return
 
+        _KIND_LABELS = {
+            "fill": "Isi Template",
+            "generate_bulanan": "Generate Bulanan",
+            "generate_mingguan": "Generate Mingguan",
+        }
+
         for it in items:
             row = ctk.CTkFrame(self.history_frame, fg_color="transparent")
             row.pack(fill="x", padx=SPACE_MD, pady=2)
@@ -440,6 +446,12 @@ class ExportScreen(ctk.CTkFrame):
                 font=FONT_MONO_SMALL, text_color=COLOR_TEXT_MUTED,
                 anchor="w", width=120,
             ).pack(side="left")
+            kind = it.get("kind", "fill")
+            ctk.CTkLabel(
+                row, text=_KIND_LABELS.get(kind, kind),
+                font=FONT_LABEL, text_color=COLOR_TEXT_DIM,
+                anchor="w", width=140,
+            ).pack(side="left", padx=(SPACE_SM, 0))
             ctk.CTkLabel(
                 row, text=Path(it["out_path"]).name,
                 font=FONT_MONO_DATA, text_color=COLOR_TEXT,
