@@ -9,6 +9,7 @@ from src.config import DB_PATH
 from src.db.connection import get_connection
 from src.db.employees import upsert_employee, get_employee_by_no_staff
 from src.db.attendance import upsert_attendance, list_recent_imports, count_overlap
+from src.db.holidays import restamp_holidays
 from src.db.settings import set_setting, get_setting
 from src.parsers.fingerprint import parse_fingerprint_file
 from src.core.issue_detector import is_issue
@@ -565,6 +566,11 @@ class ImportScreen(ctk.CTkFrame):
                     )
             if mode_month:
                 set_setting(conn, "current_month", mode_month)
+
+            # Re-stamp holiday status: upsert_attendance overwrites tipe back
+            # to 'Hari Kerja', so re-apply 'Hari Libur' + auto-resolve for
+            # dates in the holidays table (see Hari Libur design spec).
+            restamp_holidays(conn)
 
         row_count = len(self._pending_rows)
         month_display = _format_month_id(mode_month) if mode_month else "-"
