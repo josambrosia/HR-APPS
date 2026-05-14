@@ -509,3 +509,42 @@ def test_pola_jam_masuk_excludes_outlier(temp_db_path):
         rows = pola_jam_masuk(conn, "2026-04-01", "2026-04-30")
         counts = {r["band"]: r["count"] for r in rows}
         assert sum(counts.values()) == 1  # only BUDI's session
+
+
+def test_terlambat_ranking_excludes_holiday_dates(temp_db_path):
+    from src.db.holidays import mark_holidays
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, a, "2026-04-01", "Senin", "08.50", "16.00", 50)
+        _add_att(conn, a, "2026-04-03", "Jumat", "09.00", "16.00", 60)
+        base = terlambat_ranking(conn, "2026-04-01", "2026-04-30")
+        assert base[0]["total_terlambat"] == 110          # baseline: both days
+        mark_holidays(conn, ["2026-04-03"])
+        after = terlambat_ranking(conn, "2026-04-01", "2026-04-30")
+        assert after[0]["total_terlambat"] == 50          # holiday's 60 dropped
+
+
+def test_ranking_departemen_excludes_holiday_dates(temp_db_path):
+    from src.db.holidays import mark_holidays
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, a, "2026-04-01", "Senin", "08.50", "16.00", 50)
+        _add_att(conn, a, "2026-04-03", "Jumat", "09.00", "16.00", 60)
+        mark_holidays(conn, ["2026-04-03"])
+        rows = ranking_departemen(conn, "2026-04-01", "2026-04-30")
+        assert rows[0]["total_terlambat"] == 50           # only April 1 counts
+
+
+def test_resolution_rate_excludes_holiday_dates(temp_db_path):
+    from src.db.holidays import mark_holidays
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, a, "2026-04-01", "Senin", None, None, 0, has_issue=1)
+        _add_att(conn, a, "2026-04-03", "Jumat", None, None, 0, has_issue=1)
+        mark_holidays(conn, ["2026-04-03"])               # resolves Apr-3 as 'libur'
+        rate = resolution_rate(conn, "2026-04-01", "2026-04-30")
+        assert rate["total"] == 1                         # holiday row excluded
+        assert rate["resolved"] == 0

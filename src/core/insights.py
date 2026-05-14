@@ -47,6 +47,7 @@ def terlambat_ranking(
           FROM attendance_records ar
           JOIN employees e ON ar.employee_id = e.id
          WHERE ar.tanggal BETWEEN ? AND ?
+           AND ar.tipe = 'Hari Kerja'
          GROUP BY e.id
     """
     params = (*COACHING_EXCLUDED, *COACHING_EXCLUDED, start, end)
@@ -184,7 +185,8 @@ def ranking_departemen(
           FROM attendance_records ar
           JOIN employees e ON ar.employee_id = e.id
          WHERE ar.tanggal BETWEEN ? AND ?
-               AND e.dept IS NOT NULL{exc_frag}
+               AND e.dept IS NOT NULL
+               AND ar.tipe = 'Hari Kerja'{exc_frag}
          GROUP BY e.dept
          ORDER BY total_terlambat DESC, e.dept ASC
     """
@@ -227,6 +229,7 @@ def resolution_rate(
             COUNT(*) AS total
           FROM attendance_records
          WHERE has_issue = 1 AND tanggal BETWEEN ? AND ?
+           AND tipe = 'Hari Kerja'
         """,
         (start, end),
     ).fetchone()
