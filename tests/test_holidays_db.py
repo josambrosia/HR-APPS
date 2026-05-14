@@ -80,3 +80,92 @@ def test_workday_roster_lists_workdays_with_flags(temp_db_path):
         assert by_date["2026-04-03"]["is_holiday"] is True
         assert by_date["2026-04-03"]["issue_count"] == 1   # libur-resolved
         assert by_date["2026-04-01"]["hari"] == "Senin"
+
+
+def _row(conn, emp_id, tanggal):
+    return conn.execute(
+        "SELECT tipe, reason_category, resolved_at FROM attendance_records "
+        "WHERE employee_id=? AND tanggal=?", (emp_id, tanggal),
+    ).fetchone()
+
+
+def test_mark_holidays_stamps_tipe_and_inserts_row(temp_db_path):
+    from src.db.holidays import mark_holidays, list_holidays
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _emp(conn, "1", "ANDI")
+        _att(conn, a, "2026-04-03")
+        result = mark_holidays(conn, ["2026-04-03"])
+        assert list_holidays(conn) == ["2026-04-03"]
+        assert _row(conn, a, "2026-04-03")["tipe"] == "Hari Libur"
+        assert result["dates_marked"] == 1
+
+
+def test_mark_holidays_auto_resolves_only_open_issues(temp_db_path):
+    from src.db.holidays import mark_holidays
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _emp(conn, "1", "OPEN")
+        b = _emp(conn, "2", "MANUAL")
+        _att(conn, a, "2026-04-03", has_issue=1)                          # open
+        _att(conn, b, "2026-04-03", has_issue=1, reason_category="izin_sakit")
+        result = mark_holidays(conn, ["2026-04-03"])
+        assert result["issues_resolved"] == 1                             # only the open one
+        assert _row(conn, a, "2026-04-03")["reason_category"] == "libur"
+        assert _row(conn, b, "2026-04-03")["reason_category"] == "izin_sakit"
+
+
+def test_mark_holidays_idempotent(temp_db_path):
+    from src.db.holidays import mark_holidays, list_holidays
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _emp(conn, "1", "ANDI")
+        _att(conn, a, "2026-04-03", has_issue=1)
+        mark_holidays(conn, ["2026-04-03"])
+        mark_holidays(conn, ["2026-04-03"])  # second call — no dup, no error
+        assert list_holidays(conn) == ["2026-04-03"]
+
+
+def test_unmark_holidays_restores_tipe_and_reopens_libur_issues(temp_db_path):
+    from src.db.holidays import mark_holidays, unmark_holidays, list_holidays
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _emp(conn, "1", "ANDI")
+        _att(conn, a, "2026-04-03", has_issue=1)
+        mark_holidays(conn, ["2026-04-03"])
+        result = unmark_holidays(conn, ["2026-04-03"])
+        assert list_holidays(conn) == []
+        row = _row(conn, a, "2026-04-03")
+        assert row["tipe"] == "Hari Kerja"
+        assert row["reason_category"] is None
+        assert result["issues_reopened"] == 1
+
+
+def test_unmark_holidays_leaves_manually_resolved_issues(temp_db_path):
+    from src.db.holidays import mark_holidays, unmark_holidays
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        b = _emp(conn, "2", "MANUAL")
+        _att(conn, b, "2026-04-03", has_issue=1, reason_category="izin_sakit")
+        mark_holidays(conn, ["2026-04-03"])
+        unmark_holidays(conn, ["2026-04-03"])
+        assert _row(conn, b, "2026-04-03")["reason_category"] == "izin_sakit"
+
+
+def test_restamp_holidays_reapplies_after_simulated_reimport(temp_db_path):
+    from src.db.holidays import mark_holidays, restamp_holidays
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _emp(conn, "1", "ANDI")
+        _att(conn, a, "2026-04-03", has_issue=1)
+        mark_holidays(conn, ["2026-04-03"])
+        # simulate re-import: upsert overwrites tipe back to 'Hari Kerja'
+        _att(conn, a, "2026-04-03", has_issue=1)
+        assert _row(conn, a, "2026-04-03")["tipe"] == "Hari Kerja"   # lost
+        # a NEW employee imported later with an open issue on the holiday date
+        c = _emp(conn, "2", "LATE")
+        _att(conn, c, "2026-04-03", has_issue=1)
+        restamp_holidays(conn)
+        assert _row(conn, a, "2026-04-03")["tipe"] == "Hari Libur"   # restored
+        assert _row(conn, c, "2026-04-03")["tipe"] == "Hari Libur"
+        assert _row(conn, c, "2026-04-03")["reason_category"] == "libur"

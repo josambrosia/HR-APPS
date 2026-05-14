@@ -6,6 +6,7 @@ denormalisation so weekly export & other queries see it directly. The stamp
 is re-applied after every import via restamp_holidays().
 """
 import sqlite3
+from datetime import datetime, UTC
 from typing import List
 
 
@@ -71,3 +72,72 @@ def workday_roster(conn: sqlite3.Connection, year_month: str) -> List[dict]:
         }
         for r in rows
     ]
+
+
+def mark_holidays(conn: sqlite3.Connection, dates: list) -> dict:
+    """Mark the given dates ('YYYY-MM-DD') as holidays.
+
+    For each date: insert into holidays, stamp attendance_records.tipe to
+    'Hari Libur', auto-resolve OPEN issues (reason_category IS NULL) with
+    reason_category='libur'. Idempotent — already-holiday dates re-stamp
+    harmlessly. Returns {'dates_marked', 'issues_resolved'}.
+    """
+    now = datetime.now(UTC).isoformat(timespec="seconds")
+    issues_resolved = 0
+    for d in dates:
+        conn.execute(
+            "INSERT OR IGNORE INTO holidays (tanggal, created_at) VALUES (?, ?)",
+            (d, now),
+        )
+        conn.execute(
+            "UPDATE attendance_records SET tipe='Hari Libur' "
+            "WHERE tanggal=? AND tipe='Hari Kerja'",
+            (d,),
+        )
+        cur = conn.execute(
+            "UPDATE attendance_records "
+            "SET reason_category='libur', reason_detail=NULL, resolved_at=? "
+            "WHERE tanggal=? AND has_issue=1 AND reason_category IS NULL",
+            (now, d),
+        )
+        issues_resolved += cur.rowcount
+    return {"dates_marked": len(dates), "issues_resolved": issues_resolved}
+
+
+def unmark_holidays(conn: sqlite3.Connection, dates: list) -> dict:
+    """Remove holiday status from the given dates.
+
+    For each date: delete from holidays, restore attendance_records.tipe to
+    'Hari Kerja', re-open ONLY issues this feature resolved
+    (reason_category='libur'). Manual resolutions are left untouched.
+    Returns {'dates_unmarked', 'issues_reopened'}.
+    """
+    issues_reopened = 0
+    for d in dates:
+        conn.execute("DELETE FROM holidays WHERE tanggal=?", (d,))
+        conn.execute(
+            "UPDATE attendance_records SET tipe='Hari Kerja' "
+            "WHERE tanggal=? AND tipe='Hari Libur'",
+            (d,),
+        )
+        cur = conn.execute(
+            "UPDATE attendance_records "
+            "SET reason_category=NULL, reason_detail=NULL, resolved_at=NULL "
+            "WHERE tanggal=? AND reason_category='libur'",
+            (d,),
+        )
+        issues_reopened += cur.rowcount
+    return {"dates_unmarked": len(dates), "issues_reopened": issues_reopened}
+
+
+def restamp_holidays(conn: sqlite3.Connection) -> None:
+    """Re-apply holiday stamping for every date in the holidays table.
+
+    Called after a fingerprint import: upsert_attendance overwrites
+    attendance_records.tipe back to 'Hari Kerja', so this re-stamps
+    'Hari Libur' and re-resolves any newly-imported OPEN issues on
+    holiday dates. Makes import idempotent w.r.t. holiday status.
+    """
+    dates = [r[0] for r in conn.execute("SELECT tanggal FROM holidays")]
+    if dates:
+        mark_holidays(conn, dates)
