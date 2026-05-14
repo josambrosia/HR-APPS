@@ -158,3 +158,65 @@ def test_re_exclude_after_revert_creates_new_row(temp_db_path):
         assert len(rows) == 2
         assert rows[1]["effective_from"] == "2026-08"
         assert rows[1]["effective_until"] is None
+
+
+def _att(conn, emp_id, tanggal):
+    from src.db.attendance import upsert_attendance
+    upsert_attendance(
+        conn, employee_id=emp_id, tanggal=tanggal, hari="Senin",
+        tipe="Hari Kerja", jadwal="08.00 - 16.00",
+        masuk="08.05", keluar="16.00", kerja_jam=8.0,
+        lembur_jam=None, terlambat_menit=5, has_issue=0,
+        imported_from="W1.xls",
+    )
+
+
+def test_revert_all_closes_every_active_row(temp_db_path):
+    from src.db.outlier import exclude_employee, revert_all, excluded_employee_ids
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _emp(conn, "1", "A")
+        b = _emp(conn, "2", "B")
+        exclude_employee(conn, a, "2026-04")
+        exclude_employee(conn, b, "2026-04")
+        count = revert_all(conn, "2026-06")
+        assert count == 2
+        assert excluded_employee_ids(conn, "2026-06") == set()
+
+
+def test_revert_all_returns_zero_when_nothing_active(temp_db_path):
+    from src.db.outlier import revert_all
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        assert revert_all(conn, "2026-04") == 0
+
+
+def test_list_active_exclusions_returns_employee_detail(temp_db_path):
+    from src.db.outlier import exclude_employee, list_active_exclusions
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _emp(conn, "1", "ALICE")
+        _emp(conn, "2", "BOB")  # not excluded
+        exclude_employee(conn, a, "2026-04")
+        rows = list_active_exclusions(conn)
+        assert len(rows) == 1
+        assert rows[0]["employee_id"] == a
+        assert rows[0]["nama"] == "ALICE"
+        assert rows[0]["effective_from"] == "2026-04"
+
+
+def test_month_roster_lists_employees_with_attendance_in_month(temp_db_path):
+    from src.db.outlier import month_roster
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _emp(conn, "1", "ALICE")
+        b = _emp(conn, "2", "BOB")
+        _emp(conn, "3", "CAROL")  # no attendance — should not appear
+        _att(conn, a, "2026-04-01")
+        _att(conn, b, "2026-04-02")
+        _att(conn, a, "2026-05-01")  # also in May
+        roster = month_roster(conn, "2026-04")
+        names = [r["nama"] for r in roster]
+        assert names == ["ALICE", "BOB"]  # sorted by nama, CAROL absent
+        may = month_roster(conn, "2026-05")
+        assert [r["nama"] for r in may] == ["ALICE"]

@@ -93,3 +93,60 @@ def revert_employee(
             "UPDATE outlier_exclusions SET effective_until = ? WHERE id = ?",
             (active_month, row["id"]),
         )
+
+
+def revert_all(conn: sqlite3.Connection, active_month: str) -> int:
+    """Revert every currently-active exclusion. Returns count reverted."""
+    active = conn.execute(
+        "SELECT employee_id FROM outlier_exclusions WHERE effective_until IS NULL"
+    ).fetchall()
+    for r in active:
+        revert_employee(conn, r["employee_id"], active_month)
+    return len(active)
+
+
+def list_active_exclusions(conn: sqlite3.Connection) -> List[dict]:
+    """All currently-active exclusions joined with employee detail.
+
+    Each dict: employee_id, nama, dept, effective_from. Sorted by nama.
+    Feeds the "Dikecualikan" section of the Outlier screen.
+    """
+    rows = conn.execute(
+        """
+        SELECT ox.employee_id, e.nama, e.dept, ox.effective_from
+          FROM outlier_exclusions ox
+          JOIN employees e ON ox.employee_id = e.id
+         WHERE ox.effective_until IS NULL
+         ORDER BY e.nama ASC
+        """
+    ).fetchall()
+    return [
+        {
+            "employee_id": r["employee_id"],
+            "nama": r["nama"],
+            "dept": r["dept"] or "",
+            "effective_from": r["effective_from"],
+        }
+        for r in rows
+    ]
+
+
+def month_roster(conn: sqlite3.Connection, year_month: str) -> List[dict]:
+    """Employees who have an attendance record in the given month.
+
+    Each dict: id, nama, dept. Sorted by nama. Feeds the Outlier screen list.
+    """
+    rows = conn.execute(
+        """
+        SELECT DISTINCT e.id, e.nama, e.dept
+          FROM attendance_records ar
+          JOIN employees e ON ar.employee_id = e.id
+         WHERE substr(ar.tanggal, 1, 7) = ?
+         ORDER BY e.nama ASC
+        """,
+        (year_month,),
+    ).fetchall()
+    return [
+        {"id": r["id"], "nama": r["nama"], "dept": r["dept"] or ""}
+        for r in rows
+    ]
