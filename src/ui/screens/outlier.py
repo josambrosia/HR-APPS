@@ -19,7 +19,7 @@ from src.ui.theme import (
     COLOR_ACCENT, COLOR_ACCENT_HOVER,
     COLOR_INFO, COLOR_SECONDARY,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
-    FONT_DISPLAY, FONT_SUBHEAD, FONT_BODY, FONT_BODY_BOLD,
+    FONT_DISPLAY, FONT_SUBHEAD, FONT_BODY_BOLD,
     FONT_SMALL, FONT_LABEL, FONT_MONO_SMALL,
     SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
     RADIUS_SM, RADIUS_MD,
@@ -67,7 +67,7 @@ class OutlierScreen(ctk.CTkFrame):
             badge.pack(side="right")
             ctk.CTkLabel(
                 badge, text="BULAN AKTIF", font=FONT_LABEL,
-                text_color="#5FB8C8",
+                text_color="#5FB8C8",  # cyan 30% label (matches active-month badge)
             ).pack(anchor="e", padx=SPACE_MD, pady=(SPACE_XS, 0))
             ctk.CTkLabel(
                 badge, text=month_label(self._month),
