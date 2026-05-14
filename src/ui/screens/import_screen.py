@@ -30,42 +30,6 @@ from src.ui.theme import (
 )
 
 
-def _filter_excel_paths(files) -> list:
-    """Parse windnd-delivered paths into Path list, keeping only .xls/.xlsx.
-
-    windnd may deliver bytes or str depending on force_unicode flag; this
-    handles both. Returns empty list if none are Excel files. Pure function
-    for unit-testability.
-    """
-    paths = []
-    for f in files or []:
-        try:
-            p = Path(f.decode("utf-8") if isinstance(f, bytes) else f)
-        except Exception:
-            continue
-        if p.suffix.lower() in (".xls", ".xlsx"):
-            paths.append(p)
-    return paths
-
-
-def _log_dnd_crash(exc: Exception) -> None:
-    """Append a one-line crash record to ~/.hr-absensi-crash.log.
-
-    The packaged .exe is windowed (runw.exe bootloader) — stderr is /dev/null
-    so any silent exception in the windnd callback would otherwise be invisible.
-    This persists at least a one-line breadcrumb for diagnosis.
-    """
-    try:
-        log_path = Path.home() / ".hr-absensi-crash.log"
-        with log_path.open("a", encoding="utf-8") as fh:
-            fh.write(
-                f"[{datetime.now().isoformat()}] DnD: "
-                f"{type(exc).__name__}: {exc}\n"
-            )
-    except Exception:
-        pass  # logging must never raise back to caller
-
-
 _MONTH_ID = {
     1: "Januari", 2: "Februari", 3: "Maret", 4: "April",
     5: "Mei", 6: "Juni", 7: "Juli", 8: "Agustus",
@@ -219,11 +183,11 @@ class ImportScreen(ctk.CTkFrame):
             text_color=COLOR_TEXT,
         ).pack()
         ctk.CTkLabel(
-            inner, text="Drag file fingerprint .xls ke sini",
+            inner, text="Pilih file fingerprint .xls",
             font=FONT_SUBHEAD, text_color=COLOR_TEXT,
         ).pack(pady=(SPACE_SM, SPACE_XS))
         ctk.CTkLabel(
-            inner, text="atau klik browse",
+            inner, text="klik tombol di bawah untuk browse",
             font=FONT_SMALL, text_color=COLOR_TEXT_MUTED,
         ).pack(pady=(0, SPACE_SM))
 
@@ -259,29 +223,13 @@ class ImportScreen(ctk.CTkFrame):
 
         _bind_hover_recursive(zone)
 
-        # R1 — register drag-and-drop file hook.
-        # Uses in-house dnd_hook (NOT windnd) because windnd has a stack buffer
-        # overrun bug: passes byte-size instead of char-count to DragQueryFileW,
-        # which trips Windows __fastfail(0xc0000409) and bypasses Python
-        # exception handling. See src/ui/components/dnd_hook.py for details.
-        #
-        # The hook fires synchronously inside Win32 WNDPROC — we defer the real
-        # handler to the next Tk idle cycle to avoid re-entrant message-pump.
-        try:
-            from src.ui.components.dnd_hook import hook_dropfiles
-
-            def _on_drop(files):
-                try:
-                    paths = _filter_excel_paths(files)
-                    if not paths:
-                        return
-                    self.after(0, lambda p=paths: self._handle_dropped_paths(p))
-                except Exception as e:
-                    _log_dnd_crash(e)
-
-            hook_dropfiles(zone, _on_drop)
-        except Exception:
-            pass  # registration failure — drop zone still click-functional
+        # NOTE: OS-level drag-and-drop was removed (v10). It required ctypes
+        # WNDPROC subclassing (windnd / in-house dnd_hook), which proved
+        # catastrophically fragile — a single ctypes marshalling slip
+        # (buffer-size in windnd, pointer truncation in the rewrite) crashes
+        # the WHOLE app via Win32 __fastfail, bypassing Python exception
+        # handling. Blast radius is unacceptable for a nice-to-have. The
+        # zone stays fully functional via the "📁 Browse File" button.
 
         return zone
 
@@ -508,12 +456,11 @@ class ImportScreen(ctk.CTkFrame):
     def _ingest_paths(self, paths: list, source: str = "dipilih") -> None:
         """Parse + render chip + preview cards for a list of file paths.
 
-        Shared by _on_pick_file (file dialog) and _handle_dropped_paths
-        (drag-drop). Persists last folder, parses all files, computes
-        metrics, renders chip + preview + banner.
+        Called by _on_pick_file (file dialog). Persists last folder, parses
+        all files, computes metrics, renders chip + preview + banner.
 
-        source: word inserted into multi-file label ("dipilih" / "di-drop")
-            to give visual feedback about how files arrived.
+        source: word inserted into multi-file label (currently always
+            "dipilih") to give visual feedback about how files arrived.
         """
         with get_connection(DB_PATH) as conn:
             set_setting(conn, "last_import_folder", str(paths[0].parent))
@@ -570,10 +517,6 @@ class ImportScreen(ctk.CTkFrame):
             overwrite_count=overlap["overwrite"],
         )
         self._update_banner()
-
-    def _handle_dropped_paths(self, paths: list):
-        """Process files dropped via windnd hook — delegates to _ingest_paths."""
-        self._ingest_paths(paths, source="di-drop")
 
     def _on_cancel(self):
         self._pending_paths = []
