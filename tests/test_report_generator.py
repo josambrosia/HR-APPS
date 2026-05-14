@@ -243,3 +243,62 @@ def test_generate_monthly_report_holiday_row(tmp_path):
     assert ws.cell(row=holiday_row, column=8).value in (None, "")     # H Keluar
     assert ws.cell(row=holiday_row, column=12).value in (None, "")    # L Terlambat
     assert ws.cell(row=total_row, column=12).value == 30             # only April 1
+
+
+def test_generate_applies_effective_masuk_for_work_justified_late(tmp_path):
+    """A tugas_lapangan-resolved late row exports Masuk=08:00, Terlambat=0."""
+    conn = _conn()
+    emp = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+    upsert_attendance(
+        conn, employee_id=emp, tanggal="2026-04-01", hari="Rabu",
+        tipe="Hari Kerja", jadwal="08.00 - 16.00", masuk="09:40",
+        keluar="16:00", kerja_jam=6.5, lembur_jam=None,
+        terlambat_menit=100, has_issue=1, imported_from="t.xls",
+    )
+    rid = conn.execute("SELECT id FROM attendance_records").fetchone()["id"]
+    set_reason(conn, attendance_id=rid, category="tugas_lapangan", detail="Sragen")
+    out = tmp_path / "out.xlsx"
+    generate_monthly_report(conn, year_month="2026-04", out_path=out)
+    ws = load_workbook(out).active
+    assert ws.cell(row=3, column=7).value == "08:00"   # G Masuk -> effective
+    assert ws.cell(row=3, column=12).value == 0        # L Terlambat -> 0
+
+
+def test_generate_applies_effective_for_forgot_clock_in(tmp_path):
+    """A lupa_absen forgot-IN row exports Masuk=08:15, Terlambat=15, and
+    stops counting as a 'lupa' day (column O blank)."""
+    conn = _conn()
+    emp = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+    upsert_attendance(
+        conn, employee_id=emp, tanggal="2026-04-01", hari="Rabu",
+        tipe="Hari Kerja", jadwal="08.00 - 16.00", masuk=None,
+        keluar="16:05", kerja_jam=None, lembur_jam=None,
+        terlambat_menit=None, has_issue=1, imported_from="t.xls",
+    )
+    rid = conn.execute("SELECT id FROM attendance_records").fetchone()["id"]
+    set_reason(conn, attendance_id=rid, category="lupa_absen", detail=None)
+    out = tmp_path / "out.xlsx"
+    generate_monthly_report(conn, year_month="2026-04", out_path=out)
+    ws = load_workbook(out).active
+    assert ws.cell(row=3, column=7).value == "08:15"      # G Masuk -> effective
+    assert ws.cell(row=3, column=12).value == 15          # L Terlambat -> penalty
+    assert ws.cell(row=3, column=15).value in (None, "")  # O Lupa -> no longer lupa
+
+
+def test_generate_no_badge_work_justified_stays_absent(tmp_path):
+    """tugas_lapangan with masuk AND keluar NULL: no correction, stays absent."""
+    conn = _conn()
+    emp = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+    upsert_attendance(
+        conn, employee_id=emp, tanggal="2026-04-01", hari="Rabu",
+        tipe="Hari Kerja", jadwal="08.00 - 16.00", masuk=None,
+        keluar=None, kerja_jam=None, lembur_jam=None,
+        terlambat_menit=None, has_issue=1, imported_from="t.xls",
+    )
+    rid = conn.execute("SELECT id FROM attendance_records").fetchone()["id"]
+    set_reason(conn, attendance_id=rid, category="tugas_lapangan", detail="Sragen")
+    out = tmp_path / "out.xlsx"
+    generate_monthly_report(conn, year_month="2026-04", out_path=out)
+    ws = load_workbook(out).active
+    assert ws.cell(row=3, column=7).value in (None, "")   # G Masuk stays blank
+    assert ws.cell(row=3, column=14).value == 1           # N Absen -> still absent

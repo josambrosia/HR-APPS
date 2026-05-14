@@ -15,8 +15,9 @@ from openpyxl import load_workbook
 from openpyxl.cell import MergedCell
 from openpyxl.styles import PatternFill
 
-from src.config import TEMPLATE_LAPORAN_BULANAN, REASON_CATEGORIES
-from src.core.reason_mapper import render_alasan_ijin
+from src.config import TEMPLATE_LAPORAN_BULANAN, REASON_CATEGORIES, DEFAULT_SCHEDULE_START
+from src.core.reason_mapper import render_alasan_ijin, effective_attendance
+from src.db.settings import get_setting, read_lupa_penalty_min
 
 
 MONTH_NAMES_ID = [
@@ -258,6 +259,8 @@ def generate_monthly_report(
     """
     wb = load_workbook(TEMPLATE_LAPORAN_BULANAN)
     ws = wb.active
+    schedule_start = get_setting(conn, "schedule_start", default=DEFAULT_SCHEDULE_START)
+    lupa_penalty = read_lupa_penalty_min(conn)
 
     # Capture styles from sample rows 3 (data) and 4 (Total Personal)
     data_styles = _capture_row_styles(ws, 3)
@@ -309,6 +312,11 @@ def generate_monthly_report(
         total = _init_total()
         for r in emp_records:
             is_holiday = r.get("tipe") == "Hari Libur"
+            if not is_holiday:
+                eff = effective_attendance(
+                    r, schedule_start=schedule_start, lupa_penalty_min=lupa_penalty)
+                r = {**r, "masuk": eff["masuk"],
+                     "terlambat_menit": eff["terlambat_menit"]}
             derived = {} if is_holiday else compute_derived(r)
             _write_data_row(ws, current_row, r, derived, data_styles, is_holiday=is_holiday)
             if not is_holiday:
