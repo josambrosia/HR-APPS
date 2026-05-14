@@ -12,7 +12,10 @@ from src.db.export_history import record_export, list_recent_exports
 from src.core.report_filler import fill_monthly_report
 from src.core.week_utils import full_month_range
 from src.core.filename_parser import detect_year_month_from_filename
+from src.core.report_generator import generate_monthly_report, month_label
+from src.db.attendance import list_months_with_stats
 from src.ui.components.kpi_card import KPICard
+from src.ui.components.toast import show_success_toast
 from src.ui.screens.import_screen import _format_month_id, _format_relative_time
 from src.ui.theme import (
     FONT_FAMILY,
@@ -22,7 +25,7 @@ from src.ui.theme import (
     COLOR_INFO, COLOR_SUCCESS, COLOR_WARN,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED, COLOR_TEXT_DISABLED,
     FONT_DISPLAY,
-    FONT_BODY, FONT_BODY_BOLD, FONT_LABEL,
+    FONT_BODY, FONT_BODY_BOLD, FONT_LABEL, FONT_SMALL,
     FONT_MONO_DATA, FONT_MONO_SMALL,
     SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
     RADIUS_SM, RADIUS_MD,
@@ -35,18 +38,60 @@ class ExportScreen(ctk.CTkFrame):
         self._selected: Path | None = None
         self._filename_mismatch = False
         self._detected_ym: str | None = None
-        self._build()
+        self._mode = "export"
+        self._build_shell()
 
-    def _build(self):
-        # Header
+    def _build_shell(self):
         ctk.CTkLabel(
-            self, text="Export Laporan Bulanan",
-            font=FONT_DISPLAY, text_color=COLOR_TEXT,
-        ).pack(anchor="w", pady=(0, SPACE_LG))
+            self, text="Export", font=FONT_DISPLAY, text_color=COLOR_TEXT,
+        ).pack(anchor="w", pady=(0, SPACE_MD))
 
+        toggle = ctk.CTkFrame(self, fg_color="transparent")
+        toggle.pack(anchor="w", pady=(0, SPACE_XS))
+        self._mode_btns = {}
+        for mode, label in (("export", "📤 Export"), ("generate", "⚙ Generate")):
+            btn = ctk.CTkButton(
+                toggle, text=label, width=150, height=32,
+                command=lambda m=mode: self._show_mode(m),
+                font=FONT_BODY_BOLD,
+            )
+            btn.pack(side="left", padx=(0, SPACE_XS))
+            self._mode_btns[mode] = btn
+
+        ctk.CTkLabel(
+            self,
+            text="Export = isi template dari atasan · Generate = buat file dari database",
+            font=FONT_MONO_SMALL, text_color=COLOR_TEXT_MUTED,
+        ).pack(anchor="w", pady=(0, SPACE_MD))
+
+        self._export_panel = ctk.CTkFrame(self, fg_color="transparent")
+        self._generate_panel = ctk.CTkFrame(self, fg_color="transparent")
+        self._build_export_mode(self._export_panel)
+        self._build_generate_mode(self._generate_panel)
+        self._show_mode("export")
+
+    def _show_mode(self, mode):
+        self._mode = mode
+        for m, btn in self._mode_btns.items():
+            if m == mode:
+                btn.configure(
+                    fg_color=COLOR_ACCENT, text_color=COLOR_BG,
+                    hover_color=COLOR_ACCENT_HOVER,
+                )
+            else:
+                btn.configure(
+                    fg_color=COLOR_SURFACE, text_color=COLOR_TEXT_DIM,
+                    hover_color=COLOR_SURFACE_HIGH,
+                )
+        self._export_panel.pack_forget()
+        self._generate_panel.pack_forget()
+        panel = self._export_panel if mode == "export" else self._generate_panel
+        panel.pack(fill="both", expand=True)
+
+    def _build_export_mode(self, parent):
         # ── Active month banner ──
         self.banner = ctk.CTkFrame(
-            self, fg_color="#08222B",  # cyan tint
+            parent, fg_color="#08222B",  # cyan tint
             border_width=1, border_color="#12454F",
             corner_radius=RADIUS_MD,
         )
@@ -67,43 +112,43 @@ class ExportScreen(ctk.CTkFrame):
         self._update_banner()
 
         # ── R8: Save Destination dropdown ──
-        self.save_dest_frame = self._build_save_destination()
+        self.save_dest_frame = self._build_save_destination(parent)
         self.save_dest_frame.pack(fill="x", pady=(0, SPACE_MD))
 
         # ── Picker zone (initial state) ──
-        self.picker_zone = self._build_picker_zone()
+        self.picker_zone = self._build_picker_zone(parent)
         self.picker_zone.pack(fill="x", pady=(0, SPACE_LG))
 
         # ── File chip (shown after pick) ──
         self.chip_frame = ctk.CTkFrame(
-            self, fg_color=COLOR_SURFACE,
+            parent, fg_color=COLOR_SURFACE,
             border_width=1, border_color=COLOR_BORDER,
             corner_radius=RADIUS_MD,
         )
         # Not packed initially
 
         # ── Preview cards (after dry-run) ──
-        self.preview_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.preview_frame = ctk.CTkFrame(parent, fg_color="transparent")
         self.preview_frame.pack(fill="x", pady=(0, SPACE_LG))
         self._render_preview_placeholder()
 
         # ── Result strip (after successful export) ──
-        self.result_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.result_frame = ctk.CTkFrame(parent, fg_color="transparent")
         # Not packed initially
 
         # ── History list at bottom ──
         self.history_frame = ctk.CTkFrame(
-            self, fg_color=COLOR_SURFACE,
+            parent, fg_color=COLOR_SURFACE,
             border_width=1, border_color=COLOR_BORDER,
             corner_radius=RADIUS_MD,
         )
         self.history_frame.pack(fill="x", pady=(SPACE_LG, 0))
         self._render_history()
 
-    def _build_picker_zone(self):
+    def _build_picker_zone(self, parent):
         """Build the picker card shown when no template selected."""
         zone = ctk.CTkFrame(
-            self, fg_color=COLOR_SURFACE,
+            parent, fg_color=COLOR_SURFACE,
             border_width=1, border_color=COLOR_BORDER,
             corner_radius=RADIUS_MD,
         )
@@ -412,9 +457,9 @@ class ExportScreen(ctk.CTkFrame):
             ).pack(side="right")
         ctk.CTkFrame(self.history_frame, fg_color="transparent", height=SPACE_SM).pack()
 
-    def _build_save_destination(self):
+    def _build_save_destination(self, parent):
         """R8 — dropdown to choose where exported file is saved."""
-        frame = ctk.CTkFrame(self, fg_color="transparent")
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
         ctk.CTkLabel(
             frame, text="SIMPAN OUTPUT KE",
             font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
@@ -614,3 +659,79 @@ class ExportScreen(ctk.CTkFrame):
         self._filename_mismatch = False
         self._detected_ym = None
         self._update_banner()
+
+    def _build_generate_mode(self, parent):
+        """Generate mode — build a report from the database. Bulanan only;
+        Mingguan is added in Task 15."""
+        ctk.CTkLabel(
+            parent,
+            text="Buat file laporan dari database - tidak perlu template",
+            font=FONT_SMALL, text_color=COLOR_TEXT_DIM,
+        ).pack(anchor="w", pady=(0, SPACE_MD))
+
+        ctk.CTkLabel(
+            parent, text="PILIH BULAN", font=FONT_LABEL,
+            text_color=COLOR_TEXT_MUTED,
+        ).pack(anchor="w", padx=SPACE_XS)
+
+        with get_connection(DB_PATH) as conn:
+            months = [r["year_month"] for r in list_months_with_stats(conn)]
+            active = get_setting(conn, "current_month") or ""
+
+        if not months:
+            ctk.CTkLabel(
+                parent, text="(belum ada data bulan - import fingerprint dulu)",
+                font=FONT_BODY, text_color=COLOR_TEXT_MUTED,
+            ).pack(anchor="w", padx=SPACE_XS, pady=SPACE_SM)
+            return
+
+        labels = [month_label(m) for m in months]
+        self._gen_month_map = dict(zip(labels, months))
+        default_label = month_label(active) if active in months else labels[0]
+        self._gen_month_var = ctk.StringVar(value=default_label)
+        ctk.CTkOptionMenu(
+            parent, values=labels, variable=self._gen_month_var, width=280,
+            font=FONT_BODY, fg_color=COLOR_SURFACE_HIGH,
+            button_color=COLOR_BORDER, button_hover_color=COLOR_BORDER_STRONG,
+            text_color=COLOR_TEXT,
+        ).pack(anchor="w", padx=SPACE_XS, pady=(SPACE_XS, SPACE_MD))
+
+        ctk.CTkButton(
+            parent, text="⚙ Generate Laporan Bulanan", height=36,
+            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+            text_color=COLOR_BG, font=FONT_BODY_BOLD,
+            command=self._on_generate_bulanan,
+        ).pack(anchor="w", padx=SPACE_XS)
+
+    def _on_generate_bulanan(self):
+        year_month = self._gen_month_map[self._gen_month_var.get()]
+        default_name = f"Laporan Bulanan {month_label(year_month)} [Auto Filled].xlsx"
+        out_path = filedialog.asksaveasfilename(
+            defaultextension=".xlsx", initialfile=default_name,
+            filetypes=[("Excel files", "*.xlsx")],
+            title=f"Simpan Laporan {month_label(year_month)}",
+        )
+        if not out_path:
+            return
+        try:
+            with get_connection(DB_PATH) as conn:
+                summary = generate_monthly_report(
+                    conn, year_month=year_month, out_path=Path(out_path),
+                )
+                record_export(
+                    conn, out_path=str(out_path), template="-",
+                    year_month=year_month, filled=summary.rows_generated,
+                    na=summary.na_count, not_found=0, kind="generate_bulanan",
+                )
+        except Exception as e:
+            messagebox.showerror(
+                "Error generate laporan", f"Tidak bisa generate file:\n{e}",
+            )
+            return
+        show_success_toast(
+            self.winfo_toplevel(), title="Laporan Berhasil Dibuat",
+            message=(
+                f"Laporan Bulanan {month_label(year_month)} disimpan.\n"
+                f"{summary.rows_generated} baris · {summary.na_count} NA"
+            ),
+        )
