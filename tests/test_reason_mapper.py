@@ -31,10 +31,17 @@ def test_render_unknown_category_raises():
 
 
 def test_render_alasan_ijin_libur():
-    from src.core.reason_mapper import render_alasan_ijin
     assert render_alasan_ijin("libur", None) == "Libur"
 
 
 def test_libur_in_reason_categories():
     from src.config import REASON_CATEGORIES
     assert "libur" in REASON_CATEGORIES
+
+
+def test_reason_categories_and_labels_in_sync():
+    """REASON_CATEGORIES (config) and REASON_LABELS (reason_mapper) must
+    have identical key sets — a key in one but not the other is a latent
+    runtime ValueError in render_alasan_ijin."""
+    from src.config import REASON_CATEGORIES
+    assert set(REASON_CATEGORIES) == set(REASON_LABELS.keys())
