@@ -179,9 +179,8 @@ class HRApp(ctk.CTk):
                 item.pack(fill="x", pady=0)
                 self._nav_items[screen_key] = item
 
-        # ── Footer: BRAND stacked emphasis + version + tagline ──
-        # SB2 mockup: "Josaphat Tech" (white bold) / "Solution" (magenta bold)
-        # → version mono / tagline mono. Brand readable at glance.
+        # ── Footer: brand row ("Josaphat Tech" + "Solution") + 1 mono line ──
+        # Compact 2-line layout (version + tagline combined) to save sidebar height.
         from src.config import APP_VERSION, APP_TAGLINE, APP_BRAND_NAME
 
         # Split brand name into 2 lines on the last word for the stacked layout.
