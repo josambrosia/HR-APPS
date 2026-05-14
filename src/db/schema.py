@@ -64,6 +64,17 @@ CREATE TABLE IF NOT EXISTS export_history (
 
 CREATE INDEX IF NOT EXISTS idx_export_history_created_at
     ON export_history(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS outlier_exclusions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id     INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    effective_from  TEXT    NOT NULL,
+    effective_until TEXT,
+    created_at      TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_outlier_employee
+    ON outlier_exclusions(employee_id);
 """
 
 DEFAULT_SETTINGS = {

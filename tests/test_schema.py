@@ -29,3 +29,16 @@ def test_init_db_idempotent(temp_db_path):
     with sqlite3.connect(temp_db_path) as conn:
         cnt = conn.execute("SELECT COUNT(*) FROM settings").fetchone()[0]
     assert cnt == 3  # not duplicated
+
+
+def test_outlier_exclusions_table_created(temp_db_path):
+    """init_db creates the outlier_exclusions table."""
+    from src.db.schema import init_db
+    from src.db.connection import get_connection
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        row = conn.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='outlier_exclusions'"
+        ).fetchone()
+    assert row is not None
