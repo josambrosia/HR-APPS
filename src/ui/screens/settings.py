@@ -84,6 +84,8 @@ class SettingsScreen(ctk.CTkFrame):
             sched_start = get_setting(conn, "schedule_start", default="08.00")
             sched_end = get_setting(conn, "schedule_end", default="16.00")
             threshold = get_setting(conn, "coaching_threshold_min", default="75")
+            lupa_penalty = get_setting(conn, "lupa_absen_datang_penalty_min",
+                                       default="15")
 
         row = ctk.CTkFrame(
             parent, fg_color=COLOR_SURFACE,
@@ -135,6 +137,26 @@ class SettingsScreen(ctk.CTkFrame):
             row3, text=f"Jadwal Kerja: {sched_start} - {sched_end}",
             font=FONT_BODY, text_color=COLOR_TEXT,
         ).pack(side="left", padx=SPACE_MD, pady=SPACE_SM + 2)
+
+        row4 = ctk.CTkFrame(
+            parent, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER,
+            corner_radius=RADIUS_MD,
+        )
+        row4.pack(fill="x", pady=SPACE_SM)
+        ctk.CTkLabel(
+            row4, text="Penalti Lupa Absen Datang (menit):",
+            font=FONT_BODY, text_color=COLOR_TEXT,
+        ).pack(side="left", padx=SPACE_MD, pady=SPACE_SM + 2)
+        self.lupa_penalty_var = ctk.StringVar(value=lupa_penalty)
+        ctk.CTkEntry(
+            row4, textvariable=self.lupa_penalty_var, width=80,
+            fg_color=COLOR_SURFACE_HIGH,
+            border_width=1, border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_BODY,
+            placeholder_text_color=COLOR_TEXT_MUTED,
+        ).pack(side="left")
 
         # Save = magenta primary CTA (JTS brand action color).
         ctk.CTkButton(
@@ -230,4 +252,6 @@ class SettingsScreen(ctk.CTkFrame):
         with get_connection(DB_PATH) as conn:
             set_setting(conn, "current_month", self.month_var.get().strip())
             set_setting(conn, "coaching_threshold_min", self.thr_var.get().strip())
+            set_setting(conn, "lupa_absen_datang_penalty_min",
+                        self.lupa_penalty_var.get().strip())
         messagebox.showinfo("Tersimpan", "Pengaturan disimpan.")
