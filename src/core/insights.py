@@ -2,6 +2,7 @@ import sqlite3
 from typing import List, Optional
 
 from src.config import COACHING_EXCLUDED
+from src.db.outlier import excluded_employee_ids, exclusion_sql
 
 
 def terlambat_ranking(
@@ -50,6 +51,11 @@ def terlambat_ranking(
     """
     params = (*COACHING_EXCLUDED, *COACHING_EXCLUDED, start, end)
     rows = conn.execute(sql, params).fetchall()
+
+    # Drop employees excluded via the Outlier menu for this period's month
+    excluded = excluded_employee_ids(conn, start[:7])
+    if excluded:
+        rows = [r for r in rows if r["id"] not in excluded]
 
     result = [
         {

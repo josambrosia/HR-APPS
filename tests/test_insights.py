@@ -377,3 +377,46 @@ def test_terlambat_ranking_sort_order(temp_db_path):
         result = terlambat_ranking(conn, "2026-04-01", "2026-04-30")
         names_in_order = [r["nama"] for r in result]
         assert names_in_order == ["A", "B", "C", "D", "E"]
+
+
+def test_terlambat_ranking_drops_excluded_employees(temp_db_path):
+    """Employees excluded via the Outlier menu are absent from the ranking."""
+    from src.db.outlier import exclude_employee
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "ANDI")
+        b = _add_emp(conn, "2", "BUDI")
+        _add_att(conn, a, "2026-04-01", "Senin", "08.50", "16.00", 50)
+        _add_att(conn, b, "2026-04-01", "Senin", "08.40", "16.00", 40)
+        exclude_employee(conn, a, "2026-04")  # ANDI excluded from April onward
+
+        names = [r["nama"] for r in terlambat_ranking(conn, "2026-04-01", "2026-04-30")]
+        assert "ANDI" not in names
+        assert "BUDI" in names
+
+
+def test_terlambat_ranking_exclusion_cascades_to_coaching_flag(temp_db_path):
+    """coaching_flag derives from terlambat_ranking — excluded emp drop too."""
+    from src.db.outlier import exclude_employee
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, a, "2026-04-01", "Senin", "09.40", "16.00", 100)  # over threshold
+        exclude_employee(conn, a, "2026-04")
+        flagged = coaching_flag(conn, "2026-04-01", "2026-04-30", threshold=75)
+        assert [r["nama"] for r in flagged] == []
+
+
+def test_terlambat_ranking_exclusion_respects_month(temp_db_path):
+    """Exclusion effective from April does not affect March analysis."""
+    from src.db.outlier import exclude_employee
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, a, "2026-03-02", "Senin", "08.50", "16.00", 50)
+        _add_att(conn, a, "2026-04-01", "Rabu", "08.50", "16.00", 50)
+        exclude_employee(conn, a, "2026-04")
+        mar = [r["nama"] for r in terlambat_ranking(conn, "2026-03-01", "2026-03-31")]
+        apr = [r["nama"] for r in terlambat_ranking(conn, "2026-04-01", "2026-04-30")]
+        assert "ANDI" in mar   # March unaffected
+        assert "ANDI" not in apr  # April excluded
