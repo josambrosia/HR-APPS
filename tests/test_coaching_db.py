@@ -180,3 +180,24 @@ def test_list_coaching_for_week_excludes_outlier(temp_db_path):
         names = [r["nama"] for r in rows]
         assert "ANDI" not in names
         assert "BUDI" in names
+
+
+def test_list_coaching_for_week_excludes_holiday_dates():
+    """Lateness on a holiday date does not push an employee over threshold."""
+    from src.db.holidays import mark_holidays
+    conn = _conn()
+    emp = _add_employee(conn)
+    # 50 min on a normal day + 50 min on a day that becomes a holiday
+    _add_late_attendance(conn, emp, "2026-04-06", 50)
+    _add_late_attendance(conn, emp, "2026-04-08", 50)
+    # baseline: 100 total > 75 threshold -> employee appears
+    base = list_coaching_for_week(
+        conn, week_start="2026-04-06", week_end="2026-04-12", threshold_minutes=75,
+    )
+    assert len(base) == 1
+    # mark April 8 holiday -> only 50 left -> below threshold -> not flagged
+    mark_holidays(conn, ["2026-04-08"])
+    after = list_coaching_for_week(
+        conn, week_start="2026-04-06", week_end="2026-04-12", threshold_minutes=75,
+    )
+    assert after == []

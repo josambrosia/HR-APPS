@@ -117,7 +117,8 @@ def list_coaching_for_week(
                     ELSE COALESCE(ar.terlambat_menit, 0)
                 END) AS total_terlambat
               FROM attendance_records ar
-             WHERE ar.tanggal BETWEEN ? AND ?{exc_frag}
+             WHERE ar.tanggal BETWEEN ? AND ?
+               AND ar.tipe = 'Hari Kerja'{exc_frag}
              GROUP BY ar.employee_id
         )
         SELECT
