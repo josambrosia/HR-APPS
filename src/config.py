@@ -63,6 +63,7 @@ REASON_CATEGORIES = (
     "terlambat_kerja",
     "terlambat_lain",
     "lupa_absen",
+    "libur",
     "na",
 )
 

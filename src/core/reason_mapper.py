@@ -9,6 +9,7 @@ REASON_LABELS = {
     "terlambat_kerja": "Masuk Terlambat dengan Alasan Pekerjaan",
     "terlambat_lain":  "Terlambat dengan alasan",
     "lupa_absen":      "Lupa Absen",
+    "libur":           "Libur",
     "na":              "NA / Belum ada kabar",
 }
 

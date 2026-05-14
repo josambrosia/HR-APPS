@@ -2,10 +2,10 @@ import pytest
 from src.core.reason_mapper import render_alasan_ijin, REASON_LABELS
 
 
-def test_all_8_categories_present():
+def test_all_9_categories_present():
     assert set(REASON_LABELS.keys()) == {
         "tugas_lapangan", "tugas_paparan", "izin_sakit", "cuti",
-        "terlambat_kerja", "terlambat_lain", "lupa_absen", "na",
+        "terlambat_kerja", "terlambat_lain", "lupa_absen", "libur", "na",
     }
 
 
@@ -28,3 +28,13 @@ def test_render_without_detail():
 def test_render_unknown_category_raises():
     with pytest.raises(ValueError):
         render_alasan_ijin("invalid_cat", None)
+
+
+def test_render_alasan_ijin_libur():
+    from src.core.reason_mapper import render_alasan_ijin
+    assert render_alasan_ijin("libur", None) == "Libur"
+
+
+def test_libur_in_reason_categories():
+    from src.config import REASON_CATEGORIES
+    assert "libur" in REASON_CATEGORIES
