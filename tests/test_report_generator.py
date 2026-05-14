@@ -262,6 +262,8 @@ def test_generate_applies_effective_masuk_for_work_justified_late(tmp_path):
     ws = load_workbook(out).active
     assert ws.cell(row=3, column=7).value == "08:00"   # G Masuk -> effective
     assert ws.cell(row=3, column=12).value == 0        # L Terlambat -> 0
+    # Total Personal row (row 4): accumulates EFFECTIVE Terlambat, not raw 100
+    assert ws.cell(row=4, column=12).value == 0
 
 
 def test_generate_applies_effective_for_forgot_clock_in(tmp_path):
@@ -283,6 +285,8 @@ def test_generate_applies_effective_for_forgot_clock_in(tmp_path):
     assert ws.cell(row=3, column=7).value == "08:15"      # G Masuk -> effective
     assert ws.cell(row=3, column=12).value == 15          # L Terlambat -> penalty
     assert ws.cell(row=3, column=15).value in (None, "")  # O Lupa -> no longer lupa
+    # Total Personal row (row 4): accumulates the EFFECTIVE penalty, not raw None
+    assert ws.cell(row=4, column=12).value == 15
 
 
 def test_generate_no_badge_work_justified_stays_absent(tmp_path):
