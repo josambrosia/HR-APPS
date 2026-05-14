@@ -728,6 +728,7 @@ class ExportScreen(ctk.CTkFrame):
                 "Error generate laporan", f"Tidak bisa generate file:\n{e}",
             )
             return
+        self._render_history()
         show_success_toast(
             self.winfo_toplevel(), title="Laporan Berhasil Dibuat",
             message=(
