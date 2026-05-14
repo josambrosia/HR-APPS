@@ -10,7 +10,8 @@ from src.db.connection import get_connection
 from src.db.settings import get_setting, set_setting
 from src.db.export_history import record_export, list_recent_exports
 from src.core.report_filler import fill_monthly_report
-from src.core.week_utils import full_month_range
+from src.core.week_utils import full_month_range, weeks_in_month
+from src.core.weekly_export import generate_weekly_export
 from src.core.filename_parser import detect_year_month_from_filename
 from src.core.report_generator import generate_monthly_report, month_label
 from src.db.attendance import list_months_with_stats
@@ -661,14 +662,55 @@ class ExportScreen(ctk.CTkFrame):
         self._update_banner()
 
     def _build_generate_mode(self, parent):
-        """Generate mode — build a report from the database. Bulanan only;
-        Mingguan is added in Task 15."""
+        """Generate mode — build a report from the database. Sub-modes:
+        Bulanan (whole month) and Mingguan (one week)."""
         ctk.CTkLabel(
             parent,
             text="Buat file laporan dari database - tidak perlu template",
             font=FONT_SMALL, text_color=COLOR_TEXT_DIM,
         ).pack(anchor="w", pady=(0, SPACE_MD))
 
+        sub = ctk.CTkFrame(parent, fg_color="transparent")
+        sub.pack(anchor="w", pady=(0, SPACE_MD))
+        self._gen_sub = "bulanan"
+        self._gen_sub_btns = {}
+        for sub_mode, label in (("bulanan", "Bulanan"), ("mingguan", "Mingguan")):
+            b = ctk.CTkButton(
+                sub, text=label, width=120, height=30,
+                command=lambda s=sub_mode: self._show_gen_sub(s),
+                font=FONT_BODY_BOLD,
+            )
+            b.pack(side="left", padx=(0, SPACE_XS))
+            self._gen_sub_btns[sub_mode] = b
+
+        self._gen_bulanan_panel = ctk.CTkFrame(parent, fg_color="transparent")
+        self._gen_mingguan_panel = ctk.CTkFrame(parent, fg_color="transparent")
+        self._build_gen_bulanan(self._gen_bulanan_panel)
+        self._build_gen_mingguan(self._gen_mingguan_panel)
+        self._show_gen_sub("bulanan")
+
+    def _show_gen_sub(self, sub_mode):
+        self._gen_sub = sub_mode
+        for s, btn in self._gen_sub_btns.items():
+            if s == sub_mode:
+                btn.configure(
+                    fg_color=COLOR_ACCENT, text_color=COLOR_BG,
+                    hover_color=COLOR_ACCENT_HOVER,
+                )
+            else:
+                btn.configure(
+                    fg_color=COLOR_SURFACE, text_color=COLOR_TEXT_DIM,
+                    hover_color=COLOR_SURFACE_HIGH,
+                )
+        self._gen_bulanan_panel.pack_forget()
+        self._gen_mingguan_panel.pack_forget()
+        panel = (
+            self._gen_bulanan_panel if sub_mode == "bulanan"
+            else self._gen_mingguan_panel
+        )
+        panel.pack(fill="both", expand=True)
+
+    def _build_gen_bulanan(self, parent):
         ctk.CTkLabel(
             parent, text="PILIH BULAN", font=FONT_LABEL,
             text_color=COLOR_TEXT_MUTED,
@@ -702,6 +744,91 @@ class ExportScreen(ctk.CTkFrame):
             text_color=COLOR_BG, font=FONT_BODY_BOLD,
             command=self._on_generate_bulanan,
         ).pack(anchor="w", padx=SPACE_XS)
+
+    def _build_gen_mingguan(self, parent):
+        with get_connection(DB_PATH) as conn:
+            active = get_setting(conn, "current_month") or ""
+
+        if not active:
+            ctk.CTkLabel(
+                parent, text="(belum ada bulan aktif - pilih di Active Month dulu)",
+                font=FONT_BODY, text_color=COLOR_TEXT_MUTED,
+            ).pack(anchor="w", padx=SPACE_XS, pady=SPACE_SM)
+            return
+
+        self._mingguan_weeks = list(weeks_in_month(active))
+        if not self._mingguan_weeks:
+            ctk.CTkLabel(
+                parent, text="(tidak ada minggu di bulan aktif)",
+                font=FONT_BODY, text_color=COLOR_TEXT_MUTED,
+            ).pack(anchor="w", padx=SPACE_XS, pady=SPACE_SM)
+            return
+
+        ctk.CTkLabel(
+            parent, text=f"PILIH MINGGU - {month_label(active)}",
+            font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
+        ).pack(anchor="w", padx=SPACE_XS)
+
+        week_row = ctk.CTkFrame(parent, fg_color="transparent")
+        week_row.pack(anchor="w", padx=SPACE_XS, pady=(SPACE_XS, SPACE_MD))
+        self._mingguan_week_btns = {}
+        for (n, start, end) in self._mingguan_weeks:
+            b = ctk.CTkButton(
+                week_row, text=f"Minggu {n}", width=95, height=30,
+                command=lambda w=(n, start, end): self._on_select_week(w),
+                font=FONT_BODY,
+            )
+            b.pack(side="left", padx=(0, SPACE_XS))
+            self._mingguan_week_btns[n] = b
+        self._on_select_week(self._mingguan_weeks[0])
+
+        ctk.CTkButton(
+            parent, text="⚙ Generate Laporan Mingguan", height=36,
+            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+            text_color=COLOR_BG, font=FONT_BODY_BOLD,
+            command=self._on_generate_mingguan,
+        ).pack(anchor="w", padx=SPACE_XS)
+
+    def _on_select_week(self, week):
+        self._mingguan_sel = week
+        n_sel = week[0]
+        for n, btn in self._mingguan_week_btns.items():
+            if n == n_sel:
+                btn.configure(fg_color=COLOR_ACCENT, text_color=COLOR_BG)
+            else:
+                btn.configure(fg_color=COLOR_SURFACE, text_color=COLOR_TEXT_DIM)
+
+    def _on_generate_mingguan(self):
+        n, start, end = self._mingguan_sel
+        default_name = f"Laporan Mingguan {start} sd {end}.xlsx"
+        out_path = filedialog.asksaveasfilename(
+            defaultextension=".xlsx", initialfile=default_name,
+            filetypes=[("Excel files", "*.xlsx")],
+            title=f"Simpan Laporan Mingguan (Minggu {n})",
+        )
+        if not out_path:
+            return
+        try:
+            with get_connection(DB_PATH) as conn:
+                summary = generate_weekly_export(conn, start, end, Path(out_path))
+                record_export(
+                    conn, out_path=str(out_path), template="-",
+                    year_month=start[:7], filled=summary.rows, na=0,
+                    not_found=0, kind="generate_mingguan",
+                )
+        except Exception as e:
+            messagebox.showerror(
+                "Error generate mingguan", f"Tidak bisa generate file:\n{e}",
+            )
+            return
+        self._render_history()
+        show_success_toast(
+            self.winfo_toplevel(), title="Laporan Mingguan Dibuat",
+            message=(
+                f"Minggu {n} ({start} sd {end}) disimpan.\n"
+                f"{summary.rows} baris · {summary.employees} pegawai"
+            ),
+        )
 
     def _on_generate_bulanan(self):
         year_month = self._gen_month_map[self._gen_month_var.get()]
