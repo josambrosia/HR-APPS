@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS export_history (
     filled      INTEGER NOT NULL,
     na          INTEGER NOT NULL,
     not_found   INTEGER NOT NULL,
+    kind        TEXT NOT NULL DEFAULT 'fill',
     created_at  TEXT NOT NULL
 );
 
@@ -75,6 +76,11 @@ CREATE TABLE IF NOT EXISTS outlier_exclusions (
 
 CREATE INDEX IF NOT EXISTS idx_outlier_employee
     ON outlier_exclusions(employee_id);
+
+CREATE TABLE IF NOT EXISTS holidays (
+    tanggal    TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL
+);
 """
 
 DEFAULT_SETTINGS = {
@@ -84,12 +90,28 @@ DEFAULT_SETTINGS = {
 }
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Idempotent column additions for pre-existing databases.
+
+    CREATE TABLE IF NOT EXISTS only creates missing tables — it does NOT
+    add columns to a table that already exists. For an existing data/hr.db
+    the export_history.kind column must be added via ALTER TABLE.
+    """
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(export_history)")}
+    if "kind" not in cols:
+        conn.execute(
+            "ALTER TABLE export_history "
+            "ADD COLUMN kind TEXT NOT NULL DEFAULT 'fill'"
+        )
+
+
 def init_db(db_path: Path) -> None:
     """Create schema if missing and seed default settings (idempotent)."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     try:
         conn.executescript(DDL)
+        _migrate(conn)
         for key, value in DEFAULT_SETTINGS.items():
             conn.execute(
                 "INSERT INTO settings (key, value) VALUES (?, ?) "

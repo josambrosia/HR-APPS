@@ -42,3 +42,43 @@ def test_outlier_exclusions_table_created(temp_db_path):
             "WHERE type='table' AND name='outlier_exclusions'"
         ).fetchone()
     assert row is not None
+
+
+def test_holidays_table_created(temp_db_path):
+    """init_db creates the holidays table."""
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        row = conn.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='holidays'"
+        ).fetchone()
+    assert row is not None
+
+
+def test_export_history_has_kind_column(temp_db_path):
+    """export_history has the kind column after init_db (new DB)."""
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(export_history)")}
+    assert "kind" in cols
+
+
+def test_migrate_adds_kind_to_legacy_export_history(temp_db_path):
+    """A pre-existing export_history WITHOUT kind gets the column added."""
+    with sqlite3.connect(temp_db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE export_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                out_path TEXT NOT NULL, template TEXT NOT NULL,
+                year_month TEXT NOT NULL, filled INTEGER NOT NULL,
+                na INTEGER NOT NULL, not_found INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+    init_db(temp_db_path)  # must migrate in place without error
+    with sqlite3.connect(temp_db_path) as conn:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(export_history)")}
+    assert "kind" in cols
