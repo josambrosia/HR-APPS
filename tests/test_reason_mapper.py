@@ -2,9 +2,9 @@ import pytest
 from src.core.reason_mapper import render_alasan_ijin, REASON_LABELS
 
 
-def test_all_9_categories_present():
+def test_all_10_categories_present():
     assert set(REASON_LABELS.keys()) == {
-        "tugas_lapangan", "tugas_paparan", "izin_sakit", "cuti",
+        "tugas_lapangan", "tugas_paparan", "izin_sakit", "cuti", "tugas_belajar",
         "terlambat_kerja", "terlambat_lain", "lupa_absen", "libur", "na",
     }
 
@@ -32,6 +32,10 @@ def test_render_unknown_category_raises():
 
 def test_render_alasan_ijin_libur():
     assert render_alasan_ijin("libur", None) == "Libur"
+
+
+def test_render_alasan_ijin_tugas_belajar():
+    assert render_alasan_ijin("tugas_belajar", None) == "Tugas Belajar/Kuliah"
 
 
 def test_libur_in_reason_categories():

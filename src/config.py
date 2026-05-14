@@ -60,6 +60,7 @@ REASON_CATEGORIES = (
     "tugas_paparan",
     "izin_sakit",
     "cuti",
+    "tugas_belajar",
     "terlambat_kerja",
     "terlambat_lain",
     "lupa_absen",

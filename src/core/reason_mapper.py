@@ -6,6 +6,7 @@ REASON_LABELS = {
     "tugas_paparan":   "Tugas Paparan",
     "izin_sakit":      "Izin Sakit",
     "cuti":            "Cuti",
+    "tugas_belajar":   "Tugas Belajar/Kuliah",
     "terlambat_kerja": "Masuk Terlambat dengan Alasan Pekerjaan",
     "terlambat_lain":  "Terlambat dengan alasan",
     "lupa_absen":      "Lupa Absen",
