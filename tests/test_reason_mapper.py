@@ -59,9 +59,12 @@ def _att_row(reason_category=None, masuk="09:40", keluar="16:00", terlambat_meni
 
 
 def test_effective_attendance_work_justified_late_with_clock_in():
-    row = _att_row(reason_category="tugas_lapangan", masuk="09:40", terlambat_menit=100)
-    eff = effective_attendance(row, schedule_start="08.00", lupa_penalty_min=15)
-    assert eff == {"masuk": "08:00", "terlambat_menit": 0}
+    # tugas_lapangan is the representative; spot-check that all COACHING_EXCLUDED
+    # members share the same path
+    for cat in ("tugas_lapangan", "tugas_paparan", "terlambat_kerja"):
+        row = _att_row(reason_category=cat, masuk="09:40", terlambat_menit=100)
+        eff = effective_attendance(row, schedule_start="08.00", lupa_penalty_min=15)
+        assert eff == {"masuk": "08:00", "terlambat_menit": 0}, f"Failed for {cat}"
 
 
 def test_effective_attendance_work_justified_late_no_badge():
