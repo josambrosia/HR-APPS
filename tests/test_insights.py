@@ -5,7 +5,7 @@ from src.db.attendance import upsert_attendance, set_reason
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag, karyawan_teladan,
     karyawan_teladan_top_n, ranking_departemen, hari_paling_rawan, resolution_rate,
-    avg_minutes_per_late_event,
+    avg_minutes_per_late_event, pola_jam_masuk,
 )
 
 
@@ -453,3 +453,59 @@ def test_karyawan_teladan_no_exclusion_unchanged(temp_db_path):
             _add_att(conn, a, d, "Senin", "07.55", "16.00", 0)
         winner = karyawan_teladan(conn, "2026-04-01", "2026-04-30")
         assert winner["nama"] == "PERFECT"
+
+
+def test_ranking_departemen_excludes_outlier_from_dept_totals(temp_db_path):
+    from src.db.outlier import exclude_employee
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "ANDI")
+        b = _add_emp(conn, "2", "BUDI")
+        _add_att(conn, a, "2026-04-01", "Senin", "09.40", "16.00", 100)
+        _add_att(conn, b, "2026-04-01", "Senin", "08.40", "16.00", 40)
+        exclude_employee(conn, a, "2026-04")
+        rows = ranking_departemen(conn, "2026-04-01", "2026-04-30")
+        # Both are dept "X"; only BUDI's 40 should count
+        total = sum(r["total_terlambat"] for r in rows)
+        assert total == 40
+
+
+def test_hari_paling_rawan_excludes_outlier(temp_db_path):
+    from src.db.outlier import exclude_employee
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "ANDI")
+        b = _add_emp(conn, "2", "BUDI")
+        _add_att(conn, a, "2026-04-06", "Senin", "08.50", "16.00", 50)
+        _add_att(conn, b, "2026-04-06", "Senin", "08.40", "16.00", 40)
+        exclude_employee(conn, a, "2026-04")
+        rows = hari_paling_rawan(conn, "2026-04-01", "2026-04-30")
+        senin = next(r for r in rows if r["hari"] == "Senin")
+        assert senin["terlambat_count"] == 1  # only BUDI
+
+
+def test_avg_minutes_per_late_event_excludes_outlier(temp_db_path):
+    from src.db.outlier import exclude_employee
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "ANDI")
+        b = _add_emp(conn, "2", "BUDI")
+        _add_att(conn, a, "2026-04-01", "Senin", "09.40", "16.00", 100)
+        _add_att(conn, b, "2026-04-01", "Senin", "08.20", "16.00", 20)
+        exclude_employee(conn, a, "2026-04")
+        # Only BUDI's single 20-min event counts -> avg 20.0
+        assert avg_minutes_per_late_event(conn, "2026-04-01", "2026-04-30") == 20.0
+
+
+def test_pola_jam_masuk_excludes_outlier(temp_db_path):
+    from src.db.outlier import exclude_employee
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "ANDI")
+        b = _add_emp(conn, "2", "BUDI")
+        _add_att(conn, a, "2026-04-01", "Senin", "08.00", "16.00", 0)
+        _add_att(conn, b, "2026-04-01", "Senin", "08.00", "16.00", 0)
+        exclude_employee(conn, a, "2026-04")
+        rows = pola_jam_masuk(conn, "2026-04-01", "2026-04-30")
+        counts = {r["band"]: r["count"] for r in rows}
+        assert sum(counts.values()) == 1  # only BUDI's session

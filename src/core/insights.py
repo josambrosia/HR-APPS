@@ -167,6 +167,8 @@ def ranking_departemen(
     conn: sqlite3.Connection, start: str, end: str
 ) -> List[sqlite3.Row]:
     placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
+    excluded = excluded_employee_ids(conn, start[:7])
+    exc_frag, exc_params = exclusion_sql(excluded, column="e.id")
     sql = f"""
         SELECT e.dept,
                SUM(CASE WHEN ar.reason_category IN ({placeholders}) THEN 0
@@ -182,11 +184,11 @@ def ranking_departemen(
           FROM attendance_records ar
           JOIN employees e ON ar.employee_id = e.id
          WHERE ar.tanggal BETWEEN ? AND ?
-               AND e.dept IS NOT NULL
+               AND e.dept IS NOT NULL{exc_frag}
          GROUP BY e.dept
          ORDER BY total_terlambat DESC, e.dept ASC
     """
-    params = (*COACHING_EXCLUDED, *COACHING_EXCLUDED, start, end)
+    params = (*COACHING_EXCLUDED, *COACHING_EXCLUDED, start, end, *exc_params)
     return conn.execute(sql, params).fetchall()
 
 
@@ -197,7 +199,9 @@ def hari_paling_rawan(
 
     Terlambat counts only rows where the employee actually clocked in.
     """
-    sql = """
+    excluded = excluded_employee_ids(conn, start[:7])
+    exc_frag, exc_params = exclusion_sql(excluded, column="employee_id")
+    sql = f"""
         SELECT hari,
                SUM(CASE WHEN masuk IS NOT NULL AND terlambat_menit > 0 THEN 1 ELSE 0 END) AS terlambat_count,
                SUM(CASE WHEN has_issue = 1 THEN 1 ELSE 0 END) AS issue_count,
@@ -205,11 +209,11 @@ def hari_paling_rawan(
           FROM attendance_records
          WHERE tipe = 'Hari Kerja'
            AND tanggal BETWEEN ? AND ?
-           AND hari IS NOT NULL
+           AND hari IS NOT NULL{exc_frag}
          GROUP BY hari
          ORDER BY terlambat_count DESC, hari ASC
     """
-    return conn.execute(sql, (start, end)).fetchall()
+    return conn.execute(sql, (start, end, *exc_params)).fetchall()
 
 
 def resolution_rate(
@@ -241,17 +245,19 @@ def avg_minutes_per_late_event(
     Rows dengan terlambat_menit=0 atau NULL (= on time / absent) tidak
     dihitung sebagai event.
     """
+    excluded = excluded_employee_ids(conn, period_start[:7])
+    exc_frag, exc_params = exclusion_sql(excluded, column="employee_id")
     row = conn.execute(
-        """
+        f"""
         SELECT COALESCE(SUM(terlambat_menit), 0) AS total,
                COUNT(*) AS cnt
           FROM attendance_records
          WHERE tanggal BETWEEN ? AND ?
            AND tipe = 'Hari Kerja'
            AND terlambat_menit IS NOT NULL
-           AND terlambat_menit > 0
+           AND terlambat_menit > 0{exc_frag}
         """,
-        (period_start, period_end),
+        (period_start, period_end, *exc_params),
     ).fetchone()
     total, cnt = row[0], row[1]
     return float(total) / cnt if cnt else 0.0
@@ -297,15 +303,17 @@ def pola_jam_masuk(
         severe  — 31-60 min terlambat (08:31-09:00)
         chronic — > 60 min terlambat (>09:00)
     """
+    excluded = excluded_employee_ids(conn, period_start[:7])
+    exc_frag, exc_params = exclusion_sql(excluded, column="employee_id")
     rows = conn.execute(
-        """
+        f"""
         SELECT masuk
           FROM attendance_records
          WHERE tanggal BETWEEN ? AND ?
            AND tipe = 'Hari Kerja'
-           AND masuk IS NOT NULL
+           AND masuk IS NOT NULL{exc_frag}
         """,
-        (period_start, period_end),
+        (period_start, period_end, *exc_params),
     ).fetchall()
 
     counts = {band: 0 for band, _ in _POLA_JAM_BANDS}
