@@ -15,9 +15,12 @@ def record_export(
     filled: int,
     na: int,
     not_found: int,
+    kind: str = "fill",
     created_at: str | None = None,
 ) -> int:
     """Insert a row for a completed export. Returns the new row id.
+
+    kind: 'fill' (Export mode), 'generate_bulanan', or 'generate_mingguan'.
 
     Caller is responsible for transaction commit via the get_connection()
     context manager — no explicit conn.commit() here (matches the other
@@ -32,10 +35,10 @@ def record_export(
     cur = conn.execute(
         """
         INSERT INTO export_history
-            (out_path, template, year_month, filled, na, not_found, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+            (out_path, template, year_month, filled, na, not_found, kind, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (out_path, template, year_month, filled, na, not_found, created_at),
+        (out_path, template, year_month, filled, na, not_found, kind, created_at),
     )
     return cur.lastrowid
 
@@ -46,11 +49,12 @@ def list_recent_exports(
     """Return the most-recent exports, newest first.
 
     Each dict has keys: id, out_path, template, year_month, filled,
-    na, not_found, created_at.
+    na, not_found, kind, created_at.
     """
     rows = conn.execute(
         """
-        SELECT id, out_path, template, year_month, filled, na, not_found, created_at
+        SELECT id, out_path, template, year_month, filled, na, not_found,
+               kind, created_at
         FROM export_history
         ORDER BY created_at DESC, id DESC
         LIMIT ?

@@ -78,3 +78,39 @@ def test_record_export_created_at_is_iso_utc(empty_db):
     # ISO format example: "2026-05-15T08:19:47+00:00"
     assert "T" in row["created_at"]
     assert "+00:00" in row["created_at"] or row["created_at"].endswith("Z")
+
+
+def test_record_export_with_kind(empty_db):
+    with get_connection(empty_db) as conn:
+        export_id = record_export(
+            conn, out_path="/tmp/Laporan Mingguan.xlsx", template="-",
+            year_month="2026-04", filled=120, na=0, not_found=0,
+            kind="generate_mingguan",
+        )
+    with get_connection(empty_db) as conn:
+        row = conn.execute(
+            "SELECT kind FROM export_history WHERE id = ?", (export_id,)
+        ).fetchone()
+    assert row["kind"] == "generate_mingguan"
+
+
+def test_record_export_kind_defaults_to_fill(empty_db):
+    with get_connection(empty_db) as conn:
+        export_id = record_export(
+            conn, out_path="/a.xlsx", template="/t.xlsx",
+            year_month="2026-04", filled=1, na=0, not_found=0,
+        )
+        row = conn.execute(
+            "SELECT kind FROM export_history WHERE id = ?", (export_id,)
+        ).fetchone()
+    assert row["kind"] == "fill"
+
+
+def test_list_recent_exports_includes_kind(empty_db):
+    with get_connection(empty_db) as conn:
+        record_export(
+            conn, out_path="/a.xlsx", template="-", year_month="2026-04",
+            filled=1, na=0, not_found=0, kind="generate_bulanan",
+        )
+        rows = list_recent_exports(conn)
+    assert rows[0]["kind"] == "generate_bulanan"
