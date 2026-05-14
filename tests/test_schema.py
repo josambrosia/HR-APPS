@@ -45,7 +45,7 @@ def test_outlier_exclusions_table_created(temp_db_path):
 
 
 def test_holidays_table_created(temp_db_path):
-    """init_db creates the holidays table."""
+    """init_db creates the holidays table with correct columns and constraints."""
     init_db(temp_db_path)
     with sqlite3.connect(temp_db_path) as conn:
         row = conn.execute(
@@ -53,6 +53,13 @@ def test_holidays_table_created(temp_db_path):
             "WHERE type='table' AND name='holidays'"
         ).fetchone()
     assert row is not None
+
+    with sqlite3.connect(temp_db_path) as conn:
+        info = {r[1]: r for r in conn.execute("PRAGMA table_info(holidays)")}
+    assert "tanggal" in info and "created_at" in info
+    assert info["tanggal"][5] == 1      # pk flag
+    assert info["tanggal"][3] == 1      # notnull flag
+    assert info["created_at"][3] == 1   # notnull flag
 
 
 def test_export_history_has_kind_column(temp_db_path):
@@ -64,7 +71,7 @@ def test_export_history_has_kind_column(temp_db_path):
 
 
 def test_migrate_adds_kind_to_legacy_export_history(temp_db_path):
-    """A pre-existing export_history WITHOUT kind gets the column added."""
+    """A pre-existing export_history WITHOUT kind gets the column added and back-filled."""
     with sqlite3.connect(temp_db_path) as conn:
         conn.execute(
             """
@@ -77,8 +84,15 @@ def test_migrate_adds_kind_to_legacy_export_history(temp_db_path):
             )
             """
         )
+        conn.execute(
+            "INSERT INTO export_history "
+            "(out_path, template, year_month, filled, na, not_found, created_at) "
+            "VALUES ('p', 't', '2024-01', 1, 0, 0, '2024-01-01T00:00:00+00:00')"
+        )
         conn.commit()
     init_db(temp_db_path)  # must migrate in place without error
     with sqlite3.connect(temp_db_path) as conn:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(export_history)")}
+        kind_val = conn.execute("SELECT kind FROM export_history").fetchone()[0]
     assert "kind" in cols
+    assert kind_val == "fill"

@@ -78,7 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_outlier_employee
     ON outlier_exclusions(employee_id);
 
 CREATE TABLE IF NOT EXISTS holidays (
-    tanggal    TEXT PRIMARY KEY,
+    tanggal    TEXT NOT NULL PRIMARY KEY,
     created_at TEXT NOT NULL
 );
 """
