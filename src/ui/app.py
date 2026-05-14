@@ -153,6 +153,7 @@ class HRApp(ctk.CTk):
             ]),
             ("EXCEPTIONAL CASE", [
                 ("🔸", "Outlier", "Outlier"),
+                ("🌴", "Hari Libur", "Holiday"),
             ]),
             ("SYSTEM", [
                 ("⚙", "Settings", "Settings"),
@@ -170,7 +171,7 @@ class HRApp(ctk.CTk):
                 font=FONT_LABEL,
                 text_color=COLOR_TEXT_DISABLED,
                 anchor="w",
-            ).pack(fill="x", padx=SPACE_LG, pady=(SPACE_SM, SPACE_XS))
+            ).pack(fill="x", padx=SPACE_LG, pady=(SPACE_XS, 2))
 
             # Nav items in group
             for icon, label, screen_key in items:
@@ -190,41 +191,30 @@ class HRApp(ctk.CTk):
         brand_line2 = brand_parts[1] if len(brand_parts) == 2 else ""
 
         footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        footer.pack(side="bottom", fill="x", padx=8, pady=(10, 14))
+        footer.pack(side="bottom", fill="x", padx=8, pady=(SPACE_SM, 10))
 
-        # Thin separator above the footer block
         sep = ctk.CTkFrame(footer, fg_color=COLOR_BORDER, height=1)
-        sep.pack(fill="x", pady=(0, 10))
+        sep.pack(fill="x", pady=(0, SPACE_SM))
 
-        # Brand line 1: "Josaphat Tech" — white bold
+        # Brand — single horizontal row: "Josaphat Tech" white + "Solution" magenta
+        brand_row = ctk.CTkFrame(footer, fg_color="transparent")
+        brand_row.pack(fill="x")
         ctk.CTkLabel(
-            footer, text=brand_line1,
-            font=(FONT_FAMILY, 13, "bold"),
-            text_color=COLOR_TEXT, anchor="w",
-        ).pack(fill="x")
-
-        # Brand line 2: "Solution" — magenta bold (visual accent)
+            brand_row, text=brand_line1, font=(FONT_FAMILY, 12, "bold"),
+            text_color=COLOR_TEXT,
+        ).pack(side="left")
         if brand_line2:
             ctk.CTkLabel(
-                footer, text=brand_line2,
-                font=(FONT_FAMILY, 13, "bold"),
-                text_color=COLOR_ACCENT, anchor="w",
-            ).pack(fill="x", pady=(0, 6))
+                brand_row, text=f" {brand_line2}",
+                font=(FONT_FAMILY, 12, "bold"), text_color=COLOR_ACCENT,
+            ).pack(side="left")
 
-        # Version (mono, dim)
-        ctk.CTkLabel(
-            footer, text=f"v{APP_VERSION}",
-            font=("Consolas", 10),
-            text_color=COLOR_TEXT_DIM, anchor="w",
-        ).pack(fill="x")
-
-        # Tagline (mono, dim, smaller)
+        # Version + tagline — single mono line
         ctk.CTkLabel(
             footer,
-            text=f"// {APP_TAGLINE.rstrip('.').lower()}",
-            font=("Consolas", 8),
-            text_color=COLOR_TEXT_DIM, anchor="w",
-        ).pack(fill="x")
+            text=f"v{APP_VERSION} · {APP_TAGLINE.rstrip('.').lower()}",
+            font=("Consolas", 8), text_color=COLOR_TEXT_DIM, anchor="w",
+        ).pack(fill="x", pady=(2, 0))
 
     def _build_nav_item(self, icon: str, label: str, screen_key: str) -> ctk.CTkFrame:
         """Custom nav item with active state indicator (3px magenta left bar).
@@ -233,7 +223,7 @@ class HRApp(ctk.CTk):
         State stored visually — when this item becomes active, left bar shows
         + bg tints. Click handled by binding on the entire frame.
         """
-        frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=36)
+        frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=32)
         frame.pack_propagate(False)
 
         # Left active bar — created hidden, shown when active
@@ -421,6 +411,9 @@ class HRApp(ctk.CTk):
         elif name == "Outlier":
             from src.ui.screens.outlier import OutlierScreen
             OutlierScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "Holiday":
+            from src.ui.screens.holiday import HolidayScreen
+            HolidayScreen(self.content).grid(row=0, column=0, sticky="nsew")
         elif name == "Settings":
             from src.ui.screens.settings import SettingsScreen
             SettingsScreen(self.content).grid(row=0, column=0, sticky="nsew")
