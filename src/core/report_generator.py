@@ -27,8 +27,9 @@ MONTH_NAMES_ID = [
 # Schedule end (16:00) in minutes-from-midnight, for pulang_cepat computation.
 JADWAL_END_MINUTES = 16 * 60
 
-# All reason categories except "na" (which means "we don't know yet" — not really an ijin)
-IJIN_CATEGORIES = tuple(c for c in REASON_CATEGORIES if c != "na")
+# All reason categories except "na" (unknown) and "libur" (a company holiday,
+# not a personal ijin) — neither should add to the monthly Ijin column.
+IJIN_CATEGORIES = tuple(c for c in REASON_CATEGORIES if c not in ("na", "libur"))
 
 # Gray fill for Total Personal rows — matches reference Laporan Bulanan April.xlsx
 # (light gray #C0C0C0 distinguishes total rows from data rows visually).
@@ -141,6 +142,28 @@ def _write_data_row(ws, row_num: int, db_row, derived: dict, styles: list):
             tanggal_val = datetime.fromisoformat(tanggal_val)
         except ValueError:
             pass
+
+    is_holiday = db_row.get("tipe") == "Hari Libur"
+    if is_holiday:
+        # Holiday row: marker "Libur" in column G only; Tipe shown as
+        # "Hari Kerja" (matches the reference Laporan Bulanan April); all
+        # count columns + Alasan Ijin left blank.
+        values = [
+            db_row["nama"],              # A Nama
+            db_row.get("dept") or "",     # B Dept
+            tanggal_val,                 # C Tanggal
+            db_row.get("hari") or "",     # D Hari
+            "Hari Kerja",                # E Tipe (override)
+            db_row.get("jadwal") or "",   # F Jadwal
+            "Libur",                     # G Masuk -> marker
+            "",                          # H Keluar
+            "", "", "", "", "", "", "", "",  # I-P counts blank
+            "",                          # Q Alasan Ijin blank
+        ]
+        for col, val in enumerate(values, start=1):
+            ws.cell(row=row_num, column=col, value=val)
+        _apply_row_styles(ws, row_num, styles)
+        return
 
     has_issue = db_row.get("has_issue") == 1
     reason_cat = db_row.get("reason_category")
@@ -286,11 +309,13 @@ def generate_monthly_report(
     for _emp_name, emp_records in employee_blocks:
         total = _init_total()
         for r in emp_records:
+            is_holiday = r.get("tipe") == "Hari Libur"
             derived = compute_derived(r)
             _write_data_row(ws, current_row, r, derived, data_styles)
-            _accumulate_total(total, r, derived)
-            if r.get("has_issue") == 1 and not r.get("reason_category"):
-                na_count += 1
+            if not is_holiday:
+                _accumulate_total(total, r, derived)
+                if r.get("has_issue") == 1 and not r.get("reason_category"):
+                    na_count += 1
             rows_generated += 1
             current_row += 1
         _write_total_row(ws, current_row, total, total_styles)

@@ -203,3 +203,44 @@ def test_generate_na_for_open_issues_in_alasan_column():
                 assert "NA" in str(ws.cell(row=r, column=17).value)
                 return
         pytest.fail("Apr 2 row not found in generated file")
+
+
+def test_generate_monthly_report_holiday_row(tmp_path):
+    """Holiday row: G='Libur', E='Hari Kerja', count columns blank, and it
+    does not contribute to Total Personal."""
+    import sqlite3
+    from src.db.holidays import mark_holidays
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.executescript(DDL)
+    a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+    upsert_attendance(
+        conn, employee_id=a, tanggal="2026-04-01", hari="Senin",
+        tipe="Hari Kerja", jadwal="08.00 - 16.00", masuk="08:30",
+        keluar="16:00", kerja_jam=7.5, lembur_jam=None,
+        terlambat_menit=30, has_issue=0, imported_from="t.xls",
+    )
+    upsert_attendance(
+        conn, employee_id=a, tanggal="2026-04-03", hari="Jumat",
+        tipe="Hari Kerja", jadwal="08.00 - 16.00", masuk="09:00",
+        keluar="16:00", kerja_jam=7.0, lembur_jam=None,
+        terlambat_menit=60, has_issue=0, imported_from="t.xls",
+    )
+    mark_holidays(conn, ["2026-04-03"])
+    out = tmp_path / "out.xlsx"
+    generate_monthly_report(conn, year_month="2026-04", out_path=out)
+    ws = load_workbook(out).active
+
+    holiday_row = total_row = None
+    for r in range(3, ws.max_row + 1):
+        c = ws.cell(row=r, column=3).value
+        if c is not None and str(c).startswith("2026-04-03"):
+            holiday_row = r
+        if ws.cell(row=r, column=1).value == "Total Personal:":
+            total_row = r
+    assert holiday_row is not None and total_row is not None
+    assert ws.cell(row=holiday_row, column=5).value == "Hari Kerja"   # E Tipe
+    assert ws.cell(row=holiday_row, column=7).value == "Libur"        # G Masuk
+    assert ws.cell(row=holiday_row, column=8).value in (None, "")     # H Keluar
+    assert ws.cell(row=holiday_row, column=12).value in (None, "")    # L Terlambat
+    assert ws.cell(row=total_row, column=12).value == 30             # only April 1
