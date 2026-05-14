@@ -26,3 +26,16 @@ def test_settings_screen_saves_lupa_penalty(temp_db_path, monkeypatch, tk_root):
     with get_connection(temp_db_path) as conn:
         assert get_setting(conn, "lupa_absen_datang_penalty_min") == "25"
     screen.destroy()
+
+
+def test_settings_screen_loads_saved_lupa_penalty(temp_db_path, monkeypatch, tk_root):
+    import src.ui.screens.settings as settings_mod
+    monkeypatch.setattr(settings_mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        from src.db.settings import set_setting
+        set_setting(conn, "lupa_absen_datang_penalty_min", "30")
+    screen = settings_mod.SettingsScreen(tk_root)
+    tk_root.update_idletasks()
+    assert screen.lupa_penalty_var.get() == "30"
+    screen.destroy()
