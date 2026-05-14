@@ -151,6 +151,9 @@ class HRApp(ctk.CTk):
                 ("💬", "WhatsApp Assistant", "WhatsAppAssistant"),
                 ("🎯", "Coaching", "Coaching"),
             ]),
+            ("EXCEPTIONAL CASE", [
+                ("🔸", "Outlier", "Outlier"),
+            ]),
             ("SYSTEM", [
                 ("⚙", "Settings", "Settings"),
             ]),
@@ -415,6 +418,9 @@ class HRApp(ctk.CTk):
         elif name == "Coaching":
             from src.ui.screens.coaching import CoachingScreen
             CoachingScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "Outlier":
+            from src.ui.screens.outlier import OutlierScreen
+            OutlierScreen(self.content).grid(row=0, column=0, sticky="nsew")
         elif name == "Settings":
             from src.ui.screens.settings import SettingsScreen
             SettingsScreen(self.content).grid(row=0, column=0, sticky="nsew")
