@@ -208,7 +208,6 @@ def test_generate_na_for_open_issues_in_alasan_column():
 def test_generate_monthly_report_holiday_row(tmp_path):
     """Holiday row: G='Libur', E='Hari Kerja', count columns blank, and it
     does not contribute to Total Personal."""
-    import sqlite3
     from src.db.holidays import mark_holidays
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row

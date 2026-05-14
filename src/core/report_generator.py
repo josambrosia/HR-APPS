@@ -133,7 +133,7 @@ def _apply_row_styles(ws, row_num: int, styles: list):
         cell.number_format = style["number_format"]
 
 
-def _write_data_row(ws, row_num: int, db_row, derived: dict, styles: list):
+def _write_data_row(ws, row_num: int, db_row, derived: dict, styles: list, *, is_holiday=False):
     """Write 17 cells for one attendance record + apply styles."""
     _unmerge_row(ws, row_num)
     tanggal_val = db_row["tanggal"]
@@ -143,7 +143,6 @@ def _write_data_row(ws, row_num: int, db_row, derived: dict, styles: list):
         except ValueError:
             pass
 
-    is_holiday = db_row.get("tipe") == "Hari Libur"
     if is_holiday:
         # Holiday row: marker "Libur" in column G only; Tipe shown as
         # "Hari Kerja" (matches the reference Laporan Bulanan April); all
@@ -310,8 +309,8 @@ def generate_monthly_report(
         total = _init_total()
         for r in emp_records:
             is_holiday = r.get("tipe") == "Hari Libur"
-            derived = compute_derived(r)
-            _write_data_row(ws, current_row, r, derived, data_styles)
+            derived = {} if is_holiday else compute_derived(r)
+            _write_data_row(ws, current_row, r, derived, data_styles, is_holiday=is_holiday)
             if not is_holiday:
                 _accumulate_total(total, r, derived)
                 if r.get("has_issue") == 1 and not r.get("reason_category"):
