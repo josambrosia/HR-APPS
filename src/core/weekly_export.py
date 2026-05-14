@@ -11,6 +11,10 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from src.config import DEFAULT_SCHEDULE_START
+from src.core.reason_mapper import effective_attendance
+from src.db.settings import get_setting, read_lupa_penalty_min
+
 HEADERS = [
     "Nama", "No. Staff", "Dept", "Tanggal", "Hari", "Tipe",
     "Jadwal", "Masuk", "Keluar", "Kerja", "Lembur", "Terlambat",
@@ -40,7 +44,7 @@ def generate_weekly_export(
         SELECT e.nama, e.no_staff, e.dept,
                ar.tanggal, ar.hari, ar.tipe, ar.jadwal,
                ar.masuk, ar.keluar, ar.kerja_jam, ar.lembur_jam,
-               ar.terlambat_menit
+               ar.terlambat_menit, ar.reason_category
           FROM attendance_records ar
           JOIN employees e ON ar.employee_id = e.id
          WHERE ar.tanggal BETWEEN ? AND ?
@@ -48,6 +52,9 @@ def generate_weekly_export(
         """,
         (period_start, period_end),
     ).fetchall()
+
+    schedule_start = get_setting(conn, "schedule_start", default=DEFAULT_SCHEDULE_START)
+    lupa_penalty = read_lupa_penalty_min(conn)
 
     wb = Workbook()
     ws = wb.active
@@ -64,6 +71,13 @@ def generate_weekly_export(
     for r in rows:
         employees.add(r["no_staff"])
         is_holiday = r["tipe"] == "Hari Libur"
+        if is_holiday:
+            eff_masuk, eff_terlambat = None, None
+        else:
+            eff = effective_attendance(
+                r, schedule_start=schedule_start, lupa_penalty_min=lupa_penalty)
+            eff_masuk = eff["masuk"]
+            eff_terlambat = eff["terlambat_menit"]
         ws.append([
             r["nama"],
             r["no_staff"] or "",
@@ -72,14 +86,14 @@ def generate_weekly_export(
             r["hari"] or "",
             r["tipe"] or "",
             r["jadwal"] or "",
-            "" if is_holiday else (r["masuk"] or ""),
+            "" if is_holiday else (eff_masuk or ""),
             "" if is_holiday else (r["keluar"] or ""),
             "" if is_holiday else (
                 r["kerja_jam"] if r["kerja_jam"] is not None else ""),
             "" if is_holiday else (
                 r["lembur_jam"] if r["lembur_jam"] is not None else ""),
             "" if is_holiday else (
-                r["terlambat_menit"] if r["terlambat_menit"] is not None else ""),
+                eff_terlambat if eff_terlambat is not None else ""),
         ])
 
     out_path = Path(out_path)

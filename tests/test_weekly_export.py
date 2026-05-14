@@ -89,3 +89,41 @@ def test_weekly_export_summary_counts_distinct_staff_not_names(tmp_path):
     summary = generate_weekly_export(conn, "2026-04-06", "2026-04-12", out)
     assert summary.rows == 2
     assert summary.employees == 2   # would be 1 if deduped by name
+
+
+def test_weekly_export_effective_masuk_work_justified_late(tmp_path):
+    from src.db.attendance import set_reason
+    conn = _conn()
+    a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+    upsert_attendance(
+        conn, employee_id=a, tanggal="2026-04-07", hari="Selasa",
+        tipe="Hari Kerja", jadwal="08.00 - 16.00", masuk="09:40",
+        keluar="16:00", kerja_jam=6.5, lembur_jam=None,
+        terlambat_menit=100, has_issue=1, imported_from="W1.xls",
+    )
+    rid = conn.execute("SELECT id FROM attendance_records").fetchone()["id"]
+    set_reason(conn, attendance_id=rid, category="tugas_paparan", detail="PT X")
+    out = tmp_path / "weekly.xlsx"
+    generate_weekly_export(conn, "2026-04-06", "2026-04-12", out)
+    ws = load_workbook(out).active
+    assert ws.cell(row=2, column=8).value == "08:00"   # H Masuk -> effective
+    assert ws.cell(row=2, column=12).value == 0        # L Terlambat -> 0
+
+
+def test_weekly_export_effective_forgot_clock_in(tmp_path):
+    from src.db.attendance import set_reason
+    conn = _conn()
+    a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+    upsert_attendance(
+        conn, employee_id=a, tanggal="2026-04-07", hari="Selasa",
+        tipe="Hari Kerja", jadwal="08.00 - 16.00", masuk=None,
+        keluar="16:05", kerja_jam=None, lembur_jam=None,
+        terlambat_menit=None, has_issue=1, imported_from="W1.xls",
+    )
+    rid = conn.execute("SELECT id FROM attendance_records").fetchone()["id"]
+    set_reason(conn, attendance_id=rid, category="lupa_absen", detail=None)
+    out = tmp_path / "weekly.xlsx"
+    generate_weekly_export(conn, "2026-04-06", "2026-04-12", out)
+    ws = load_workbook(out).active
+    assert ws.cell(row=2, column=8).value == "08:15"   # H Masuk -> effective
+    assert ws.cell(row=2, column=12).value == 15       # L Terlambat -> penalty
