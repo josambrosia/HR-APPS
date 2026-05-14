@@ -1,22 +1,16 @@
 """Active Month screen — list all months in DB with stats and per-month actions."""
-from pathlib import Path
-from tkinter import filedialog, messagebox
-
 import customtkinter as ctk
 
 from src.config import DB_PATH
-from src.core.report_generator import (
-    generate_monthly_report, month_label,
-)
+from src.core.report_generator import month_label
 from src.db.attendance import list_months_with_stats
 from src.db.connection import get_connection
 from src.db.settings import get_setting, set_setting
-from src.ui.components.toast import show_success_toast
 from src.ui.theme import (
-    COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
+    COLOR_BG, COLOR_SURFACE,
     COLOR_BORDER,
     COLOR_ACCENT, COLOR_ACCENT_HOVER,
-    COLOR_INFO, COLOR_SUCCESS,
+    COLOR_SUCCESS,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
     FONT_DISPLAY, FONT_SUBHEAD,
     FONT_BODY_BOLD, FONT_SMALL,
@@ -145,16 +139,6 @@ class ActiveMonthScreen(ctk.CTkFrame):
                 font=FONT_BODY_BOLD,
                 command=lambda ym=m["year_month"]: self._on_pick(ym),
             ).pack(side="left", padx=SPACE_XS)
-        # Generate button: cyan secondary (both states)
-        ctk.CTkButton(
-            btn_row, text="Generate", width=160,
-            fg_color="transparent",
-            border_width=1, border_color=COLOR_INFO,
-            text_color=COLOR_INFO,
-            hover_color=COLOR_SURFACE_HIGH,
-            font=FONT_BODY_BOLD,
-            command=lambda ym=m["year_month"]: self._on_generate(ym),
-        ).pack(side="left", padx=SPACE_XS)
 
     def _on_pick(self, year_month: str):
         """Make this month the active one + navigate to Dashboard."""
@@ -166,37 +150,3 @@ class ActiveMonthScreen(ctk.CTkFrame):
         top = self.winfo_toplevel()
         if hasattr(top, "_show"):
             top._show("Dashboard")
-
-    def _on_generate(self, year_month: str):
-        default_name = f"Laporan Bulanan {month_label(year_month)} [Auto Filled].xlsx"
-        out_path = filedialog.asksaveasfilename(
-            defaultextension=".xlsx",
-            initialfile=default_name,
-            filetypes=[("Excel files", "*.xlsx")],
-            title=f"Simpan Laporan {month_label(year_month)}",
-        )
-        if not out_path:
-            return  # cancelled
-
-        try:
-            with get_connection(DB_PATH) as conn:
-                summary = generate_monthly_report(
-                    conn, year_month=year_month, out_path=Path(out_path),
-                )
-        except Exception as e:
-            messagebox.showerror(
-                "Error generate laporan",
-                f"Tidak bisa generate file:\n{e}",
-            )
-            return
-
-        show_success_toast(
-            self.winfo_toplevel(),
-            title="Laporan Berhasil Dibuat",
-            message=(
-                f"Laporan Bulanan {month_label(year_month)} disimpan.\n"
-                f"File: {out_path}\n"
-                f"{summary.rows_generated} baris di-generate · "
-                f"{summary.na_count} baris NA / Belum ada kabar"
-            ),
-        )
