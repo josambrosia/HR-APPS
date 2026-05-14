@@ -71,3 +71,19 @@ def synthetic_monthly_xlsx(tmp_path: Path) -> Path:
 @pytest.fixture
 def temp_db_path(tmp_path: Path) -> Path:
     return tmp_path / "test_hr.db"
+
+
+@pytest.fixture(scope="session")
+def tk_root():
+    """Single CustomTkinter root shared across ALL UI screen tests.
+
+    Session-scoped (not module-scoped) because Windows/Tkinter cannot
+    re-create Tk() after a previous root was destroy()ed — multiple
+    module-scoped roots would collide. Created lazily on first request,
+    destroyed once at session end.
+    """
+    import customtkinter as ctk
+    root = ctk.CTk()
+    root.withdraw()
+    yield root
+    root.destroy()

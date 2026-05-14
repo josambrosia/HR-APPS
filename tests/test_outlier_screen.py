@@ -1,26 +1,12 @@
 """Smoke test for the Outlier screen — verifies it constructs without error
 against a temp DB with sample data. Deep UI behaviour is covered by the
 src/db/outlier.py unit tests."""
-import pytest
-import customtkinter as ctk
-
 from src.db.schema import init_db
 from src.db.connection import get_connection
 from src.db.employees import upsert_employee
 from src.db.attendance import upsert_attendance
 from src.db.settings import set_setting
 from src.db.outlier import exclude_employee
-
-
-# A single Tk root is reused across all tests in the module to avoid the
-# known Windows/Tkinter limitation where re-creating Tk() after destroy()
-# fails with a TclError.
-@pytest.fixture(scope="module")
-def tk_root():
-    root = ctk.CTk()
-    root.withdraw()
-    yield root
-    root.destroy()
 
 
 def test_outlier_screen_constructs(temp_db_path, monkeypatch, tk_root):

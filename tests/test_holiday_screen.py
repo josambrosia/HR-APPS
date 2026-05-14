@@ -1,22 +1,11 @@
 """Smoke test for the Hari Libur screen — constructs without error against
 a temp DB. Deep behaviour is covered by tests/test_holidays_db.py."""
-import pytest
-import customtkinter as ctk
-
 from src.db.schema import init_db
 from src.db.connection import get_connection
 from src.db.employees import upsert_employee
 from src.db.attendance import upsert_attendance
 from src.db.settings import set_setting
 from src.db.holidays import mark_holidays
-
-
-@pytest.fixture(scope="module")
-def tk_root():
-    root = ctk.CTk()
-    root.withdraw()
-    yield root
-    root.destroy()
 
 
 def test_holiday_screen_constructs(temp_db_path, monkeypatch, tk_root):
