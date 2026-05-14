@@ -420,3 +420,36 @@ def test_terlambat_ranking_exclusion_respects_month(temp_db_path):
         apr = [r["nama"] for r in terlambat_ranking(conn, "2026-04-01", "2026-04-30")]
         assert "ANDI" in mar   # March unaffected
         assert "ANDI" not in apr  # April excluded
+
+
+def test_karyawan_teladan_excludes_outlier(temp_db_path):
+    """An excluded employee cannot win Teladan even with a perfect record."""
+    from src.db.outlier import exclude_employee
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "PERFECT")
+        b = _add_emp(conn, "2", "OKAY")
+        # PERFECT: 3 clean days (best score)
+        for d in ("2026-04-01", "2026-04-02", "2026-04-03"):
+            _add_att(conn, a, d, "Senin", "07.55", "16.00", 0)
+        # OKAY: 3 slightly-late days
+        for d in ("2026-04-01", "2026-04-02", "2026-04-03"):
+            _add_att(conn, b, d, "Senin", "08.10", "16.00", 10)
+        exclude_employee(conn, a, "2026-04")
+
+        winner = karyawan_teladan(conn, "2026-04-01", "2026-04-30")
+        assert winner["nama"] == "OKAY"  # PERFECT excluded
+
+        top = karyawan_teladan_top_n(conn, "2026-04-01", "2026-04-30", n=None)
+        assert "PERFECT" not in [r["nama"] for r in top]
+
+
+def test_karyawan_teladan_no_exclusion_unchanged(temp_db_path):
+    """With no exclusions, Teladan behaves exactly as before."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = _add_emp(conn, "1", "PERFECT")
+        for d in ("2026-04-01", "2026-04-02", "2026-04-03"):
+            _add_att(conn, a, d, "Senin", "07.55", "16.00", 0)
+        winner = karyawan_teladan(conn, "2026-04-01", "2026-04-30")
+        assert winner["nama"] == "PERFECT"

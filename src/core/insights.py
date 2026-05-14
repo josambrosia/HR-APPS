@@ -102,6 +102,8 @@ def karyawan_teladan(
 ) -> Optional[sqlite3.Row]:
     """Lowest composite score = best. Filter min 3 hari kerja (excludes long leave)."""
     placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
+    excluded = excluded_employee_ids(conn, start[:7])
+    exc_frag, exc_params = exclusion_sql(excluded, column="e.id")
     sql = f"""
         SELECT e.id, e.nama, e.dept,
                SUM(CASE WHEN ar.reason_category IN ({placeholders}) THEN 0
@@ -114,13 +116,13 @@ def karyawan_teladan(
           FROM attendance_records ar
           JOIN employees e ON ar.employee_id = e.id
          WHERE ar.tanggal BETWEEN ? AND ?
-               AND ar.tipe = 'Hari Kerja'
+               AND ar.tipe = 'Hari Kerja'{exc_frag}
          GROUP BY e.id
          HAVING hari_kerja >= 3
          ORDER BY score ASC, e.nama ASC
          LIMIT 1
     """
-    params = (*COACHING_EXCLUDED, start, end)
+    params = (*COACHING_EXCLUDED, start, end, *exc_params)
     return conn.execute(sql, params).fetchone()
 
 
@@ -133,6 +135,8 @@ def karyawan_teladan_top_n(
     backward compat with existing callers (UI dashboard, etc.).
     """
     placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
+    excluded = excluded_employee_ids(conn, start[:7])
+    exc_frag, exc_params = exclusion_sql(excluded, column="e.id")
     limit_clause = "" if n is None else "LIMIT ?"
     sql = f"""
         SELECT e.id, e.nama, e.dept,
@@ -146,16 +150,16 @@ def karyawan_teladan_top_n(
           FROM attendance_records ar
           JOIN employees e ON ar.employee_id = e.id
          WHERE ar.tanggal BETWEEN ? AND ?
-               AND ar.tipe = 'Hari Kerja'
+               AND ar.tipe = 'Hari Kerja'{exc_frag}
          GROUP BY e.id
          HAVING hari_kerja >= 3
          ORDER BY score ASC, e.nama ASC
          {limit_clause}
     """
     if n is None:
-        params = (*COACHING_EXCLUDED, start, end)
+        params = (*COACHING_EXCLUDED, start, end, *exc_params)
     else:
-        params = (*COACHING_EXCLUDED, start, end, n)
+        params = (*COACHING_EXCLUDED, start, end, *exc_params, n)
     return conn.execute(sql, params).fetchall()
 
 
