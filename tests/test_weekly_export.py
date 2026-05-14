@@ -76,3 +76,16 @@ def test_weekly_export_sorted_by_nama_then_tanggal(tmp_path):
     ws = load_workbook(out).active
     assert [ws.cell(row=r, column=1).value for r in range(2, 5)] == \
         ["ANDI", "ANDI", "ZARA"]
+
+
+def test_weekly_export_summary_counts_distinct_staff_not_names(tmp_path):
+    """Two employees sharing a name must count as 2, not 1."""
+    conn = _conn()
+    a = upsert_employee(conn, no_staff="1", nama="BUDI", dept="X")
+    b = upsert_employee(conn, no_staff="2", nama="BUDI", dept="Y")
+    _att(conn, a, "2026-04-07", "Selasa")
+    _att(conn, b, "2026-04-07", "Selasa")
+    out = tmp_path / "weekly.xlsx"
+    summary = generate_weekly_export(conn, "2026-04-06", "2026-04-12", out)
+    assert summary.rows == 2
+    assert summary.employees == 2   # would be 1 if deduped by name

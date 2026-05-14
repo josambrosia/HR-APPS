@@ -62,7 +62,7 @@ def generate_weekly_export(
 
     employees = set()
     for r in rows:
-        employees.add(r["nama"])
+        employees.add(r["no_staff"])
         is_holiday = r["tipe"] == "Hari Libur"
         ws.append([
             r["nama"],
