@@ -6,7 +6,6 @@ denormalisation so weekly export & other queries see it directly. The stamp
 is re-applied after every import via restamp_holidays().
 """
 import sqlite3
-from datetime import datetime, UTC
 from typing import List
 
 
