@@ -8,6 +8,7 @@ from datetime import datetime, UTC
 from typing import List, Optional
 
 from src.config import COACHING_EXCLUDED
+from src.db.outlier import excluded_employee_ids, exclusion_sql
 
 
 def mark_coached(
@@ -104,6 +105,8 @@ def list_coaching_for_week(
       - is_coached (1 or 0)
     """
     placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
+    excluded = excluded_employee_ids(conn, week_start[:7])
+    exc_frag, exc_params = exclusion_sql(excluded, column="ar.employee_id")
     sql = f"""
         WITH terlambat AS (
             SELECT
@@ -114,7 +117,7 @@ def list_coaching_for_week(
                     ELSE COALESCE(ar.terlambat_menit, 0)
                 END) AS total_terlambat
               FROM attendance_records ar
-             WHERE ar.tanggal BETWEEN ? AND ?
+             WHERE ar.tanggal BETWEEN ? AND ?{exc_frag}
              GROUP BY ar.employee_id
         )
         SELECT
@@ -135,7 +138,7 @@ def list_coaching_for_week(
          ORDER BY t.total_terlambat DESC, e.nama ASC
     """
     params = (
-        *COACHING_EXCLUDED, week_start, week_end,
+        *COACHING_EXCLUDED, week_start, week_end, *exc_params,
         week_start, week_start, threshold_minutes,
     )
     return conn.execute(sql, params).fetchall()

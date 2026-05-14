@@ -147,3 +147,36 @@ def test_list_coaching_excludes_work_justified_lateness():
         threshold_minutes=75,
     )]
     assert rows == []  # excluded — not over threshold once work-justified removed
+
+
+def test_list_coaching_for_week_excludes_outlier(temp_db_path):
+    """An employee excluded via the Outlier menu does not appear in the
+    Coaching list, even when over the lateness threshold."""
+    from src.db.schema import init_db
+    from src.db.connection import get_connection
+    from src.db.employees import upsert_employee
+    from src.db.attendance import upsert_attendance
+    from src.db.outlier import exclude_employee
+    from src.db.coaching import list_coaching_for_week
+
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        b = upsert_employee(conn, no_staff="2", nama="BUDI", dept="X")
+        for emp in (a, b):
+            upsert_attendance(
+                conn, employee_id=emp, tanggal="2026-04-06", hari="Senin",
+                tipe="Hari Kerja", jadwal="08.00 - 16.00",
+                masuk="09.40", keluar="16.00", kerja_jam=6.0,
+                lembur_jam=None, terlambat_menit=100, has_issue=0,
+                imported_from="W1.xls",
+            )
+        exclude_employee(conn, a, "2026-04")  # ANDI excluded
+
+        rows = list_coaching_for_week(
+            conn, week_start="2026-04-06", week_end="2026-04-12",
+            threshold_minutes=75,
+        )
+        names = [r["nama"] for r in rows]
+        assert "ANDI" not in names
+        assert "BUDI" in names
