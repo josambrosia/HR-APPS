@@ -26,8 +26,9 @@ def terlambat_ranking(
         issue_count (has_issue=1 row count).
 
     Sort: total_terlambat DESC, absent_count DESC, hari_telat DESC, nama ASC.
-    Includes employees who only have absences (no late events) so the
-    "Ranking Lengkap" print panel shows ALL active employees of the period.
+    Includes employees with at least one Hari Kerja row in the period
+    (Hari Libur and Istirahat rows are excluded). The "Ranking Lengkap"
+    print panel shows all employees who had any scheduled workday in the range.
     """
     placeholders = ",".join("?" for _ in COACHING_EXCLUDED)
     sql = f"""

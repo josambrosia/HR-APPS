@@ -532,6 +532,8 @@ def test_ranking_departemen_excludes_holiday_dates(temp_db_path):
         a = _add_emp(conn, "1", "ANDI")
         _add_att(conn, a, "2026-04-01", "Senin", "08.50", "16.00", 50)
         _add_att(conn, a, "2026-04-03", "Jumat", "09.00", "16.00", 60)
+        base = ranking_departemen(conn, "2026-04-01", "2026-04-30")
+        assert base[0]["total_terlambat"] == 110          # baseline: both days
         mark_holidays(conn, ["2026-04-03"])
         rows = ranking_departemen(conn, "2026-04-01", "2026-04-30")
         assert rows[0]["total_terlambat"] == 50           # only April 1 counts
