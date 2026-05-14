@@ -65,7 +65,7 @@ def fill_monthly_report(
 
         row = conn.execute(
             """
-            SELECT ar.has_issue, ar.reason_category, ar.reason_detail
+            SELECT ar.has_issue, ar.reason_category, ar.reason_detail, ar.tipe
               FROM attendance_records ar
               JOIN employees e ON ar.employee_id = e.id
              WHERE e.nama = ? COLLATE NOCASE AND ar.tanggal = ?
@@ -76,6 +76,8 @@ def fill_monthly_report(
         if row is None:
             summary.not_found_count += 1
             continue
+        if row["tipe"] == "Hari Libur":
+            continue  # holiday row — skip; do not write Alasan Ijin
         if row["has_issue"] != 1:
             continue  # skip non-issue rows entirely
 
