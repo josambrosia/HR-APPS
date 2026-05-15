@@ -103,9 +103,23 @@ class IssuesScreen(ctk.CTkFrame):
             on_change=self._on_period_change, initial="semua",
         )
         self.nav.pack(side="left")
+        ctk.CTkButton(
+            header, text="+ Resolve Massal", command=self._on_batch_resolve,
+            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+            text_color=COLOR_BG, font=FONT_BODY_BOLD, width=160,
+        ).pack(side="right")
 
     def _on_period_change(self, _key):
         self._reload()
+
+    def _on_batch_resolve(self):
+        from src.ui.components.batch_resolve_dialog import BatchResolveDialog
+        start, end = self._active_range()
+        BatchResolveDialog(
+            self.winfo_toplevel(),
+            period_start=start, period_end=end,
+            on_done=self._reload,
+        )
 
     def _build_stats(self):
         self.stats = ctk.CTkFrame(self, fg_color="transparent")
