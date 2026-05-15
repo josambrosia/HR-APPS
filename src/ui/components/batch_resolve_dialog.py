@@ -75,7 +75,7 @@ def group_open_issues_by_employee(issue_rows) -> list:
 def apply_batch_resolve(conn, attendance_ids: list, category: str,
                         detail: Optional[str]) -> int:
     """Resolve each attendance_id with the given category + detail via
-    set_reason. Returns the count resolved. Caller commits."""
+    set_reason. Returns the count resolved. get_connection auto-commits on clean block exit."""
     for aid in attendance_ids:
         set_reason(conn, attendance_id=aid, category=category, detail=detail)
     return len(attendance_ids)
@@ -176,10 +176,16 @@ class BatchResolveDialog(ctk.CTkToplevel):
             text_color=COLOR_TEXT, font=FONT_BODY,
         ).pack(anchor="w", padx=SPACE_XL, pady=(0, SPACE_XS))
 
+        # Detail field lives in a dedicated frame packed ONCE at a fixed
+        # position (directly below the category combo, above btn_row) so its
+        # placement is deterministic regardless of when _on_cat_change runs.
+        self._detail_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self._detail_frame.pack(anchor="w", fill="x", padx=SPACE_XL, pady=0)
         self._detail_label = ctk.CTkLabel(
-            self, text="Detail:", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED)
+            self._detail_frame, text="Detail:", font=FONT_SMALL,
+            text_color=COLOR_TEXT_MUTED)
         self._detail_entry = ctk.CTkEntry(
-            self, width=DIALOG_W - 2 * SPACE_XL,
+            self._detail_frame, width=DIALOG_W - 2 * SPACE_XL,
             fg_color=COLOR_SURFACE_HIGH, border_width=1,
             border_color=COLOR_BORDER, text_color=COLOR_TEXT, font=FONT_BODY)
 
@@ -233,8 +239,8 @@ class BatchResolveDialog(ctk.CTkToplevel):
         self._detail_label.pack_forget()
         self._detail_entry.pack_forget()
         if key in REASON_NEEDS_DETAIL:
-            self._detail_label.pack(anchor="w", padx=SPACE_XL)
-            self._detail_entry.pack(anchor="w", padx=SPACE_XL, pady=(SPACE_XS, 0))
+            self._detail_label.pack(anchor="w")
+            self._detail_entry.pack(anchor="w", pady=(SPACE_XS, 0))
 
     def _checked_ids(self) -> list:
         return [aid for aid, var in self._date_vars.items() if var.get()]

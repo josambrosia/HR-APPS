@@ -80,3 +80,29 @@ def test_batch_resolve_dialog_constructs_with_no_issues(temp_db_path, monkeypatc
     tk_root.update_idletasks()
     assert dlg is not None
     dlg.destroy()
+
+
+def test_batch_resolve_dialog_detail_field_toggles(temp_db_path, monkeypatch, tk_root):
+    """Detail entry is pack-managed for a needs-detail category, hidden otherwise."""
+    import src.ui.components.batch_resolve_dialog as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        _issue(conn, a, "2026-04-07", "Selasa")
+        conn.commit()
+    dlg = mod.BatchResolveDialog(
+        tk_root, period_start="2026-04-01", period_end="2026-04-30",
+        on_done=lambda: None)
+    tk_root.update_idletasks()
+    # needs-detail category -> detail entry is pack-managed
+    dlg._cat_var.set("Tugas Lapangan")
+    dlg._on_cat_change("Tugas Lapangan")
+    tk_root.update_idletasks()
+    assert dlg._detail_entry.winfo_manager() == "pack"
+    # no-detail category -> detail entry is unmanaged
+    dlg._cat_var.set("Cuti")
+    dlg._on_cat_change("Cuti")
+    tk_root.update_idletasks()
+    assert dlg._detail_entry.winfo_manager() == ""
+    dlg.destroy()
