@@ -69,8 +69,10 @@
   .b-jam-divider{border-top:1px dashed #e5e5e5;margin:8px 0;text-align:center;font-size:9px;color:#a3a3a3;text-transform:uppercase;letter-spacing:1px;padding-top:6px}
 
   /* Footer */
-  .b-footer{margin-top:22px;padding-top:12px;border-top:1px solid #e5e5e5;display:flex;justify-content:space-between;font-size:9.5px;color:#737373;font-family:Consolas,monospace}
-  .b-footer .jts{color:#ec4899;letter-spacing:1.5px;text-transform:uppercase;font-weight:700}
+  .b-footer{margin-top:22px;padding-top:12px;border-top:1px solid #e5e5e5;display:flex;justify-content:space-between;align-items:flex-end;font-size:9.5px;color:#737373;font-family:Consolas,monospace}
+  .b-footer .brand{text-align:right;line-height:1.35}
+  .b-footer .brand svg{height:26px;width:auto;display:block}
+  .b-footer .brand .sub{font-size:8px;color:#525252;letter-spacing:.5px;font-family:'Segoe UI',sans-serif}
 
   /* Page 2 header */
   .b-rank-head{padding-bottom:10px;border-bottom:2px solid #ec4899;margin-bottom:14px;position:relative}
@@ -185,7 +187,7 @@
 
   <div class="b-footer">
     <span>// page 1/2 &middot; confidential</span>
-    <span class="jts">[jts] josaphat tech solution</span>
+    <div class="brand">{{ brand_lockup_svg | safe }}<span class="sub">Tech Solution</span></div>
   </div>
 
   {# === PAGE BREAK === #}
@@ -227,7 +229,7 @@
 
   <div class="b-footer">
     <span>// page 2/2 &middot; confidential</span>
-    <span class="jts">[jts] josaphat tech solution</span>
+    <div class="brand">{{ brand_lockup_svg | safe }}<span class="sub">Tech Solution</span></div>
   </div>
 </div>
 

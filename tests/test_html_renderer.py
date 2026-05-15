@@ -50,8 +50,9 @@ def test_render_html_contains_key_sections(temp_db_path, tmp_path):
     # Page 2: mandatory ranking
     assert "Ranking Lengkap" in content
     assert "Tidak Hadir" in content
-    # Footer
-    assert "[jts] josaphat tech solution" in content
+    # Footer — brand lockup (inlined SVG) + "Tech Solution" line
+    assert "<svg" in content
+    assert "Tech Solution" in content
     # Data sanity
     assert "ANDIKA" in content
     assert "50" in content  # terlambat menit shown
@@ -113,3 +114,20 @@ def test_render_html_signoff_renders_when_name_empty(temp_db_path, tmp_path):
         )
     content = out.read_text(encoding="utf-8")
     assert "HR Officer in Charge" in content
+
+
+def test_render_html_inlines_brand_lockup_svg(temp_db_path, tmp_path):
+    """The JTS lockup is inlined as <svg>, not referenced as an external file,
+    and the old plain-text footer is gone."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, emp, "2026-04-01", "Senin", "08.00", "16.00", 0)
+        out = render_dashboard_html(
+            conn, period_start="2026-04-01", period_end="2026-04-30",
+            period_label="April 2026", out_dir=tmp_path,
+        )
+    content = out.read_text(encoding="utf-8")
+    assert "<svg" in content                              # lockup inlined as SVG
+    assert "josaphat" in content                          # the lockup wordmark text
+    assert "[jts] josaphat tech solution" not in content  # old text footer removed

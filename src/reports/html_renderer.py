@@ -11,7 +11,7 @@ from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from src.config import DEFAULT_COACHING_THRESHOLD_MINUTES
+from src.config import DEFAULT_COACHING_THRESHOLD_MINUTES, BRAND_LOCKUP_LIGHT_SVG
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
     avg_minutes_per_late_event, pola_jam_masuk,
@@ -36,6 +36,20 @@ def _build_env() -> Environment:
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=select_autoescape(["html", "xml"]),
     )
+
+
+def _load_brand_lockup() -> str:
+    """Return the JTS light-background lockup SVG markup, ready to inline into
+    the print HTML. Strips the XML prolog (not valid mid-HTML-document).
+    Falls back to a plain text wordmark if the asset is missing, so rendering
+    never fails."""
+    try:
+        svg = BRAND_LOCKUP_LIGHT_SVG.read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return "josaphat"
+    if svg.lstrip().startswith("<?xml"):
+        svg = svg.split("?>", 1)[1]
+    return svg.strip()
 
 
 def render_dashboard_html(
@@ -78,6 +92,7 @@ def render_dashboard_html(
     teladan_count = len(teladan)
 
     hr_officer_name = get_setting(conn, "hr_officer_name", default="")
+    brand_lockup_svg = _load_brand_lockup()
 
     env = _build_env()
     tmpl = env.get_template(TEMPLATE_FILE)
@@ -101,6 +116,7 @@ def render_dashboard_html(
         ranking=ranking,
         sections=sections,
         hr_officer_name=hr_officer_name,
+        brand_lockup_svg=brand_lockup_svg,
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
