@@ -156,3 +156,21 @@ def test_render_html_page_margin_zero(temp_db_path, tmp_path):
     content = out.read_text(encoding="utf-8")
     assert "@page{size:A4;margin:0}" in content
     assert ".doc{padding:14mm}" in content
+
+
+def test_render_html_escapes_hr_officer_name(temp_db_path, tmp_path):
+    """hr_officer_name is user input — it must be HTML-escaped in the print
+    output, not injected as raw markup."""
+    from src.db.settings import set_setting
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        set_setting(conn, "hr_officer_name", "<script>alert(1)</script>")
+        emp = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, emp, "2026-04-01", "Senin", "08.00", "16.00", 0)
+        out = render_dashboard_html(
+            conn, period_start="2026-04-01", period_end="2026-04-30",
+            period_label="April 2026", out_dir=tmp_path,
+        )
+    content = out.read_text(encoding="utf-8")
+    assert "<script>alert(1)</script>" not in content
+    assert "&lt;script&gt;" in content

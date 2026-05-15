@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader
 
 from src.config import DEFAULT_COACHING_THRESHOLD_MINUTES, BRAND_LOCKUP_LIGHT_SVG
 from src.core.insights import (
@@ -34,7 +34,7 @@ DEFAULT_SECTIONS = {
 def _build_env() -> Environment:
     return Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
-        autoescape=select_autoescape(["html", "xml"]),
+        autoescape=True,
     )
 
 
