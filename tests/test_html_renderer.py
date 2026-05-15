@@ -176,11 +176,11 @@ def test_render_html_escapes_hr_officer_name(temp_db_path, tmp_path):
     assert "&lt;script&gt;" in content
 
 
-def test_render_html_print_footer_repeats_on_every_page(temp_db_path, tmp_path):
-    """The footer is a single .print-footer block that becomes position:fixed
-    in @media print, so the JTS lockup appears at the bottom of every printed
-    page (not stuck mid-content where the div lands in normal flow when
-    content paginates beyond the manually-placed dividers)."""
+def test_render_html_print_footer_in_tfoot(temp_db_path, tmp_path):
+    """The footer lives inside <tfoot> so browsers natively repeat it at the
+    bottom of every printed page (the reliable cross-browser pattern;
+    position:fixed in @media print was unreliable in Chrome's print engine
+    and the footer disappeared entirely on multi-page PDFs)."""
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
         emp = _add_emp(conn, "1", "ANDI")
@@ -190,11 +190,15 @@ def test_render_html_print_footer_repeats_on_every_page(temp_db_path, tmp_path):
             period_label="April 2026", out_dir=tmp_path,
         )
     content = out.read_text(encoding="utf-8")
-    # Exactly one .print-footer element (replacing the old paired .b-footer divs)
+    # Exactly one .print-footer block
     assert content.count('class="print-footer"') == 1
-    # @media print pins it to the bottom of every printed page
-    assert "@media print" in content
-    assert ".print-footer{position:fixed;bottom:0" in content
+    # And it lives inside <tfoot> for per-page repeat
+    assert "<tfoot>" in content
+    tfoot_start = content.find("<tfoot>")
+    tfoot_end = content.find("</tfoot>", tfoot_start)
+    assert tfoot_start != -1 and tfoot_end != -1
+    assert 'class="print-footer"' in content[tfoot_start:tfoot_end], \
+        "expected the .print-footer block to live inside <tfoot>"
 
 
 def test_render_html_no_legacy_b_footer(temp_db_path, tmp_path):
