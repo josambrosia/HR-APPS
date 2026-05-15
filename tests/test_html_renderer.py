@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from src.db.schema import init_db
 from src.db.connection import get_connection
 from src.db.employees import upsert_employee
@@ -131,3 +133,10 @@ def test_render_html_inlines_brand_lockup_svg(temp_db_path, tmp_path):
     assert "<svg" in content                              # lockup inlined as SVG
     assert "josaphat" in content                          # the lockup wordmark text
     assert "[jts] josaphat tech solution" not in content  # old text footer removed
+
+
+def test_load_brand_lockup_falls_back_to_text_when_svg_missing(monkeypatch):
+    """_load_brand_lockup returns 'josaphat' when the asset file is absent."""
+    import src.reports.html_renderer as mod
+    monkeypatch.setattr(mod, "BRAND_LOCKUP_LIGHT_SVG", Path("/nonexistent/lockup.svg"))
+    assert mod._load_brand_lockup() == "josaphat"
