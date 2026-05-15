@@ -68,11 +68,18 @@
   .b-bar-row .v{font-family:Consolas;font-weight:700;text-align:right;color:#171717}
   .b-jam-divider{border-top:1px dashed #e5e5e5;margin:8px 0;text-align:center;font-size:9px;color:#a3a3a3;text-transform:uppercase;letter-spacing:1px;padding-top:6px}
 
-  /* Footer */
-  .b-footer{margin-top:22px;padding-top:12px;border-top:1px solid #e5e5e5;display:flex;justify-content:space-between;align-items:flex-end;font-size:9.5px;color:#737373;font-family:Consolas,monospace}
-  .b-footer .brand{text-align:right;line-height:1.35}
-  .b-footer .brand svg{height:26px;width:auto;display:block}
-  .b-footer .brand .sub{font-size:8px;color:#525252;letter-spacing:.5px;font-family:'Segoe UI',sans-serif}
+  /* Footer — single .print-footer block becomes position:fixed in print so the JTS lockup
+     appears at the bottom of every printed page (not stuck mid-content where a flow div
+     would land when content paginates beyond the manually-placed dividers). */
+  .print-footer{margin-top:22px;padding:10px 14mm;border-top:1px solid #e5e5e5;display:flex;justify-content:space-between;align-items:flex-end;font-size:9.5px;color:#737373;font-family:Consolas,monospace;background:#fff}
+  .print-footer .brand{text-align:right;line-height:1.35}
+  .print-footer .brand svg{height:26px;width:auto;display:block}
+  .print-footer .brand .sub{font-size:8px;color:#525252;letter-spacing:.5px;font-family:'Segoe UI',sans-serif}
+
+  @media print {
+    .doc{padding-bottom:24mm}
+    .print-footer{position:fixed;bottom:0;left:0;right:0;margin-top:0}
+  }
 
   /* Page 2 header */
   .b-rank-head{padding-bottom:10px;border-bottom:2px solid #ec4899;margin-bottom:14px;position:relative}
@@ -185,11 +192,6 @@
   </div>
   {% endif %}
 
-  <div class="b-footer">
-    <span>// page 1/2 &middot; confidential</span>
-    <div class="brand">{{ brand_lockup_svg | safe }}<span class="sub">Tech Solution</span></div>
-  </div>
-
   {# === PAGE BREAK === #}
   <div class="page-break"></div>
 
@@ -227,10 +229,11 @@
     </div>
   </div>
 
-  <div class="b-footer">
-    <span>// page 2/2 &middot; confidential</span>
-    <div class="brand">{{ brand_lockup_svg | safe }}<span class="sub">Tech Solution</span></div>
-  </div>
+</div>
+
+<div class="print-footer">
+  <span>// confidential</span>
+  <div class="brand">{{ brand_lockup_svg | safe }}<span class="sub">Tech Solution</span></div>
 </div>
 
 </body>

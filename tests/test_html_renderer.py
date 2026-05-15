@@ -174,3 +174,41 @@ def test_render_html_escapes_hr_officer_name(temp_db_path, tmp_path):
     content = out.read_text(encoding="utf-8")
     assert "<script>alert(1)</script>" not in content
     assert "&lt;script&gt;" in content
+
+
+def test_render_html_print_footer_repeats_on_every_page(temp_db_path, tmp_path):
+    """The footer is a single .print-footer block that becomes position:fixed
+    in @media print, so the JTS lockup appears at the bottom of every printed
+    page (not stuck mid-content where the div lands in normal flow when
+    content paginates beyond the manually-placed dividers)."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, emp, "2026-04-01", "Senin", "08.00", "16.00", 0)
+        out = render_dashboard_html(
+            conn, period_start="2026-04-01", period_end="2026-04-30",
+            period_label="April 2026", out_dir=tmp_path,
+        )
+    content = out.read_text(encoding="utf-8")
+    # Exactly one .print-footer element (replacing the old paired .b-footer divs)
+    assert content.count('class="print-footer"') == 1
+    # @media print pins it to the bottom of every printed page
+    assert "@media print" in content
+    assert ".print-footer{position:fixed;bottom:0" in content
+
+
+def test_render_html_no_legacy_b_footer(temp_db_path, tmp_path):
+    """The old paired .b-footer markup is fully removed."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, emp, "2026-04-01", "Senin", "08.00", "16.00", 0)
+        out = render_dashboard_html(
+            conn, period_start="2026-04-01", period_end="2026-04-30",
+            period_label="April 2026", out_dir=tmp_path,
+        )
+    content = out.read_text(encoding="utf-8")
+    assert 'class="b-footer"' not in content
+    # No more hardcoded per-page numbering
+    assert "page 1/2" not in content
+    assert "page 2/2" not in content
