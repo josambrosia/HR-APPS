@@ -74,9 +74,11 @@ class SettingsScreen(ctk.CTkFrame):
         self.tabs.pack(fill="both", expand=True)
         self.tabs.add("General")
         self.tabs.add("Pegawai")
+        self.tabs.add("Profil")
 
         self._build_general(self.tabs.tab("General"))
         self._build_pegawai(self.tabs.tab("Pegawai"))
+        self._build_profil(self.tabs.tab("Profil"))
 
     def _build_general(self, parent):
         with get_connection(DB_PATH) as conn:
@@ -162,6 +164,46 @@ class SettingsScreen(ctk.CTkFrame):
         ctk.CTkButton(
             parent, text="Simpan Pengaturan",
             command=self._save,
+            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+            text_color=COLOR_BG,
+            font=FONT_BODY_BOLD,
+            corner_radius=RADIUS_MD,
+        ).pack(anchor="w", pady=SPACE_MD)
+
+    def _build_profil(self, parent):
+        with get_connection(DB_PATH) as conn:
+            hr_name = get_setting(conn, "hr_officer_name", default="")
+
+        ctk.CTkLabel(
+            parent,
+            text="Nama ini muncul di hasil cetak Dashboard sebagai "
+                 "HR Officer in Charge.",
+            font=FONT_SMALL, text_color=COLOR_TEXT_DIM,
+        ).pack(anchor="w", pady=(SPACE_SM, SPACE_XS))
+
+        row = ctk.CTkFrame(
+            parent, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER,
+            corner_radius=RADIUS_MD,
+        )
+        row.pack(fill="x", pady=SPACE_SM)
+        ctk.CTkLabel(
+            row, text="Nama:",
+            font=FONT_BODY, text_color=COLOR_TEXT,
+        ).pack(side="left", padx=SPACE_MD, pady=SPACE_SM + 2)
+        self.hr_name_var = ctk.StringVar(value=hr_name)
+        ctk.CTkEntry(
+            row, textvariable=self.hr_name_var, width=260,
+            fg_color=COLOR_SURFACE_HIGH,
+            border_width=1, border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_BODY,
+            placeholder_text_color=COLOR_TEXT_MUTED,
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            parent, text="Simpan Profil",
+            command=self._save_profil,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
             text_color=COLOR_BG,
             font=FONT_BODY_BOLD,
@@ -255,3 +297,8 @@ class SettingsScreen(ctk.CTkFrame):
             set_setting(conn, "lupa_absen_datang_penalty_min",
                         self.lupa_penalty_var.get().strip())
         messagebox.showinfo("Tersimpan", "Pengaturan disimpan.")
+
+    def _save_profil(self):
+        with get_connection(DB_PATH) as conn:
+            set_setting(conn, "hr_officer_name", self.hr_name_var.get().strip())
+        messagebox.showinfo("Tersimpan", "Profil disimpan.")
