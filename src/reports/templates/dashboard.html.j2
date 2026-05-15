@@ -78,6 +78,13 @@
   .b-rank-head h2{font-size:18px;color:#171717}
   .b-rank-head .sub{font-size:10px;color:#737373;text-transform:uppercase;letter-spacing:1.5px;margin-top:6px;font-family:Consolas}
 
+  /* Sign-off */
+  .b-signoff{margin-top:28px;display:flex;justify-content:flex-end;break-inside:avoid}
+  .b-signoff .so{text-align:center;font-size:10px;min-width:200px}
+  .b-signoff .so .role{color:#525252}
+  .b-signoff .so .gap{height:46px}
+  .b-signoff .so .name{font-weight:700;color:#171717;border-top:1px solid #171717;padding-top:4px}
+
   /* Print */
   .page-break{break-before:page;page-break-before:always}
   .empty-state{padding:14px;background:#fafafa;border:1px dashed #e5e5e5;border-radius:6px;text-align:center;color:#737373;font-size:11px}
@@ -208,6 +215,15 @@
   </table>
   <div style="font-size:10px;color:#737373;margin-top:8px">Highlight emerald = karyawan teladan &middot; Highlight violet pada kolom absen = perlu perhatian khusus (&ge;1 hari tidak hadir).</div>
   {% else %}<div class="empty-state">Tidak ada data karyawan di periode ini.</div>{% endif %}
+
+  {# === SIGN-OFF === #}
+  <div class="b-signoff">
+    <div class="so">
+      <div class="role">HR Officer in Charge</div>
+      <div class="gap"></div>
+      <div class="name">{{ hr_officer_name }}</div>
+    </div>
+  </div>
 
   <div class="b-footer">
     <span>// page 2/2 &middot; confidential</span>

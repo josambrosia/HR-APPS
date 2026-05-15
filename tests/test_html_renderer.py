@@ -82,3 +82,34 @@ def test_ranking_is_mandatory_even_if_section_false(temp_db_path, tmp_path):
     assert "Top 5 Paling Terlambat" not in html
     assert "Karyawan Teladan" not in html
     assert "Butuh Coaching" not in html
+
+
+def test_render_html_includes_hr_officer_signoff(temp_db_path, tmp_path):
+    """The print includes an HR Officer in Charge sign-off with the saved name."""
+    from src.db.settings import set_setting
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        set_setting(conn, "hr_officer_name", "Supriyadi, S.E.")
+        emp = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, emp, "2026-04-01", "Senin", "08.00", "16.00", 0)
+        out = render_dashboard_html(
+            conn, period_start="2026-04-01", period_end="2026-04-30",
+            period_label="April 2026", out_dir=tmp_path,
+        )
+    content = out.read_text(encoding="utf-8")
+    assert "HR Officer in Charge" in content
+    assert "Supriyadi, S.E." in content
+
+
+def test_render_html_signoff_renders_when_name_empty(temp_db_path, tmp_path):
+    """The sign-off block + label render even when no HR name is set."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp = _add_emp(conn, "1", "ANDI")
+        _add_att(conn, emp, "2026-04-01", "Senin", "08.00", "16.00", 0)
+        out = render_dashboard_html(
+            conn, period_start="2026-04-01", period_end="2026-04-30",
+            period_label="April 2026", out_dir=tmp_path,
+        )
+    content = out.read_text(encoding="utf-8")
+    assert "HR Officer in Charge" in content

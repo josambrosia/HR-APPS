@@ -16,6 +16,7 @@ from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
     avg_minutes_per_late_event, pola_jam_masuk,
 )
+from src.db.settings import get_setting
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 TEMPLATE_FILE = "dashboard.html.j2"
@@ -76,6 +77,8 @@ def render_dashboard_html(
     total_min = sum(r['total_terlambat'] for r in ranking)
     teladan_count = len(teladan)
 
+    hr_officer_name = get_setting(conn, "hr_officer_name", default="")
+
     env = _build_env()
     tmpl = env.get_template(TEMPLATE_FILE)
     html = tmpl.render(
@@ -97,6 +100,7 @@ def render_dashboard_html(
         jam_masuk=jam_masuk,
         ranking=ranking,
         sections=sections,
+        hr_officer_name=hr_officer_name,
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
