@@ -141,3 +141,19 @@ def restamp_holidays(conn: sqlite3.Connection) -> None:
     dates = [r[0] for r in conn.execute("SELECT tanggal FROM holidays")]
     if dates:
         mark_holidays(conn, dates)
+
+
+def working_days_count(conn: sqlite3.Connection, start_iso: str, end_iso: str) -> int:
+    """Count distinct dates with tipe='Hari Kerja' in [start_iso, end_iso] inclusive.
+
+    Used by the Dashboard coaching panel and the standalone Coaching menu to
+    scale the per-day threshold to the actual working days in the period.
+    Hari Libur and Istirahat rows are automatically excluded by the tipe filter.
+    Returns 0 if no fingerprint data has been imported for the period.
+    """
+    row = conn.execute(
+        "SELECT COUNT(DISTINCT tanggal) FROM attendance_records "
+        "WHERE tipe = 'Hari Kerja' AND tanggal BETWEEN ? AND ?",
+        (start_iso, end_iso),
+    ).fetchone()
+    return int(row[0]) if row else 0

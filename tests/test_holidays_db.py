@@ -169,3 +169,51 @@ def test_restamp_holidays_reapplies_after_simulated_reimport(temp_db_path):
         assert _row(conn, a, "2026-04-03")["tipe"] == "Hari Libur"   # restored
         assert _row(conn, c, "2026-04-03")["tipe"] == "Hari Libur"
         assert _row(conn, c, "2026-04-03")["reason_category"] == "libur"
+
+
+def test_working_days_count_empty_range(temp_db_path):
+    from src.db.holidays import working_days_count
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        assert working_days_count(conn, "2026-04-01", "2026-04-07") == 0
+
+
+def test_working_days_count_only_hari_kerja(temp_db_path):
+    """Counts only distinct dates with tipe='Hari Kerja'. Hari Libur and Istirahat excluded."""
+    from src.db.holidays import working_days_count
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp = _emp(conn, "1", "ANI")
+        # 3 Hari Kerja dates (one outside the range, one is Hari Libur, one Istirahat)
+        _att(conn, emp, "2026-04-13", tipe="Hari Kerja")          # in range, kerja
+        _att(conn, emp, "2026-04-14", tipe="Hari Kerja")          # in range, kerja
+        _att(conn, emp, "2026-04-15", tipe="Hari Libur")          # in range, libur
+        _att(conn, emp, "2026-04-16", tipe="Istirahat")           # in range, istirahat
+        _att(conn, emp, "2026-04-17", tipe="Hari Kerja")          # in range, kerja
+        _att(conn, emp, "2026-04-20", tipe="Hari Kerja")          # OUT of range
+        assert working_days_count(conn, "2026-04-13", "2026-04-19") == 3
+
+
+def test_working_days_count_distinct_dates(temp_db_path):
+    """Multiple employees on the same date → counted once."""
+    from src.db.holidays import working_days_count
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        e1 = _emp(conn, "1", "ANI")
+        e2 = _emp(conn, "2", "BUDI")
+        _att(conn, e1, "2026-04-13", tipe="Hari Kerja")
+        _att(conn, e2, "2026-04-13", tipe="Hari Kerja")
+        _att(conn, e1, "2026-04-14", tipe="Hari Kerja")
+        assert working_days_count(conn, "2026-04-13", "2026-04-14") == 2
+
+
+def test_working_days_count_inclusive_bounds(temp_db_path):
+    """Date-range filter is BETWEEN — inclusive on both ends."""
+    from src.db.holidays import working_days_count
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp = _emp(conn, "1", "ANI")
+        _att(conn, emp, "2026-04-13", tipe="Hari Kerja")  # start boundary
+        _att(conn, emp, "2026-04-17", tipe="Hari Kerja")  # end boundary
+        _att(conn, emp, "2026-04-15", tipe="Hari Kerja")  # middle
+        assert working_days_count(conn, "2026-04-13", "2026-04-17") == 3
