@@ -10,6 +10,7 @@ from src.db.coaching import (
     get_coaching_notes, update_notes,
 )
 from src.db.connection import get_connection
+from src.db.holidays import working_days_count
 from src.db.settings import get_setting
 from src.ui.components.kpi_card import KPICard
 from src.ui.components.week_nav import WeekNavBar
@@ -37,11 +38,11 @@ class CoachingScreen(ctk.CTkFrame):
 
         with get_connection(DB_PATH) as conn:
             self._current_month = get_setting(conn, "current_month") or ""
-            threshold_raw = get_setting(conn, "coaching_threshold_min") or "75"
+            daily_raw = get_setting(conn, "coaching_threshold_per_day") or "15"
             try:
-                self._threshold = int(threshold_raw)
+                self._daily_threshold = int(daily_raw)
             except ValueError:
-                self._threshold = 75
+                self._daily_threshold = 15
 
         self.selected_row = None  # dict from _row_cache when row is selected
         self._row_cache = {}      # iid -> row dict
@@ -208,9 +209,14 @@ class CoachingScreen(ctk.CTkFrame):
             return
 
         with get_connection(DB_PATH) as conn:
+            working_days = working_days_count(conn, start, end)
+            if working_days == 0:
+                self._render_stats([])
+                return
+            effective = self._daily_threshold * working_days
             raw_rows = list_coaching_for_week(
                 conn, week_start=start, week_end=end,
-                threshold_minutes=self._threshold,
+                threshold_minutes=effective,
             )
         rows = [dict(r) for r in raw_rows]
         self._render_stats(rows)
