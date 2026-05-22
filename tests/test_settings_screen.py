@@ -66,3 +66,32 @@ def test_settings_screen_loads_saved_hr_officer_name(temp_db_path, monkeypatch, 
     tk_root.update_idletasks()
     assert screen.hr_name_var.get() == "Budi Hartono"
     screen.destroy()
+
+
+def test_settings_screen_saves_threshold_per_day(temp_db_path, monkeypatch, tk_root):
+    """Edit thr_var and save → coaching_threshold_per_day persists."""
+    import src.ui.screens.settings as settings_mod
+    monkeypatch.setattr(settings_mod, "DB_PATH", temp_db_path)
+    monkeypatch.setattr(settings_mod.messagebox, "showinfo", lambda *a, **k: None)
+    init_db(temp_db_path)
+    screen = settings_mod.SettingsScreen(tk_root)
+    tk_root.update_idletasks()
+    screen.thr_var.set("12")
+    screen._save()
+    with get_connection(temp_db_path) as conn:
+        assert get_setting(conn, "coaching_threshold_per_day") == "12"
+    screen.destroy()
+
+
+def test_settings_screen_loads_saved_threshold_per_day(temp_db_path, monkeypatch, tk_root):
+    """Pre-seed coaching_threshold_per_day → screen populates thr_var with it."""
+    import src.ui.screens.settings as settings_mod
+    monkeypatch.setattr(settings_mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        from src.db.settings import set_setting
+        set_setting(conn, "coaching_threshold_per_day", "18")
+    screen = settings_mod.SettingsScreen(tk_root)
+    tk_root.update_idletasks()
+    assert screen.thr_var.get() == "18"
+    screen.destroy()

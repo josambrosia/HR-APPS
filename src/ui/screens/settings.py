@@ -85,7 +85,7 @@ class SettingsScreen(ctk.CTkFrame):
             current_month = get_setting(conn, "current_month", default="")
             sched_start = get_setting(conn, "schedule_start", default="08.00")
             sched_end = get_setting(conn, "schedule_end", default="16.00")
-            threshold = get_setting(conn, "coaching_threshold_min", default="75")
+            threshold = get_setting(conn, "coaching_threshold_per_day", default="15")
             lupa_penalty = get_setting(conn, "lupa_absen_datang_penalty_min",
                                        default="15")
 
@@ -116,7 +116,7 @@ class SettingsScreen(ctk.CTkFrame):
         )
         row2.pack(fill="x", pady=SPACE_SM)
         ctk.CTkLabel(
-            row2, text="Coaching Threshold (mnt/minggu):",
+            row2, text="Coaching Threshold (mnt/hari):",
             font=FONT_BODY, text_color=COLOR_TEXT,
         ).pack(side="left", padx=SPACE_MD, pady=SPACE_SM + 2)
         self.thr_var = ctk.StringVar(value=threshold)
@@ -293,7 +293,7 @@ class SettingsScreen(ctk.CTkFrame):
     def _save(self):
         with get_connection(DB_PATH) as conn:
             set_setting(conn, "current_month", self.month_var.get().strip())
-            set_setting(conn, "coaching_threshold_min", self.thr_var.get().strip())
+            set_setting(conn, "coaching_threshold_per_day", self.thr_var.get().strip())
             set_setting(conn, "lupa_absen_datang_penalty_min",
                         self.lupa_penalty_var.get().strip())
         messagebox.showinfo("Tersimpan", "Pengaturan disimpan.")
