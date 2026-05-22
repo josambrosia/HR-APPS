@@ -7,6 +7,7 @@ from tkinter import ttk
 
 from src.config import DB_PATH
 from src.db.connection import get_connection
+from src.db.holidays import working_days_count
 from src.db.settings import get_setting
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
@@ -63,6 +64,7 @@ class DashboardScreen(ctk.CTkFrame):
         self._kpi_labels: dict = {}        # name -> CTkLabel for value
         self._kpi_label_period: ctk.CTkLabel | None = None
         self._panel_titles: dict = {}      # panel key -> CTkLabel for title
+        self._panel_subtitles: dict = {}   # panel key -> CTkLabel for subtitle (optional)
         self._panel_content: dict = {}     # panel key -> parent frame for rows
         self._panel_boxes: dict = {}       # panel key -> outer CTkFrame (for grid/grid_remove)
         self._panel_rows: dict[str, list[dict]] = {}   # panel_key -> [{"frame", "left", "right"}, ...]
@@ -181,7 +183,7 @@ class DashboardScreen(ctk.CTkFrame):
         left.grid_columnconfigure(0, weight=1)
         left.grid_columnconfigure(1, weight=1)
 
-        def make_panel(parent, title, color, panel_key, fixed_height):
+        def make_panel(parent, title, color, panel_key, fixed_height, with_subtitle=False):
             box = ctk.CTkFrame(
                 parent, fg_color=COLOR_SURFACE,
                 border_width=1, border_color=COLOR_BORDER,
@@ -190,7 +192,6 @@ class DashboardScreen(ctk.CTkFrame):
             )
             box.grid_propagate(False)
             box.grid_columnconfigure(0, weight=1)
-            box.grid_rowconfigure(1, weight=1)
             title_lbl = ctk.CTkLabel(
                 box, text=title,
                 font=FONT_SUBHEAD,
@@ -199,8 +200,23 @@ class DashboardScreen(ctk.CTkFrame):
             title_lbl.grid(row=0, column=0, sticky="w", padx=SPACE_MD, pady=(SPACE_SM, SPACE_XS))
             self._panel_titles[panel_key] = title_lbl
 
+            if with_subtitle:
+                subtitle_lbl = ctk.CTkLabel(
+                    box, text="",
+                    font=FONT_SMALL,
+                    text_color=COLOR_TEXT_MUTED,
+                    anchor="w", justify="left",
+                )
+                subtitle_lbl.grid(row=1, column=0, sticky="w", padx=SPACE_MD, pady=(0, SPACE_XS))
+                self._panel_subtitles[panel_key] = subtitle_lbl
+                box.grid_rowconfigure(2, weight=1)
+                content_row = 2
+            else:
+                box.grid_rowconfigure(1, weight=1)
+                content_row = 1
+
             content = ctk.CTkFrame(box, fg_color="transparent")
-            content.grid(row=1, column=0, sticky="nsew", padx=SPACE_XS, pady=(0, SPACE_SM))
+            content.grid(row=content_row, column=0, sticky="nsew", padx=SPACE_XS, pady=(0, SPACE_SM))
             self._panel_content[panel_key] = content
             self._panel_boxes[panel_key] = box
             return box
@@ -212,7 +228,7 @@ class DashboardScreen(ctk.CTkFrame):
                    "teladan", self.PANEL_H_REGULAR)
         # Coaching: taller, non-scrollable; only shown in Mingguan view
         make_panel(left, "⚠ Butuh Coaching", COLOR_WARN,
-                   "coaching", self.PANEL_H_COACH)
+                   "coaching", self.PANEL_H_COACH, with_subtitle=True)
         # Dept ranking: non-scrollable (~4 depts, bounded)
         make_panel(left, "🏢 Ranking Departemen", COLOR_TEXT,
                    "dept", self.PANEL_H_REGULAR)
@@ -343,12 +359,23 @@ class DashboardScreen(ctk.CTkFrame):
         return start, end, f"Bulanan ({self._current_month})"
 
     def _dynamic_coaching_threshold(self, start_iso, end_iso):
-        from datetime import date
-        s = date.fromisoformat(start_iso)
-        e = date.fromisoformat(end_iso)
-        days = (e - s).days + 1
-        weeks = max(1, (days + 6) // 7)
-        return 75 * weeks
+        """Compute coaching threshold for the period.
+
+        Returns dict {'daily': int, 'working_days': int, 'effective': int}.
+        Effective = daily quota × distinct Hari Kerja dates in [start, end].
+        """
+        with get_connection(DB_PATH) as conn:
+            daily_raw = get_setting(conn, "coaching_threshold_per_day", default="15")
+            try:
+                daily = int(daily_raw)
+            except (TypeError, ValueError):
+                daily = 15
+            working_days = working_days_count(conn, start_iso, end_iso)
+        return {
+            "daily": daily,
+            "working_days": working_days,
+            "effective": daily * working_days,
+        }
 
     # ──────────────────────────────────────────────────── Data updates
 
@@ -397,16 +424,16 @@ class DashboardScreen(ctk.CTkFrame):
         if key in self._query_cache:
             return self._query_cache[key]
 
-        threshold = self._dynamic_coaching_threshold(start, end)
+        threshold_info = self._dynamic_coaching_threshold(start, end)
         with get_connection(DB_PATH) as conn:
             data = {
                 "ranking": [dict(r) for r in terlambat_ranking(conn, start, end)],
                 "top5_late": [dict(r) for r in top_n_terlambat(conn, start, end, 5)],
-                "coaching": [dict(r) for r in coaching_flag(conn, start, end, threshold=threshold)],
+                "coaching": [dict(r) for r in coaching_flag(conn, start, end, threshold=threshold_info["effective"])],
                 "top5_teladan": [dict(r) for r in karyawan_teladan_top_n(conn, start, end, 5)],
                 "dept_rows": [dict(r) for r in ranking_departemen(conn, start, end)],
                 "day_rows": [dict(r) for r in hari_paling_rawan(conn, start, end)],
-                "threshold": threshold,
+                "threshold": threshold_info,
             }
         self._query_cache[key] = data
         return data
@@ -425,10 +452,19 @@ class DashboardScreen(ctk.CTkFrame):
         self._kpi_labels["total_terlambat"].configure(text=f"{total_late} mnt")
         self._kpi_labels["coaching_count"].configure(text=str(len(data["coaching"])))
 
-        # Coaching panel title with dynamic threshold
-        self._panel_titles["coaching"].configure(
-            text=f"⚠ Butuh Coaching (>{threshold} mnt)"
-        )
+        # Coaching panel title + subtitle with dynamic threshold
+        if threshold["working_days"] > 0:
+            self._panel_titles["coaching"].configure(
+                text=f"⚠ Butuh Coaching (>{threshold['effective']} mnt)"
+            )
+            self._panel_subtitles["coaching"].configure(
+                text=f"{threshold['daily']} mnt/hari × {threshold['working_days']} hari kerja"
+            )
+        else:
+            self._panel_titles["coaching"].configure(text="⚠ Butuh Coaching")
+            self._panel_subtitles["coaching"].configure(
+                text="Belum ada data hari kerja periode ini."
+            )
 
         # ── Top 5 Late ──
         self._populate_pool(
@@ -487,7 +523,7 @@ class DashboardScreen(ctk.CTkFrame):
         from src.ui.components.toast import show_success_toast
 
         start, end, label = self._period_range()
-        dynamic_threshold = self._dynamic_coaching_threshold(start, end)
+        threshold_info = self._dynamic_coaching_threshold(start, end)
         out_dir = Path(tempfile.gettempdir())
         try:
             with get_connection(DB_PATH) as conn:
@@ -495,7 +531,7 @@ class DashboardScreen(ctk.CTkFrame):
                     conn, period_start=start, period_end=end,
                     period_label=label, out_dir=out_dir,
                     sections=sections,
-                    threshold=dynamic_threshold,
+                    threshold_info=threshold_info,
                 )
         except Exception as e:
             messagebox.showerror("Error generating PDF", str(e))
