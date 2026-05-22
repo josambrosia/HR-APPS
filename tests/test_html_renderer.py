@@ -33,6 +33,7 @@ def test_render_html_contains_key_sections(temp_db_path, tmp_path):
         out = render_dashboard_html(
             conn, period_start="2026-04-01", period_end="2026-04-30",
             period_label="April 2026", out_dir=tmp_path,
+            threshold_info={"daily": 15, "working_days": 1, "effective": 15},
         )
     assert out.exists()
     content = out.read_text(encoding="utf-8")
@@ -74,6 +75,7 @@ def test_ranking_is_mandatory_even_if_section_false(temp_db_path, tmp_path):
                 "kpi": False, "top5_late": False, "top5_teladan": False,
                 "coaching": False, "pola_jam_masuk": False, "ranking": False,
             },
+            threshold_info={"daily": 15, "working_days": 1, "effective": 15},
         )
     html = out.read_text(encoding="utf-8")
     # Mandatory section heading is still there even when ranking=False
@@ -98,6 +100,7 @@ def test_render_html_includes_hr_officer_signoff(temp_db_path, tmp_path):
         out = render_dashboard_html(
             conn, period_start="2026-04-01", period_end="2026-04-30",
             period_label="April 2026", out_dir=tmp_path,
+            threshold_info={"daily": 15, "working_days": 1, "effective": 15},
         )
     content = out.read_text(encoding="utf-8")
     assert "HR Officer in Charge" in content
@@ -113,6 +116,7 @@ def test_render_html_signoff_renders_when_name_empty(temp_db_path, tmp_path):
         out = render_dashboard_html(
             conn, period_start="2026-04-01", period_end="2026-04-30",
             period_label="April 2026", out_dir=tmp_path,
+            threshold_info={"daily": 15, "working_days": 1, "effective": 15},
         )
     content = out.read_text(encoding="utf-8")
     assert "HR Officer in Charge" in content
@@ -128,6 +132,7 @@ def test_render_html_inlines_brand_lockup_svg(temp_db_path, tmp_path):
         out = render_dashboard_html(
             conn, period_start="2026-04-01", period_end="2026-04-30",
             period_label="April 2026", out_dir=tmp_path,
+            threshold_info={"daily": 15, "working_days": 1, "effective": 15},
         )
     content = out.read_text(encoding="utf-8")
     assert "<svg" in content                              # lockup inlined as SVG
@@ -152,6 +157,7 @@ def test_render_html_page_margin_zero(temp_db_path, tmp_path):
         out = render_dashboard_html(
             conn, period_start="2026-04-01", period_end="2026-04-30",
             period_label="April 2026", out_dir=tmp_path,
+            threshold_info={"daily": 15, "working_days": 1, "effective": 15},
         )
     content = out.read_text(encoding="utf-8")
     assert "@page{size:A4;margin:0}" in content
@@ -170,6 +176,7 @@ def test_render_html_escapes_hr_officer_name(temp_db_path, tmp_path):
         out = render_dashboard_html(
             conn, period_start="2026-04-01", period_end="2026-04-30",
             period_label="April 2026", out_dir=tmp_path,
+            threshold_info={"daily": 15, "working_days": 1, "effective": 15},
         )
     content = out.read_text(encoding="utf-8")
     assert "<script>alert(1)</script>" not in content
@@ -188,6 +195,7 @@ def test_render_html_print_footer_in_tfoot(temp_db_path, tmp_path):
         out = render_dashboard_html(
             conn, period_start="2026-04-01", period_end="2026-04-30",
             period_label="April 2026", out_dir=tmp_path,
+            threshold_info={"daily": 15, "working_days": 1, "effective": 15},
         )
     content = out.read_text(encoding="utf-8")
     # Exactly one .print-footer block
@@ -210,9 +218,50 @@ def test_render_html_no_legacy_b_footer(temp_db_path, tmp_path):
         out = render_dashboard_html(
             conn, period_start="2026-04-01", period_end="2026-04-30",
             period_label="April 2026", out_dir=tmp_path,
+            threshold_info={"daily": 15, "working_days": 1, "effective": 15},
         )
     content = out.read_text(encoding="utf-8")
     assert 'class="b-footer"' not in content
     # No more hardcoded per-page numbering
     assert "page 1/2" not in content
     assert "page 2/2" not in content
+
+
+def test_coaching_section_shows_formula_when_working_days_present(temp_db_path, tmp_path):
+    """When threshold_info has working_days > 0, the rendered HTML shows the formula."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp = _add_emp(conn, "1", "ANI", dept="X")
+        _add_att(conn, emp, "2026-04-13", "Senin", "08.00", "16.00", 0)
+        out = render_dashboard_html(
+            conn, period_start="2026-04-13", period_end="2026-04-19",
+            period_label="Minggu 3 (2026-04-13 → 2026-04-19)",
+            out_dir=tmp_path,
+            threshold_info={"daily": 15, "working_days": 3, "effective": 45},
+        )
+    html = out.read_text(encoding="utf-8")
+    # KPI delta uses effective + working days
+    assert "&ge; 45 mnt / 3 hari" in html or ">= 45 mnt / 3 hari" in html
+    # Coaching panel footer shows the full formula
+    assert "Threshold" in html
+    assert "45 mnt" in html
+    assert "15 mnt/hari" in html
+    assert "3 hari kerja" in html
+
+
+def test_coaching_section_fallback_when_no_working_days(temp_db_path, tmp_path):
+    """When threshold_info.working_days == 0, the rendered HTML shows the fallback text."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        # No attendance rows seeded — but render should still succeed using threshold_info
+        emp = _add_emp(conn, "1", "ANI", dept="X")
+        out = render_dashboard_html(
+            conn, period_start="2026-04-13", period_end="2026-04-19",
+            period_label="Minggu 3", out_dir=tmp_path,
+            threshold_info={"daily": 15, "working_days": 0, "effective": 0},
+        )
+    html = out.read_text(encoding="utf-8")
+    assert "Belum ada data hari kerja periode ini." in html
+    assert "tanpa data hari kerja" in html
+    # Formula MUST NOT appear when working_days == 0
+    assert "mnt/hari ×" not in html and "mnt/hari &times;" not in html

@@ -127,7 +127,7 @@
   <div class="b-kpi">
     <div class="k"><div class="l">Total Terlambat</div><div class="n">{{ kpi.total_terlambat }}</div><div class="delta">kejadian</div></div>
     <div class="k cyan"><div class="l">Rata-rata / Kejadian</div><div class="n">{{ '%.0f' % kpi.avg_min }}<span class="u">min</span></div><div class="delta">{{ kpi.total_min }} menit &divide; {{ kpi.total_terlambat }}</div></div>
-    <div class="k violet"><div class="l">Coaching</div><div class="n">{{ kpi.coaching_count }}</div><div class="delta">&ge; {{ coaching_threshold }} min</div></div>
+    <div class="k violet"><div class="l">Coaching</div><div class="n">{{ kpi.coaching_count }}</div><div class="delta">{% if coaching_working_days > 0 %}&ge; {{ coaching_threshold_effective }} mnt / {{ coaching_working_days }} hari{% else %}tanpa data hari kerja{% endif %}</div></div>
     <div class="k emerald"><div class="l">Teladan</div><div class="n">{{ kpi.teladan_count }}</div><div class="delta">hadir penuh</div></div>
   </div>
   {% endif %}
@@ -166,8 +166,8 @@
       <h2>Butuh Coaching</h2>
       {% if coaching %}
         {% for r in coaching %}<span class="b-pill">{{ r.nama }} &middot; {{ r.total_terlambat }}m</span>{% endfor %}
-        <div style="font-size:10px;color:#737373;margin-top:8px">Threshold &ge; {{ coaching_threshold }} menit / periode</div>
       {% else %}<div class="empty-state">Tidak ada kandidat coaching.</div>{% endif %}
+      <div style="font-size:10px;color:#737373;margin-top:8px">{% if coaching_working_days > 0 %}Threshold &ge; {{ coaching_threshold_effective }} mnt ({{ coaching_threshold_daily }} mnt/hari &times; {{ coaching_working_days }} hari kerja){% else %}Belum ada data hari kerja periode ini.{% endif %}</div>
     </div>
     {% endif %}
   </div>

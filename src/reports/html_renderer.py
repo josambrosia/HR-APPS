@@ -11,7 +11,7 @@ from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader
 
-from src.config import DEFAULT_COACHING_THRESHOLD_PER_DAY, BRAND_LOCKUP_LIGHT_SVG
+from src.config import BRAND_LOCKUP_LIGHT_SVG
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
     avg_minutes_per_late_event, pola_jam_masuk,
@@ -59,7 +59,7 @@ def render_dashboard_html(
     period_end: str,
     period_label: str,
     out_dir: Path,
-    threshold: int = DEFAULT_COACHING_THRESHOLD_PER_DAY,
+    threshold_info: Optional[dict] = None,
     sections: Optional[dict] = None,
 ) -> Path:
     """Render the dashboard HTML print output and return its path.
@@ -67,6 +67,11 @@ def render_dashboard_html(
     `sections` is a dict of booleans keyed by section name (see DEFAULT_SECTIONS).
     Missing keys default to True. The "ranking" section is always rendered even
     if set to False — it's mandatory per design spec.
+
+    `threshold_info` is a dict {daily, working_days, effective} describing the
+    dynamic coaching threshold for the period. `effective = daily * working_days`.
+    When `working_days == 0`, the template renders a "no working-day data"
+    fallback instead of the formula.
     """
     if sections is None:
         sections = DEFAULT_SECTIONS.copy()
@@ -74,9 +79,13 @@ def render_dashboard_html(
         sections = {**DEFAULT_SECTIONS, **sections}
     sections["ranking"] = True  # enforce mandatory
 
+    if threshold_info is None:
+        threshold_info = {"daily": 15, "working_days": 0, "effective": 0}
+    threshold_effective = threshold_info["effective"]
+
     ranking = terlambat_ranking(conn, period_start, period_end)
     top5_late = top_n_terlambat(conn, period_start, period_end, n=5)
-    coaching = coaching_flag(conn, period_start, period_end, threshold=threshold)
+    coaching = coaching_flag(conn, period_start, period_end, threshold=threshold_effective)
     # Teladan = perfect attendance (no late, no absent). Derived from ranking
     # so KPI count and panel list always agree.
     teladan = [
@@ -111,7 +120,9 @@ def render_dashboard_html(
         top5_late=top5_late,
         teladan=teladan,
         coaching=coaching,
-        coaching_threshold=threshold,
+        coaching_threshold_effective=threshold_info["effective"],
+        coaching_threshold_daily=threshold_info["daily"],
+        coaching_working_days=threshold_info["working_days"],
         jam_masuk=jam_masuk,
         ranking=ranking,
         sections=sections,
