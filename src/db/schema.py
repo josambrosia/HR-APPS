@@ -86,22 +86,45 @@ CREATE TABLE IF NOT EXISTS holidays (
 DEFAULT_SETTINGS = {
     "schedule_start": "08.00",
     "schedule_end": "16.00",
-    "coaching_threshold_min": "75",
+    "coaching_threshold_per_day": "15",
 }
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    """Idempotent column additions for pre-existing databases.
+    """Idempotent column additions and settings-key migrations for pre-existing databases.
 
     CREATE TABLE IF NOT EXISTS only creates missing tables — it does NOT
     add columns to a table that already exists. For an existing data/hr.db
     the export_history.kind column must be added via ALTER TABLE.
+
+    Also migrates coaching_threshold_min (weekly, default 75) to
+    coaching_threshold_per_day (daily, ≈15) by integer divide-by-5.
     """
     cols = {row[1] for row in conn.execute("PRAGMA table_info(export_history)")}
     if "kind" not in cols:
         conn.execute(
             "ALTER TABLE export_history "
             "ADD COLUMN kind TEXT NOT NULL DEFAULT 'fill'"
+        )
+
+    # Coaching threshold: weekly → daily (idempotent — only writes if new key absent).
+    row = conn.execute(
+        "SELECT 1 FROM settings WHERE key = 'coaching_threshold_per_day'"
+    ).fetchone()
+    if row is None:
+        old_row = conn.execute(
+            "SELECT value FROM settings WHERE key = 'coaching_threshold_min'"
+        ).fetchone()
+        new_val = 15
+        if old_row is not None:
+            try:
+                old = int(old_row[0])
+                new_val = max(1, round(old / 5))
+            except (TypeError, ValueError):
+                new_val = 15
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?)",
+            ("coaching_threshold_per_day", str(new_val)),
         )
 
 

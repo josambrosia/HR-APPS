@@ -11,7 +11,7 @@ from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader
 
-from src.config import DEFAULT_COACHING_THRESHOLD_MINUTES, BRAND_LOCKUP_LIGHT_SVG
+from src.config import DEFAULT_COACHING_THRESHOLD_PER_DAY, BRAND_LOCKUP_LIGHT_SVG
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
     avg_minutes_per_late_event, pola_jam_masuk,
@@ -59,7 +59,7 @@ def render_dashboard_html(
     period_end: str,
     period_label: str,
     out_dir: Path,
-    threshold: int = DEFAULT_COACHING_THRESHOLD_MINUTES,
+    threshold: int = DEFAULT_COACHING_THRESHOLD_PER_DAY,
     sections: Optional[dict] = None,
 ) -> Path:
     """Render the dashboard HTML print output and return its path.

@@ -20,7 +20,7 @@ def test_init_db_seeds_default_settings(temp_db_path):
         rows = dict(conn.execute("SELECT key, value FROM settings").fetchall())
     assert rows["schedule_start"] == "08.00"
     assert rows["schedule_end"] == "16.00"
-    assert rows["coaching_threshold_min"] == "75"
+    assert rows["coaching_threshold_per_day"] == "15"
 
 
 def test_init_db_idempotent(temp_db_path):
@@ -96,3 +96,71 @@ def test_migrate_adds_kind_to_legacy_export_history(temp_db_path):
         kind_val = conn.execute("SELECT kind FROM export_history").fetchone()[0]
     assert "kind" in cols
     assert kind_val == "fill"
+
+
+def test_migrate_seeds_threshold_per_day_on_fresh_db(temp_db_path):
+    """A brand-new DB has no old key; migration seeds coaching_threshold_per_day = 15."""
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key = 'coaching_threshold_per_day'"
+        ).fetchone()
+    assert row is not None
+    assert row[0] == "15"
+
+
+def test_migrate_converts_existing_weekly_threshold(temp_db_path):
+    """Existing coaching_threshold_min='60' migrates to coaching_threshold_per_day='12'."""
+    with sqlite3.connect(temp_db_path) as conn:
+        conn.executescript(
+            "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);"
+        )
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES ('coaching_threshold_min', '60')"
+        )
+        conn.commit()
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        per_day = conn.execute(
+            "SELECT value FROM settings WHERE key = 'coaching_threshold_per_day'"
+        ).fetchone()
+        old = conn.execute(
+            "SELECT value FROM settings WHERE key = 'coaching_threshold_min'"
+        ).fetchone()
+    assert per_day[0] == "12"
+    assert old[0] == "60"  # orphan preserved, not deleted
+
+
+def test_migrate_converts_default_75_to_15(temp_db_path):
+    """Existing coaching_threshold_min='75' (old default) migrates to '15'."""
+    with sqlite3.connect(temp_db_path) as conn:
+        conn.executescript(
+            "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);"
+        )
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES ('coaching_threshold_min', '75')"
+        )
+        conn.commit()
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        per_day = conn.execute(
+            "SELECT value FROM settings WHERE key = 'coaching_threshold_per_day'"
+        ).fetchone()
+    assert per_day[0] == "15"
+
+
+def test_migrate_threshold_idempotent(temp_db_path):
+    """Second init_db call leaves coaching_threshold_per_day untouched."""
+    init_db(temp_db_path)
+    # Simulate user changing the value
+    with sqlite3.connect(temp_db_path) as conn:
+        conn.execute(
+            "UPDATE settings SET value = '20' WHERE key = 'coaching_threshold_per_day'"
+        )
+        conn.commit()
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        per_day = conn.execute(
+            "SELECT value FROM settings WHERE key = 'coaching_threshold_per_day'"
+        ).fetchone()
+    assert per_day[0] == "20"

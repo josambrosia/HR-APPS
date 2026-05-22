@@ -7,7 +7,7 @@ def test_get_default_settings(temp_db_path):
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
         assert get_setting(conn, "schedule_start") == "08.00"
-        assert get_setting(conn, "coaching_threshold_min") == "75"
+        assert get_setting(conn, "coaching_threshold_per_day") == "15"
 
 
 def test_set_setting_inserts_and_updates(temp_db_path):
