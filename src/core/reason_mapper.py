@@ -69,11 +69,16 @@ def effective_attendance(row, *, schedule_start: str, lupa_penalty_min: int) -> 
         terlambat_menit = 0.
       - reason_category in COACHING_EXCLUDED AND raw masuk is NULL (a no-badge
         field day) -> no correction; stays a justified absence.
-      - reason_category == 'lupa_absen' AND masuk is NULL AND keluar is set
-        (forgot to clock IN) -> terlambat_menit = lupa_penalty_min,
+      - reason_category == 'lupa_absen_datang' AND masuk is NULL
+        (user labeled the row as 'datang missing scan', regardless of keluar)
+        -> terlambat_menit = lupa_penalty_min,
         masuk = schedule_start + lupa_penalty_min.
-      - everything else (incl. lupa_absen forgot-OUT, other categories,
-        no reason) -> raw values unchanged.
+      - reason_category == 'lupa_absen_pulang' -> no correction; raw values
+        pass through (explicit no-op for clarity).
+      - reason_category == 'lupa_absen' (legacy, pre-v15-migration) AND masuk
+        IS NULL AND keluar is set (forgot to clock IN) -> terlambat_menit =
+        lupa_penalty_min, masuk = schedule_start + lupa_penalty_min.
+      - everything else (other categories, no reason) -> raw values unchanged.
     """
     cat = row["reason_category"]
     masuk = row["masuk"]
@@ -88,6 +93,22 @@ def effective_attendance(row, *, schedule_start: str, lupa_penalty_min: int) -> 
             }
         return {"masuk": masuk, "terlambat_menit": terlambat}
 
+    # NEW (v15): explicit Datang/Pulang split
+    # Datang: penalty applies whenever masuk is missing — the category itself
+    # is the user's explicit claim that datang is the missing event, even when
+    # keluar is also NULL.
+    if cat == "lupa_absen_datang" and masuk is None:
+        return {
+            "masuk": _minutes_to_hhmm(
+                _schedule_start_minutes(schedule_start) + lupa_penalty_min),
+            "terlambat_menit": lupa_penalty_min,
+        }
+    # Pulang: no correction, raw values pass through. Explicit no-op for clarity.
+    if cat == "lupa_absen_pulang":
+        return {"masuk": masuk, "terlambat_menit": terlambat}
+
+    # LEGACY (transitional): pre-migration 'lupa_absen' rows still get the old
+    # behavior. Dropped in cleanup task once schema migration has split them all.
     if cat == "lupa_absen" and masuk is None and keluar is not None:
         return {
             "masuk": _minutes_to_hhmm(

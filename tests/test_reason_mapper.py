@@ -113,3 +113,36 @@ def test_effective_attendance_custom_penalty():
                    terlambat_menit=None)
     eff = effective_attendance(row, schedule_start="08.00", lupa_penalty_min=20)
     assert eff == {"masuk": "08:20", "terlambat_menit": 20}
+
+
+def test_effective_attendance_lupa_datang_forgot_clock_in():
+    """Lupa Absen Datang with masuk=NULL, keluar set: penalty applied."""
+    row = _att_row(reason_category="lupa_absen_datang", masuk=None, keluar="16:05",
+                   terlambat_menit=None)
+    eff = effective_attendance(row, schedule_start="08.00", lupa_penalty_min=15)
+    assert eff == {"masuk": "08:15", "terlambat_menit": 15}
+
+
+def test_effective_attendance_lupa_datang_both_null():
+    """Lupa Absen Datang with both masuk AND keluar NULL: penalty still applied
+    because user explicitly labeled the row as 'datang missing'."""
+    row = _att_row(reason_category="lupa_absen_datang", masuk=None, keluar=None,
+                   terlambat_menit=None)
+    eff = effective_attendance(row, schedule_start="08.00", lupa_penalty_min=15)
+    assert eff == {"masuk": "08:15", "terlambat_menit": 15}
+
+
+def test_effective_attendance_lupa_datang_zero_penalty():
+    """Penalty=0 means karyawan dianggap masuk tepat pukul 08:00, no terlambat."""
+    row = _att_row(reason_category="lupa_absen_datang", masuk=None, keluar="16:00",
+                   terlambat_menit=None)
+    eff = effective_attendance(row, schedule_start="08.00", lupa_penalty_min=0)
+    assert eff == {"masuk": "08:00", "terlambat_menit": 0}
+
+
+def test_effective_attendance_lupa_pulang_no_correction():
+    """Lupa Absen Pulang: raw masuk preserved, no penalty applied to terlambat."""
+    row = _att_row(reason_category="lupa_absen_pulang", masuk="08:05", keluar=None,
+                   terlambat_menit=5)
+    eff = effective_attendance(row, schedule_start="08.00", lupa_penalty_min=15)
+    assert eff == {"masuk": "08:05", "terlambat_menit": 5}
