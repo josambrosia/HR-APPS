@@ -291,11 +291,26 @@ class SettingsScreen(ctk.CTkFrame):
         self._reload_pegawai()
 
     def _save(self):
+        # Validate Lupa Absen Datang penalty: integer in [0, 999]
+        raw = self.lupa_penalty_var.get().strip()
+        try:
+            penalty = int(raw)
+        except ValueError:
+            messagebox.showwarning(
+                "Penalti tidak valid",
+                f"'{raw}' bukan angka. Penalti harus berupa bilangan "
+                f"bulat antara 0 dan 999.")
+            return
+        if penalty < 0 or penalty > 999:
+            messagebox.showwarning(
+                "Penalti di luar rentang",
+                f"{penalty} di luar rentang yang diizinkan. "
+                f"Penalti harus antara 0 dan 999 menit.")
+            return
         with get_connection(DB_PATH) as conn:
             set_setting(conn, "current_month", self.month_var.get().strip())
             set_setting(conn, "coaching_threshold_per_day", self.thr_var.get().strip())
-            set_setting(conn, "lupa_absen_datang_penalty_min",
-                        self.lupa_penalty_var.get().strip())
+            set_setting(conn, "lupa_absen_datang_penalty_min", str(penalty))
         messagebox.showinfo("Tersimpan", "Pengaturan disimpan.")
 
     def _save_profil(self):
