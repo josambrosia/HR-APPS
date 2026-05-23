@@ -127,6 +127,33 @@ def _migrate(conn: sqlite3.Connection) -> None:
             ("coaching_threshold_per_day", str(new_val)),
         )
 
+    # v15: split legacy 'lupa_absen' into lupa_absen_datang / lupa_absen_pulang.
+    # Idempotent: after the catch-all sweep, no rows have 'lupa_absen' left;
+    # subsequent passes find nothing to update.
+    #
+    # Order matters:
+    #   1. Rows where karyawan forgot to scan IN (masuk NULL) → datang.
+    #   2. Rows where karyawan forgot to scan OUT (masuk set, keluar NULL) → pulang.
+    #   3. Catch-all sweep → datang (conservative; applies penalty).
+    conn.execute(
+        "UPDATE attendance_records "
+        "SET reason_category = 'lupa_absen_datang' "
+        "WHERE reason_category = 'lupa_absen' "
+        "  AND masuk IS NULL"
+    )
+    conn.execute(
+        "UPDATE attendance_records "
+        "SET reason_category = 'lupa_absen_pulang' "
+        "WHERE reason_category = 'lupa_absen' "
+        "  AND masuk IS NOT NULL "
+        "  AND keluar IS NULL"
+    )
+    conn.execute(
+        "UPDATE attendance_records "
+        "SET reason_category = 'lupa_absen_datang' "
+        "WHERE reason_category = 'lupa_absen'"
+    )
+
 
 def init_db(db_path: Path) -> None:
     """Create schema if missing and seed default settings (idempotent)."""

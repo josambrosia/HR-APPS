@@ -164,3 +164,112 @@ def test_migrate_threshold_idempotent(temp_db_path):
             "SELECT value FROM settings WHERE key = 'coaching_threshold_per_day'"
         ).fetchone()
     assert per_day[0] == "20"
+
+
+def test_migrate_splits_legacy_lupa_absen_datang(temp_db_path):
+    """Legacy lupa_absen rows with masuk=NULL migrate to lupa_absen_datang."""
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        # Set up an employee + an attendance row with legacy lupa_absen + masuk=NULL
+        conn.execute(
+            "INSERT INTO employees (no_staff, nama) VALUES ('1', 'ANDI')"
+        )
+        emp_id = conn.execute("SELECT id FROM employees WHERE no_staff='1'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO attendance_records "
+            "(employee_id, tanggal, hari, tipe, masuk, keluar, "
+            "has_issue, reason_category, imported_from, imported_at) "
+            "VALUES (?, '2026-04-01', 'Rabu', 'Hari Kerja', NULL, '16:00', "
+            "1, 'lupa_absen', 't.xls', '2026-04-01T00:00:00+00:00')",
+            (emp_id,),
+        )
+        conn.commit()
+    # Re-run init_db to trigger migration
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        cat = conn.execute(
+            "SELECT reason_category FROM attendance_records"
+        ).fetchone()[0]
+    assert cat == "lupa_absen_datang"
+
+
+def test_migrate_splits_legacy_lupa_absen_pulang(temp_db_path):
+    """Legacy lupa_absen rows with masuk set, keluar=NULL migrate to lupa_absen_pulang."""
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        conn.execute(
+            "INSERT INTO employees (no_staff, nama) VALUES ('1', 'ANDI')"
+        )
+        emp_id = conn.execute("SELECT id FROM employees WHERE no_staff='1'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO attendance_records "
+            "(employee_id, tanggal, hari, tipe, masuk, keluar, "
+            "has_issue, reason_category, imported_from, imported_at) "
+            "VALUES (?, '2026-04-01', 'Rabu', 'Hari Kerja', '08:05', NULL, "
+            "1, 'lupa_absen', 't.xls', '2026-04-01T00:00:00+00:00')",
+            (emp_id,),
+        )
+        conn.commit()
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        cat = conn.execute(
+            "SELECT reason_category FROM attendance_records"
+        ).fetchone()[0]
+    assert cat == "lupa_absen_pulang"
+
+
+def test_migrate_splits_legacy_lupa_absen_fallback_both_null(temp_db_path):
+    """Legacy lupa_absen rows with both masuk AND keluar NULL fallback to
+    lupa_absen_datang (conservative — applies penalty)."""
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        conn.execute(
+            "INSERT INTO employees (no_staff, nama) VALUES ('1', 'ANDI')"
+        )
+        emp_id = conn.execute("SELECT id FROM employees WHERE no_staff='1'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO attendance_records "
+            "(employee_id, tanggal, hari, tipe, masuk, keluar, "
+            "has_issue, reason_category, imported_from, imported_at) "
+            "VALUES (?, '2026-04-01', 'Rabu', 'Hari Kerja', NULL, NULL, "
+            "1, 'lupa_absen', 't.xls', '2026-04-01T00:00:00+00:00')",
+            (emp_id,),
+        )
+        conn.commit()
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        cat = conn.execute(
+            "SELECT reason_category FROM attendance_records"
+        ).fetchone()[0]
+    assert cat == "lupa_absen_datang"
+
+
+def test_migrate_lupa_absen_idempotent(temp_db_path):
+    """Running migration twice leaves the table in the same state — no
+    rows are still 'lupa_absen', and split rows aren't re-touched."""
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        conn.execute(
+            "INSERT INTO employees (no_staff, nama) VALUES ('1', 'ANDI')"
+        )
+        emp_id = conn.execute("SELECT id FROM employees WHERE no_staff='1'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO attendance_records "
+            "(employee_id, tanggal, hari, tipe, masuk, keluar, "
+            "has_issue, reason_category, imported_from, imported_at) "
+            "VALUES (?, '2026-04-01', 'Rabu', 'Hari Kerja', NULL, '16:00', "
+            "1, 'lupa_absen', 't.xls', '2026-04-01T00:00:00+00:00')",
+            (emp_id,),
+        )
+        conn.commit()
+    init_db(temp_db_path)
+    init_db(temp_db_path)  # second migration pass
+    with sqlite3.connect(temp_db_path) as conn:
+        cat = conn.execute(
+            "SELECT reason_category FROM attendance_records"
+        ).fetchone()[0]
+        legacy_count = conn.execute(
+            "SELECT COUNT(*) FROM attendance_records WHERE reason_category='lupa_absen'"
+        ).fetchone()[0]
+    assert cat == "lupa_absen_datang"
+    assert legacy_count == 0
