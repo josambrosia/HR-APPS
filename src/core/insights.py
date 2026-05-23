@@ -15,6 +15,10 @@ def terlambat_ranking(
     (both masuk AND keluar NULL on Hari Kerja) are counted separately
     as `tidak_hadir` (alias: `absent_count`).
 
+    Rows resolved as `lupa_absen_datang` are excluded from `tidak_hadir`
+    because the user explicitly asserted that the karyawan came but missed
+    the morning fingerprint scan (v15).
+
     Each returned dict has keys:
         id, nama, no_staff, dept,
         total_terlambat (sum of terlambat_menit > 0, excluding work-justified
@@ -43,6 +47,8 @@ def terlambat_ranking(
                           THEN 1 END) AS hari_telat,
                SUM(CASE WHEN ar.tipe = 'Hari Kerja'
                           AND ar.masuk IS NULL AND ar.keluar IS NULL
+                          AND (ar.reason_category IS NULL
+                               OR ar.reason_category != 'lupa_absen_datang')
                         THEN 1 ELSE 0 END) AS tidak_hadir,
                SUM(CASE WHEN ar.has_issue = 1 THEN 1 ELSE 0 END) AS issue_count
           FROM attendance_records ar

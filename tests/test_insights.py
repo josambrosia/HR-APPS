@@ -550,3 +550,53 @@ def test_resolution_rate_excludes_holiday_dates(temp_db_path):
         rate = resolution_rate(conn, "2026-04-01", "2026-04-30")
         assert rate["total"] == 1                         # holiday row excluded
         assert rate["resolved"] == 0
+
+
+def test_terlambat_ranking_excludes_lupa_datang_from_tidak_hadir(temp_db_path):
+    """A Hari Kerja row with both masuk & keluar NULL but marked as
+    lupa_absen_datang must NOT count as tidak_hadir. This is the user's
+    explicit v15 requirement — once resolved as 'datang missing scan',
+    the day is considered attended."""
+    from src.db.schema import init_db
+    from src.db.connection import get_connection
+    from src.db.employees import upsert_employee
+    from src.db.attendance import upsert_attendance, set_reason
+    from src.core.insights import terlambat_ranking
+
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        upsert_attendance(
+            conn, employee_id=emp, tanggal="2026-04-01", hari="Rabu",
+            tipe="Hari Kerja", jadwal="08.00 - 16.00",
+            masuk=None, keluar=None, kerja_jam=None, lembur_jam=None,
+            terlambat_menit=None, has_issue=1, imported_from="t.xls",
+        )
+        rid = conn.execute("SELECT id FROM attendance_records").fetchone()["id"]
+        set_reason(conn, attendance_id=rid, category="lupa_absen_datang", detail=None)
+        ranking = terlambat_ranking(conn, "2026-04-01", "2026-04-30")
+    assert len(ranking) == 1
+    assert ranking[0]["tidak_hadir"] == 0
+    assert ranking[0]["absent_count"] == 0
+
+
+def test_terlambat_ranking_unresolved_both_null_still_counts(temp_db_path):
+    """Sanity: unresolved (reason_category=NULL) both-NULL row still counts
+    as tidak_hadir. Confirms the exclusion only triggers on lupa_absen_datang."""
+    from src.db.schema import init_db
+    from src.db.connection import get_connection
+    from src.db.employees import upsert_employee
+    from src.db.attendance import upsert_attendance
+    from src.core.insights import terlambat_ranking
+
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        emp = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        upsert_attendance(
+            conn, employee_id=emp, tanggal="2026-04-01", hari="Rabu",
+            tipe="Hari Kerja", jadwal="08.00 - 16.00",
+            masuk=None, keluar=None, kerja_jam=None, lembur_jam=None,
+            terlambat_menit=None, has_issue=1, imported_from="t.xls",
+        )
+        ranking = terlambat_ranking(conn, "2026-04-01", "2026-04-30")
+    assert ranking[0]["tidak_hadir"] == 1
