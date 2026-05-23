@@ -83,14 +83,14 @@ def test_effective_attendance_work_justified_late_no_badge():
 
 
 def test_effective_attendance_forgot_clock_in():
-    row = _att_row(reason_category="lupa_absen", masuk=None, keluar="16:05",
+    row = _att_row(reason_category="lupa_absen_datang", masuk=None, keluar="16:05",
                    terlambat_menit=None)
     eff = effective_attendance(row, schedule_start="08.00", lupa_penalty_min=15)
     assert eff == {"masuk": "08:15", "terlambat_menit": 15}
 
 
 def test_effective_attendance_forgot_clock_out_untouched():
-    row = _att_row(reason_category="lupa_absen", masuk="08:05", keluar=None,
+    row = _att_row(reason_category="lupa_absen_pulang", masuk="08:05", keluar=None,
                    terlambat_menit=5)
     eff = effective_attendance(row, schedule_start="08.00", lupa_penalty_min=15)
     assert eff == {"masuk": "08:05", "terlambat_menit": 5}
@@ -109,7 +109,7 @@ def test_effective_attendance_no_reason_untouched():
 
 
 def test_effective_attendance_custom_penalty():
-    row = _att_row(reason_category="lupa_absen", masuk=None, keluar="16:00",
+    row = _att_row(reason_category="lupa_absen_datang", masuk=None, keluar="16:00",
                    terlambat_menit=None)
     eff = effective_attendance(row, schedule_start="08.00", lupa_penalty_min=20)
     assert eff == {"masuk": "08:20", "terlambat_menit": 20}

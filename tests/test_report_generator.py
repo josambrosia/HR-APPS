@@ -267,7 +267,7 @@ def test_generate_applies_effective_masuk_for_work_justified_late(tmp_path):
 
 
 def test_generate_applies_effective_for_forgot_clock_in(tmp_path):
-    """A lupa_absen forgot-IN row exports Masuk=08:15, Terlambat=15, and
+    """A lupa_absen_datang forgot-IN row exports Masuk=08:15, Terlambat=15, and
     stops counting as a 'lupa' day (column O blank)."""
     conn = _conn()
     emp = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
@@ -278,7 +278,7 @@ def test_generate_applies_effective_for_forgot_clock_in(tmp_path):
         terlambat_menit=None, has_issue=1, imported_from="t.xls",
     )
     rid = conn.execute("SELECT id FROM attendance_records").fetchone()["id"]
-    set_reason(conn, attendance_id=rid, category="lupa_absen", detail=None)
+    set_reason(conn, attendance_id=rid, category="lupa_absen_datang", detail=None)
     out = tmp_path / "out.xlsx"
     generate_monthly_report(conn, year_month="2026-04", out_path=out)
     ws = load_workbook(out).active

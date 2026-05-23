@@ -8,7 +8,7 @@ from src.core.report_filler import fill_monthly_report
 
 def _seed(conn):
     emp_id = upsert_employee(conn, no_staff="9001", nama="BUDI", dept="TEST")
-    # Day 2: lupa keluar — user inputs "lupa_absen"
+    # Day 2: lupa keluar — user inputs "lupa_absen_pulang"
     upsert_attendance(conn, employee_id=emp_id, tanggal="2026-04-02",
                       hari="Selasa", tipe="Hari Kerja", jadwal="08.00 - 16.00",
                       masuk="08.10", keluar=None, kerja_jam=None,
@@ -17,7 +17,7 @@ def _seed(conn):
     rec = conn.execute(
         "SELECT id FROM attendance_records WHERE tanggal='2026-04-02'"
     ).fetchone()
-    set_reason(conn, attendance_id=rec["id"], category="lupa_absen", detail=None)
+    set_reason(conn, attendance_id=rec["id"], category="lupa_absen_pulang", detail=None)
     # Day 3: tidak masuk — left as NA
     upsert_attendance(conn, employee_id=emp_id, tanggal="2026-04-03",
                       hari="Rabu", tipe="Hari Kerja", jadwal="08.00 - 16.00",
@@ -39,10 +39,10 @@ def test_fill_writes_alasan_ijin_to_correct_rows(synthetic_monthly_xlsx, temp_db
     wb = load_workbook(out_path)
     ws = wb.active
     # Row 3: BUDI 2026-04-01 (no issue, no reason → no alasan written)
-    # Row 4: BUDI 2026-04-02 (lupa_absen → "Lupa Absen")
+    # Row 4: BUDI 2026-04-02 (lupa_absen_pulang → "Lupa Absen Pulang")
     # Row 5: BUDI 2026-04-03 (no reason → "NA / Belum ada kabar")
     assert ws.cell(row=3, column=17).value in (None, "")
-    assert ws.cell(row=4, column=17).value == "Lupa Absen"
+    assert ws.cell(row=4, column=17).value == "Lupa Absen Pulang"
     assert ws.cell(row=5, column=17).value == "NA / Belum ada kabar"
 
 

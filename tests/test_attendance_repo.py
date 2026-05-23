@@ -46,7 +46,7 @@ def test_upsert_preserves_reason_on_reimport(temp_db_path):
         )
         # User sets reason
         rec = conn.execute("SELECT id FROM attendance_records").fetchone()
-        set_reason(conn, attendance_id=rec["id"], category="lupa_absen", detail=None)
+        set_reason(conn, attendance_id=rec["id"], category="lupa_absen_pulang", detail=None)
 
         # Re-import same row (e.g., user re-pulls W1)
         upsert_attendance(
@@ -56,7 +56,7 @@ def test_upsert_preserves_reason_on_reimport(temp_db_path):
             terlambat_menit=10, has_issue=1, imported_from="W1.xls",
         )
         row = conn.execute("SELECT * FROM attendance_records").fetchone()
-        assert row["reason_category"] == "lupa_absen"  # preserved
+        assert row["reason_category"] == "lupa_absen_pulang"  # preserved
         assert row["resolved_at"] is not None
 
 
@@ -93,7 +93,7 @@ def test_list_open_issues_returns_only_unresolved(temp_db_path):
         first = conn.execute(
             "SELECT id FROM attendance_records WHERE tanggal='2026-04-02'"
         ).fetchone()
-        set_reason(conn, attendance_id=first["id"], category="lupa_absen", detail=None)
+        set_reason(conn, attendance_id=first["id"], category="lupa_absen_pulang", detail=None)
 
         open_ones = list_open_issues(conn)
         assert len(open_ones) == 1

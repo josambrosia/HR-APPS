@@ -121,7 +121,7 @@ def test_weekly_export_effective_forgot_clock_in(tmp_path):
         terlambat_menit=None, has_issue=1, imported_from="W1.xls",
     )
     rid = conn.execute("SELECT id FROM attendance_records").fetchone()["id"]
-    set_reason(conn, attendance_id=rid, category="lupa_absen", detail=None)
+    set_reason(conn, attendance_id=rid, category="lupa_absen_datang", detail=None)
     out = tmp_path / "weekly.xlsx"
     generate_weekly_export(conn, "2026-04-06", "2026-04-12", out)
     ws = load_workbook(out).active
