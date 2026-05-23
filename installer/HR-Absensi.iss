@@ -5,7 +5,9 @@
 #define AppName        "HR Absensi App"
 #define AppPublisher   "Josaphat Tech Solution"
 #define AppExeName     "HR-Absensi.exe"
-#define AppId          "{18FBCFB9-E4BA-41E0-9985-BB96E07FC355}"
+; Note: leading "{{" is Inno's escape for a literal "{" — without it
+; the preprocessor would interpret "{GUID}" as a constant reference.
+#define AppId          "{{18FBCFB9-E4BA-41E0-9985-BB96E07FC355}"
 ; AppVersion is injected at build time via /DAppVersion=
 
 [Setup]
