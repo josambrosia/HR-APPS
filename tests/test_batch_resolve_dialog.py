@@ -106,3 +106,28 @@ def test_batch_resolve_dialog_detail_field_toggles(temp_db_path, monkeypatch, tk
     tk_root.update_idletasks()
     assert dlg._detail_entry.winfo_manager() == ""
     dlg.destroy()
+
+
+def test_batch_resolve_dialog_btn_row_attr_exposed(temp_db_path, monkeypatch, tk_root):
+    """Regression guard for the v15 refactor (structural only).
+
+    The visible-button regression itself is verified by manual smoke per
+    project policy — pytest's headless tkinter doesn't reliably trigger
+    the pack manager's lazy reflow pass. This test catches reverts of
+    the `self._btn_row` attribute exposure (Step 3 of the fix), which
+    is the precondition for the Step 4 reflow call to compile at all.
+    """
+    import src.ui.components.batch_resolve_dialog as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        _issue(conn, a, "2026-04-07", "Selasa")
+        conn.commit()
+    dlg = mod.BatchResolveDialog(
+        tk_root, period_start="2026-04-01", period_end="2026-04-30",
+        on_done=lambda: None)
+    tk_root.update_idletasks()
+    assert hasattr(dlg, "_btn_row"), "_btn_row must be set so _on_cat_change can re-pack it"
+    assert dlg._btn_row.winfo_manager() == "pack"
+    dlg.destroy()

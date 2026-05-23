@@ -189,23 +189,23 @@ class BatchResolveDialog(ctk.CTkToplevel):
             fg_color=COLOR_SURFACE_HIGH, border_width=1,
             border_color=COLOR_BORDER, text_color=COLOR_TEXT, font=FONT_BODY)
 
-        btn_row = ctk.CTkFrame(self, fg_color="transparent")
-        btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG),
-                     side="bottom")
+        self._btn_row = ctk.CTkFrame(self, fg_color="transparent")
+        self._btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG),
+                           side="bottom")
         self._submit_btn = ctk.CTkButton(
-            btn_row, text="Resolve", command=self._on_submit,
+            self._btn_row, text="Resolve", command=self._on_submit,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
             text_color=COLOR_BG, width=200, height=40, font=FONT_BODY_BOLD,
             corner_radius=RADIUS_MD)
         self._submit_btn.pack(side="right")
         ctk.CTkButton(
-            btn_row, text="Batal", command=self._on_cancel,
+            self._btn_row, text="Batal", command=self._on_cancel,
             fg_color="transparent", hover_color=COLOR_SURFACE_HIGH,
             border_width=1, border_color=COLOR_INFO, text_color=COLOR_INFO,
             width=120, height=40, font=FONT_BODY_BOLD, corner_radius=RADIUS_MD,
         ).pack(side="right", padx=(0, SPACE_MD))
         self._preview = ctk.CTkLabel(
-            btn_row, text="0 tanggal dipilih", font=FONT_SMALL,
+            self._btn_row, text="0 tanggal dipilih", font=FONT_SMALL,
             text_color=COLOR_TEXT_DIM)
         self._preview.pack(side="left")
 
@@ -241,6 +241,14 @@ class BatchResolveDialog(ctk.CTkToplevel):
         if key in REASON_NEEDS_DETAIL:
             self._detail_label.pack(anchor="w")
             self._detail_entry.pack(anchor="w", pady=(SPACE_XS, 0))
+        # Force a full reflow of the bottom button row. Without this, tkinter's
+        # pack manager leaves self._btn_row "lost" (geometrically zero-height)
+        # when only top-side detail widgets get toggled, hiding the Resolve
+        # button. Single-resolve form (issues.py _lay_out_form) avoids this
+        # quirk by repacking save_btn on every category change.
+        self._btn_row.pack_forget()
+        self._btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG),
+                           side="bottom")
 
     def _checked_ids(self) -> list:
         return [aid for aid, var in self._date_vars.items() if var.get()]
