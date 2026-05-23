@@ -94,7 +94,7 @@ begin
       mbConfirmation, MB_YESNO
     ) = IDYES then
     begin
-      if not FileCopy(LegacyDb, NewDb, False) then
+      if not CopyFile(LegacyDb, NewDb, False) then
       begin
         MsgBox(
           'Copy failed. You can copy the file manually after install.',
