@@ -3,16 +3,12 @@ from src.core.reason_mapper import render_alasan_ijin, REASON_LABELS, effective_
 
 
 def test_all_categories_present():
-    """v15: split lupa_absen → lupa_absen_datang + lupa_absen_pulang.
-    Both new + old (transitional) categories live in REASON_LABELS until
-    legacy cleanup task drops `lupa_absen`.
-    """
+    """v15: lupa_absen split is final — legacy key removed."""
     assert set(REASON_LABELS.keys()) == {
         "tugas_lapangan", "tugas_paparan", "izin_sakit", "cuti", "tugas_belajar",
         "terlambat_kerja", "terlambat_lain",
-        "lupa_absen",            # transitional — dropped in cleanup task
-        "lupa_absen_datang",     # NEW
-        "lupa_absen_pulang",     # NEW
+        "lupa_absen_datang",
+        "lupa_absen_pulang",
         "libur", "na",
     }
 
@@ -29,7 +25,8 @@ def test_render_with_detail():
 def test_render_without_detail():
     assert render_alasan_ijin("izin_sakit", None) == "Izin Sakit"
     assert render_alasan_ijin("cuti", None) == "Cuti"
-    assert render_alasan_ijin("lupa_absen", None) == "Lupa Absen"
+    assert render_alasan_ijin("lupa_absen_datang", None) == "Lupa Absen Datang"
+    assert render_alasan_ijin("lupa_absen_pulang", None) == "Lupa Absen Pulang"
     assert render_alasan_ijin("na", None) == "NA / Belum ada kabar"
 
 

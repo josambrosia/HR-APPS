@@ -11,9 +11,8 @@ REASON_LABELS = {
     "tugas_belajar":      "Tugas Belajar/Kuliah",
     "terlambat_kerja":    "Masuk Terlambat dengan Alasan Pekerjaan",
     "terlambat_lain":     "Terlambat dengan alasan",
-    "lupa_absen":         "Lupa Absen",            # transitional — see cleanup task
-    "lupa_absen_datang":  "Lupa Absen Datang",     # NEW v15
-    "lupa_absen_pulang":  "Lupa Absen Pulang",     # NEW v15
+    "lupa_absen_datang":  "Lupa Absen Datang",
+    "lupa_absen_pulang":  "Lupa Absen Pulang",
     "libur":              "Libur",
     "na":                 "NA / Belum ada kabar",
 }
@@ -75,14 +74,10 @@ def effective_attendance(row, *, schedule_start: str, lupa_penalty_min: int) -> 
         masuk = schedule_start + lupa_penalty_min.
       - reason_category == 'lupa_absen_pulang' -> no correction; raw values
         pass through (explicit no-op for clarity).
-      - reason_category == 'lupa_absen' (legacy, pre-v15-migration) AND masuk
-        IS NULL AND keluar is set (forgot to clock IN) -> terlambat_menit =
-        lupa_penalty_min, masuk = schedule_start + lupa_penalty_min.
       - everything else (other categories, no reason) -> raw values unchanged.
     """
     cat = row["reason_category"]
     masuk = row["masuk"]
-    keluar = row["keluar"]
     terlambat = row["terlambat_menit"]
 
     if cat in COACHING_EXCLUDED:
@@ -106,14 +101,5 @@ def effective_attendance(row, *, schedule_start: str, lupa_penalty_min: int) -> 
     # Pulang: no correction, raw values pass through. Explicit no-op for clarity.
     if cat == "lupa_absen_pulang":
         return {"masuk": masuk, "terlambat_menit": terlambat}
-
-    # LEGACY (transitional): pre-migration 'lupa_absen' rows still get the old
-    # behavior. Dropped in cleanup task once schema migration has split them all.
-    if cat == "lupa_absen" and masuk is None and keluar is not None:
-        return {
-            "masuk": _minutes_to_hhmm(
-                _schedule_start_minutes(schedule_start) + lupa_penalty_min),
-            "terlambat_menit": lupa_penalty_min,
-        }
 
     return {"masuk": masuk, "terlambat_menit": terlambat}
