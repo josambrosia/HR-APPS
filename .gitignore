@@ -38,6 +38,9 @@ MANIFEST
 !HR-Absensi.spec
 *.manifest
 
+# Inno Setup build artifacts
+installer/Output/
+
 # pytest / testing
 .pytest_cache/
 .coverage

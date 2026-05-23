@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "0.0.1"
+APP_VERSION = "14.0.0"
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
