@@ -64,7 +64,9 @@ REASON_CATEGORIES = (
     "tugas_belajar",
     "terlambat_kerja",
     "terlambat_lain",
-    "lupa_absen",
+    "lupa_absen",            # transitional — kept during v15 migration; dropped in cleanup task
+    "lupa_absen_datang",     # NEW v15
+    "lupa_absen_pulang",     # NEW v15
     "libur",
     "na",
 )

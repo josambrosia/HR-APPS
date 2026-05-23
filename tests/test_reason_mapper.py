@@ -2,10 +2,18 @@ import pytest
 from src.core.reason_mapper import render_alasan_ijin, REASON_LABELS, effective_attendance
 
 
-def test_all_10_categories_present():
+def test_all_categories_present():
+    """v15: split lupa_absen → lupa_absen_datang + lupa_absen_pulang.
+    Both new + old (transitional) categories live in REASON_LABELS until
+    legacy cleanup task drops `lupa_absen`.
+    """
     assert set(REASON_LABELS.keys()) == {
         "tugas_lapangan", "tugas_paparan", "izin_sakit", "cuti", "tugas_belajar",
-        "terlambat_kerja", "terlambat_lain", "lupa_absen", "libur", "na",
+        "terlambat_kerja", "terlambat_lain",
+        "lupa_absen",            # transitional — dropped in cleanup task
+        "lupa_absen_datang",     # NEW
+        "lupa_absen_pulang",     # NEW
+        "libur", "na",
     }
 
 

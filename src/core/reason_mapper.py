@@ -4,16 +4,18 @@ from src.config import COACHING_EXCLUDED
 
 # Human-readable labels for UI
 REASON_LABELS = {
-    "tugas_lapangan":  "Tugas Lapangan",
-    "tugas_paparan":   "Tugas Paparan",
-    "izin_sakit":      "Izin Sakit",
-    "cuti":            "Cuti",
-    "tugas_belajar":   "Tugas Belajar/Kuliah",
-    "terlambat_kerja": "Masuk Terlambat dengan Alasan Pekerjaan",
-    "terlambat_lain":  "Terlambat dengan alasan",
-    "lupa_absen":      "Lupa Absen",
-    "libur":           "Libur",
-    "na":              "NA / Belum ada kabar",
+    "tugas_lapangan":     "Tugas Lapangan",
+    "tugas_paparan":      "Tugas Paparan",
+    "izin_sakit":         "Izin Sakit",
+    "cuti":               "Cuti",
+    "tugas_belajar":      "Tugas Belajar/Kuliah",
+    "terlambat_kerja":    "Masuk Terlambat dengan Alasan Pekerjaan",
+    "terlambat_lain":     "Terlambat dengan alasan",
+    "lupa_absen":         "Lupa Absen",            # transitional — see cleanup task
+    "lupa_absen_datang":  "Lupa Absen Datang",     # NEW v15
+    "lupa_absen_pulang":  "Lupa Absen Pulang",     # NEW v15
+    "libur":              "Libur",
+    "na":                 "NA / Belum ada kabar",
 }
 
 # Categories that NEED a detail field
