@@ -108,14 +108,25 @@ def test_batch_resolve_dialog_detail_field_toggles(temp_db_path, monkeypatch, tk
     dlg.destroy()
 
 
-def test_batch_resolve_dialog_btn_row_attr_exposed(temp_db_path, monkeypatch, tk_root):
-    """Regression guard for the v15 refactor (structural only).
+def test_batch_resolve_dialog_btn_row_packed_top_side(temp_db_path, monkeypatch, tk_root):
+    """Regression guard for v15.1 — btn_row must be packed with side='top'.
 
-    The visible-button regression itself is verified by manual smoke per
-    project policy — pytest's headless tkinter doesn't reliably trigger
-    the pack manager's lazy reflow pass. This test catches reverts of
-    the `self._btn_row` attribute exposure (Step 3 of the fix), which
-    is the precondition for the Step 4 reflow call to compile at all.
+    Root cause (smoke-found post-v15): the v15 Task A fix re-packed
+    self._btn_row with side='bottom' on every category change. That
+    approach is fragile — Tk's pack manager skips a real reflow when
+    pack_forget + pack of the same bottom-pinned widget is the only
+    change between them. The detail-less branch of _on_cat_change has
+    no other layout side-effects (detail label/entry pack_forget calls
+    are no-ops when those widgets aren't currently packed), so btn_row
+    stays in whatever broken state it was in.
+
+    The fix replicates the working pattern in issues.py _lay_out_form:
+    pack btn_row with default side='top', let it flow naturally below
+    the detail frame. This test catches a revert to side='bottom'.
+
+    The visible-button regression itself is still verified by manual
+    smoke per project policy — pytest's headless tkinter can't tell us
+    if pixels are on-screen.
     """
     import src.ui.components.batch_resolve_dialog as mod
     monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
@@ -130,4 +141,16 @@ def test_batch_resolve_dialog_btn_row_attr_exposed(temp_db_path, monkeypatch, tk
     tk_root.update_idletasks()
     assert hasattr(dlg, "_btn_row"), "_btn_row must be set so _on_cat_change can re-pack it"
     assert dlg._btn_row.winfo_manager() == "pack"
+    pack_info = dlg._btn_row.pack_info()
+    assert pack_info.get("side") == "top", (
+        f"btn_row must use side='top' (got {pack_info.get('side')!r}). "
+        "side='bottom' caused the Resolve button to vanish for detail-less "
+        "categories — see v15.1 release notes."
+    )
+    # Re-pack via _on_cat_change with a detail-less category to confirm
+    # the cat-change path also lands on side='top'.
+    dlg._cat_var.set("Cuti")
+    dlg._on_cat_change("Cuti")
+    tk_root.update_idletasks()
+    assert dlg._btn_row.pack_info().get("side") == "top"
     dlg.destroy()

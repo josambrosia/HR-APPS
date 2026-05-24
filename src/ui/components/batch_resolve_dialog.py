@@ -189,9 +189,18 @@ class BatchResolveDialog(ctk.CTkToplevel):
             fg_color=COLOR_SURFACE_HIGH, border_width=1,
             border_color=COLOR_BORDER, text_color=COLOR_TEXT, font=FONT_BODY)
 
+        # v15.1: btn_row uses default side="top" (flows naturally after
+        # _detail_frame), matching the working pattern in issues.py
+        # _lay_out_form. The previous side="bottom" architecture was
+        # fragile — Tk's pack manager skipped real reflow on
+        # pack_forget+pack of the same bottom-pinned widget when the only
+        # other layout change between them was a no-op (the case when
+        # detail-less categories selected detail label/entry pack_forget
+        # that did nothing). Result: btn_row stayed in a broken geometric
+        # state and the Resolve/Batal buttons disappeared. Top-side
+        # packing flows like every other widget and reflows reliably.
         self._btn_row = ctk.CTkFrame(self, fg_color="transparent")
-        self._btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG),
-                           side="bottom")
+        self._btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG))
         self._submit_btn = ctk.CTkButton(
             self._btn_row, text="Resolve", command=self._on_submit,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
@@ -241,14 +250,13 @@ class BatchResolveDialog(ctk.CTkToplevel):
         if key in REASON_NEEDS_DETAIL:
             self._detail_label.pack(anchor="w")
             self._detail_entry.pack(anchor="w", pady=(SPACE_XS, 0))
-        # Force a full reflow of the bottom button row. Without this, tkinter's
-        # pack manager leaves self._btn_row "lost" (geometrically zero-height)
-        # when only top-side detail widgets get toggled, hiding the Resolve
-        # button. Single-resolve form (issues.py _lay_out_form) avoids this
-        # quirk by repacking save_btn on every category change.
+        # Re-pack btn_row (top-side) after toggling detail widgets so it
+        # always renders below any newly-packed detail entry. update_idletasks
+        # forces the layout flush immediately — belt-and-suspenders for
+        # consistent rendering across Tk versions.
         self._btn_row.pack_forget()
-        self._btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG),
-                           side="bottom")
+        self._btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG))
+        self.update_idletasks()
 
     def _checked_ids(self) -> list:
         return [aid for aid, var in self._date_vars.items() if var.get()]
