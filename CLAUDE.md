@@ -16,9 +16,10 @@ Each `vN` milestone delivers a **distributable bundle**, not just commits. Befor
 
 - `installer/Output/HR-Absensi-Setup-v{VERSION}.exe` is built via `python -m tools.build_installer`
 - `dist/HR-Absensi/HR-Absensi.exe` (and `_internal/`) is rotated to production (`D:\Gawe\Project X\HR App\dist\HR-Absensi\`) per the 2-level `.bak` / `.bak.old` pattern
+- **The freshly-built installer is copied to `D:\Gawe\Project X\HR App\Installers\HR-Absensi-Setup-v{VERSION}.exe`** — this is the canonical distributable artifact location at the project root, easy to grab and share to other laptops
 - Manual smoke is run at least at the "app launches + dashboard renders" level
 
-**Why:** a `vN` reference on origin must correspond to a runnable artifact the user can install/distribute, not just source code.
+**Why:** a `vN` reference on origin must correspond to a runnable artifact the user can install/distribute, not just source code. The `Installers/` folder is the user-facing pickup point — no need to dig into worktrees or `installer/Output/` to find the latest setup.
 
 ### 2. Push and merge happen AFTER the bundle is built and smoke-passed
 
@@ -27,11 +28,12 @@ The release sequence is fixed:
 1. Implement + commit + (full pytest green)
 2. **Build installer** (`python -m tools.build_installer`)
 3. **Rotate production .exe** (per `memory/workflow_rules.md` Rule 2)
-4. **Smoke test** (manual, even briefly)
-5. Update local `vN` branch → `git push origin vN`
-6. Update `memory/version_state.md`
+4. **Copy installer to `D:\Gawe\Project X\HR App\Installers\HR-Absensi-Setup-v{VERSION}.exe`** (distributable pickup point)
+5. **Smoke test** (manual, even briefly)
+6. Update local `vN` branch → `git push origin vN`
+7. Update `memory/version_state.md`
 
-Never push before steps 2-4. The bundle is the proof the milestone is real.
+Never push before steps 2-5. The bundle (rotated .exe + Installers/ copy) is the proof the milestone is real.
 
 ### 3. Auto-approve execution; use best judgment
 
@@ -82,9 +84,10 @@ tasklist | grep -i HR-Absensi || echo "not running"
 
 ## Current state (as of last commit)
 
-- Latest milestone: `v14` (commit `1b0f788`) — coaching threshold dynamic + Windows installer
-- Test baseline: **241 passing**
-- Latest installer artifact: `installer/Output/HR-Absensi-Setup-v14.0.0.exe` (33.4 MB)
-- Production `.exe` at `D:\Gawe\Project X\HR App\dist\HR-Absensi\` is v14 with 2-level rotation backup of v13
+- Latest milestone: `v15` (commit `cc761de`) — Resolve Massal bug fix + Lupa Absen split (datang/pulang) + Laporan Bulanan holiday format
+- Test baseline: **256 passing**
+- Latest installer artifact: `Installers/HR-Absensi-Setup-v15.0.0.exe` (33.4 MB) — canonical distributable
+- Backup installer: `Installers/HR-Absensi-Setup-v14.0.0.exe` (33.4 MB) — for rollback
+- Production `.exe` at `D:\Gawe\Project X\HR App\dist\HR-Absensi\` is v15 with 2-level rotation backup of v14
 
-Subsequent work forks from `v14`. New features → new `vN+1` milestone following the 3-rule framework above.
+Subsequent work forks from `v15`. New features → new `vN+1` milestone following the 3-rule framework above.
