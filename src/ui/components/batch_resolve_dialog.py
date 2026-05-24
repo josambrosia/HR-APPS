@@ -97,19 +97,19 @@ class BatchResolveDialog(ctk.CTkToplevel):
         h = min(DIALOG_H, sh - _SCREEN_BUFFER)
         w = DIALOG_W
         x = (sw - w) // 2
-        y = (sh - h) // 2
+        y = max(0, (sh - h) // 2)
         self.geometry(f"{w}x{h}+{x}+{y}")
 
-        # v15.2: lock the toplevel at the requested geometry. Without these
-        # propagate calls, Tk auto-grows the window to fit natural child
-        # sizes — which in v15.0/v15.1 caused the bottom button row to fall
-        # below the visible area on some configurations (e.g., CTkScrollableFrame
-        # not honoring height=160 and pushing everything down). Locking the
-        # window forces children to fit within 520x600 and the grid manager
-        # to place btn_row at row 10 regardless of upstream growth.
-        self.pack_propagate(False)
-        self.grid_propagate(False)
+        # v15.3: 3-row grid on the toplevel itself — header (row 0, fixed),
+        # scrollable content (row 1, weight=1 expands), footer (row 2, fixed).
+        # The footer cannot be displaced by content overflow because the
+        # middle row scrolls when content exceeds its allocated space.
+        # No propagate(False) calls — letting Tk size naturally is fine when
+        # the footer is in a structural grid slot that can't be pushed off.
         self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=0)  # header — fixed
+        self.grid_rowconfigure(1, weight=1)  # content — expands & scrolls
+        self.grid_rowconfigure(2, weight=0)  # footer — fixed
 
         self._on_done = on_done
 
@@ -128,140 +128,79 @@ class BatchResolveDialog(ctk.CTkToplevel):
         self._build()
 
         self.after(50, lambda: (self.grab_set(), self.focus_set()))
+        # v15.3 diagnostic — dump actual rendered geometry to a log file so
+        # we can see WHY the dialog grows / where btn_row actually lands on
+        # the user's monitor. To be removed in v15.4 once root cause is
+        # confirmed. See _dump_geometry_to_log for details.
+        self.after(250, self._dump_geometry_to_log)
         self.bind("<Escape>", lambda _e: self._on_cancel())
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
 
-    # Grid row constants — exposed so tests can assert btn_row stays at the
-    # bottom row regardless of what's toggled above it.
-    ROW_HEADING       = 0
-    ROW_SUBTITLE      = 1
-    ROW_EMP_LABEL     = 2
-    ROW_EMP_COMBO     = 3
-    ROW_DATES_LABEL   = 4
-    ROW_DATES_SCROLL  = 5
-    ROW_CAT_LABEL     = 6
-    ROW_CAT_COMBO     = 7
-    ROW_DETAIL_FRAME  = 8
-    ROW_SPACER        = 9   # weight=1 absorbs all extra vertical space
-    ROW_BTN_ROW       = 10  # always at the bottom — protected by spacer above
+    # Grid row constants for the toplevel itself. Three rows — header
+    # (fixed at top), content (scrollable middle, expands), footer (fixed
+    # at bottom). The footer's row index is structural and cannot be
+    # displaced by anything happening inside content.
+    ROW_HEADER  = 0  # weight=0 — header
+    ROW_CONTENT = 1  # weight=1 — scrollable middle (CTkScrollableFrame)
+    ROW_FOOTER  = 2  # weight=0 — footer (btn_row)
 
     def _build(self):
-        """Build the dialog using GRID layout (v15.2 architectural fix).
+        """Build the dialog using header/scrollable-middle/footer architecture.
 
-        Pack-based layouts in v15/v15.1 were fragile because mixing top/bottom
-        sides with dynamically toggled widgets exposed Tk reflow quirks
-        (detail-less categories left btn_row geometrically lost). Grid is
-        fully deterministic: each widget gets a fixed row index, and the
-        spacer row (ROW_SPACER, weight=1) absorbs all extra vertical space
-        so btn_row stays pinned at ROW_BTN_ROW no matter what changes above.
+        v15.3 architectural pivot after three failed pack/grid attempts:
+        - v15.0 Task A: side='bottom' reflow trick — failed (Tk skips reflow).
+        - v15.1: side='top' natural flow — failed (toplevel auto-grew past
+          requested geometry, btn_row fell off the visible bottom).
+        - v15.2: single-grid-on-toplevel with spacer row — failed (dialog
+          STILL grew past geometry, screenshot showed visible area ~862px
+          for a 600px request; pack_propagate(False) / grid_propagate(False)
+          didn't actually lock the window size on this customtkinter build).
+
+        v15.3 stops fighting the toplevel sizing. Structure:
+            Row 0: header (heading + subtitle) — fixed
+            Row 1: content (CTkScrollableFrame) — scrolls if too tall
+            Row 2: footer (btn_row with Resolve + Batal + preview) — fixed
+        If the toplevel grows in any direction, header and footer remain
+        at the top and bottom respectively, and the middle scrolls.
+        If the toplevel shrinks (DPI scaling, screen too small), same
+        result — middle scrolls. btn_row is mechanically pinned to row 2.
         """
-        # Heading + subtitle (always shown)
+        # === Row 0: Header (always shown) ===
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.grid(row=self.ROW_HEADER, column=0, sticky="ew",
+                    padx=SPACE_XL, pady=(SPACE_LG, SPACE_MD))
         ctk.CTkLabel(
-            self, text="Resolve Massal",
+            header, text="Resolve Massal",
             font=FONT_HEADING, text_color=COLOR_TEXT, anchor="w",
-        ).grid(row=self.ROW_HEADING, column=0, sticky="ew",
-               padx=SPACE_XL, pady=(SPACE_LG, SPACE_XS))
+        ).pack(anchor="w", fill="x")
         ctk.CTkLabel(
-            self, text="Selesaikan beberapa issue sekaligus untuk satu karyawan.",
+            header,
+            text="Selesaikan beberapa issue sekaligus untuk satu karyawan.",
             font=FONT_BODY, text_color=COLOR_TEXT_DIM, anchor="w",
-        ).grid(row=self.ROW_SUBTITLE, column=0, sticky="ew",
-               padx=SPACE_XL, pady=(0, SPACE_MD))
+        ).pack(anchor="w", fill="x", pady=(SPACE_XS, 0))
+
+        # === Row 2: Footer FIRST (so it's in the grid before content can
+        # affect anything). btn_row holds Resolve + Batal + preview label. ===
+        self._btn_row = ctk.CTkFrame(self, fg_color="transparent")
+        self._btn_row.grid(row=self.ROW_FOOTER, column=0, sticky="ew",
+                           padx=SPACE_XL, pady=(SPACE_MD, SPACE_LG))
 
         if not self._groups:
-            # Empty state — center the message, put Tutup button in the
-            # standard btn_row slot (ROW_BTN_ROW) for layout consistency.
-            ctk.CTkLabel(
-                self, text="Tidak ada issue terbuka di periode ini.",
-                font=FONT_BODY, text_color=COLOR_TEXT_MUTED,
-            ).grid(row=self.ROW_EMP_LABEL, column=0, sticky="ew",
-                   padx=SPACE_XL, pady=60)
-            self.grid_rowconfigure(self.ROW_SPACER, weight=1)
-            self._btn_row = ctk.CTkFrame(self, fg_color="transparent")
-            self._btn_row.grid(row=self.ROW_BTN_ROW, column=0, sticky="ew",
-                               padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG))
+            # Empty state — single Tutup button, no scrollable content.
             ctk.CTkButton(
                 self._btn_row, text="Tutup", command=self._on_cancel,
                 fg_color="transparent", border_width=1, border_color=COLOR_INFO,
                 text_color=COLOR_INFO, hover_color=COLOR_SURFACE_HIGH,
                 width=160, height=40, font=FONT_BODY_BOLD, corner_radius=RADIUS_MD,
             ).pack(side="right")
+            ctk.CTkLabel(
+                self, text="Tidak ada issue terbuka di periode ini.",
+                font=FONT_BODY, text_color=COLOR_TEXT_MUTED,
+            ).grid(row=self.ROW_CONTENT, column=0, sticky="nsew",
+                   padx=SPACE_XL, pady=60)
             return
 
-        # KARYAWAN
-        ctk.CTkLabel(self, text="KARYAWAN", font=FONT_LABEL,
-                     text_color=COLOR_TEXT_MUTED, anchor="w").grid(
-            row=self.ROW_EMP_LABEL, column=0, sticky="ew",
-            padx=SPACE_XL, pady=(0, SPACE_XS))
-        self._emp_var = ctk.StringVar(value="")
-        ctk.CTkComboBox(
-            self, values=list(self._by_label.keys()),
-            variable=self._emp_var,
-            command=self._on_employee_change,
-            fg_color=COLOR_SURFACE_HIGH, button_color=COLOR_ACCENT,
-            button_hover_color=COLOR_ACCENT_HOVER, border_color=COLOR_BORDER,
-            text_color=COLOR_TEXT, font=FONT_BODY,
-        ).grid(row=self.ROW_EMP_COMBO, column=0, sticky="ew",
-               padx=SPACE_XL, pady=(0, SPACE_MD))
-
-        # TANGGAL — dates_scroll wrapped in a fixed-height container so
-        # CTkScrollableFrame's unreliable height parameter can't push
-        # subsequent rows down. The container's pack_propagate(False)
-        # locks it at 160px regardless of inner content size.
-        ctk.CTkLabel(self, text="TANGGAL DENGAN ISSUE TERBUKA",
-                     font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
-                     anchor="w").grid(
-            row=self.ROW_DATES_LABEL, column=0, sticky="ew",
-            padx=SPACE_XL, pady=(0, SPACE_XS))
-        dates_container = ctk.CTkFrame(self, fg_color="transparent",
-                                       height=160)
-        dates_container.grid(row=self.ROW_DATES_SCROLL, column=0, sticky="ew",
-                             padx=SPACE_XL, pady=(0, SPACE_MD))
-        dates_container.pack_propagate(False)
-        dates_container.grid_propagate(False)
-        self._dates_scroll = ctk.CTkScrollableFrame(
-            dates_container, fg_color=COLOR_SURFACE)
-        self._dates_scroll.pack(fill="both", expand=True)
-
-        # KATEGORI
-        ctk.CTkLabel(self, text="KATEGORI ALASAN", font=FONT_LABEL,
-                     text_color=COLOR_TEXT_MUTED, anchor="w").grid(
-            row=self.ROW_CAT_LABEL, column=0, sticky="ew",
-            padx=SPACE_XL, pady=(0, SPACE_XS))
-        self._cat_var = ctk.StringVar(value="")
-        ctk.CTkComboBox(
-            self, values=list(REASON_LABELS.values()),
-            variable=self._cat_var,
-            command=self._on_cat_change,
-            fg_color=COLOR_SURFACE_HIGH, button_color=COLOR_ACCENT,
-            button_hover_color=COLOR_ACCENT_HOVER, border_color=COLOR_BORDER,
-            text_color=COLOR_TEXT, font=FONT_BODY,
-        ).grid(row=self.ROW_CAT_COMBO, column=0, sticky="ew",
-               padx=SPACE_XL, pady=(0, SPACE_XS))
-
-        # Detail frame — fixed row slot. Children (label + entry) get
-        # toggled via pack/pack_forget but the frame's row position is
-        # invariant, so it can NEVER displace btn_row below it.
-        self._detail_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self._detail_frame.grid(row=self.ROW_DETAIL_FRAME, column=0,
-                                sticky="ew", padx=SPACE_XL, pady=0)
-        self._detail_label = ctk.CTkLabel(
-            self._detail_frame, text="Detail:", font=FONT_SMALL,
-            text_color=COLOR_TEXT_MUTED)
-        self._detail_entry = ctk.CTkEntry(
-            self._detail_frame,
-            fg_color=COLOR_SURFACE_HIGH, border_width=1,
-            border_color=COLOR_BORDER, text_color=COLOR_TEXT, font=FONT_BODY)
-
-        # Spacer row absorbs all unused vertical space — pushes btn_row
-        # to the visual bottom of the dialog.
-        self.grid_rowconfigure(self.ROW_SPACER, weight=1)
-
-        # btn_row pinned to the bottom row (10). NEVER reflows. The Resolve
-        # button is on the right, Batal next to it, preview label on the
-        # left.
-        self._btn_row = ctk.CTkFrame(self, fg_color="transparent")
-        self._btn_row.grid(row=self.ROW_BTN_ROW, column=0, sticky="ew",
-                           padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG))
+        # Footer buttons (normal case)
         self._submit_btn = ctk.CTkButton(
             self._btn_row, text="Resolve", command=self._on_submit,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
@@ -278,6 +217,69 @@ class BatchResolveDialog(ctk.CTkToplevel):
             self._btn_row, text="0 tanggal dipilih", font=FONT_SMALL,
             text_color=COLOR_TEXT_DIM)
         self._preview.pack(side="left")
+
+        # === Row 1: Scrollable content (everything between header and footer) ===
+        # Using CTkScrollableFrame here means if the toplevel ends up smaller
+        # than the natural content size, content scrolls rather than pushing
+        # the footer off-screen.
+        content = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        content.grid(row=self.ROW_CONTENT, column=0, sticky="nsew",
+                     padx=SPACE_XL, pady=0)
+
+        # KARYAWAN
+        ctk.CTkLabel(content, text="KARYAWAN", font=FONT_LABEL,
+                     text_color=COLOR_TEXT_MUTED, anchor="w").pack(
+            anchor="w", fill="x", pady=(0, SPACE_XS))
+        self._emp_var = ctk.StringVar(value="")
+        ctk.CTkComboBox(
+            content, values=list(self._by_label.keys()),
+            variable=self._emp_var,
+            command=self._on_employee_change,
+            fg_color=COLOR_SURFACE_HIGH, button_color=COLOR_ACCENT,
+            button_hover_color=COLOR_ACCENT_HOVER, border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT, font=FONT_BODY,
+        ).pack(anchor="w", fill="x", pady=(0, SPACE_MD))
+
+        # TANGGAL — dates_scroll wrapped in a fixed-height container so
+        # the inner scrollable can't push subsequent widgets down.
+        ctk.CTkLabel(content, text="TANGGAL DENGAN ISSUE TERBUKA",
+                     font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
+                     anchor="w").pack(anchor="w", fill="x", pady=(0, SPACE_XS))
+        dates_container = ctk.CTkFrame(content, fg_color="transparent",
+                                       height=160)
+        dates_container.pack(fill="x", pady=(0, SPACE_MD))
+        dates_container.pack_propagate(False)
+        self._dates_scroll = ctk.CTkScrollableFrame(
+            dates_container, fg_color=COLOR_SURFACE)
+        self._dates_scroll.pack(fill="both", expand=True)
+
+        # KATEGORI
+        ctk.CTkLabel(content, text="KATEGORI ALASAN", font=FONT_LABEL,
+                     text_color=COLOR_TEXT_MUTED, anchor="w").pack(
+            anchor="w", fill="x", pady=(0, SPACE_XS))
+        self._cat_var = ctk.StringVar(value="")
+        ctk.CTkComboBox(
+            content, values=list(REASON_LABELS.values()),
+            variable=self._cat_var,
+            command=self._on_cat_change,
+            fg_color=COLOR_SURFACE_HIGH, button_color=COLOR_ACCENT,
+            button_hover_color=COLOR_ACCENT_HOVER, border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT, font=FONT_BODY,
+        ).pack(anchor="w", fill="x", pady=(0, SPACE_XS))
+
+        # Detail frame — packed inside content. Its children toggle via
+        # pack/pack_forget but the frame itself stays in the content flow.
+        # Since it's INSIDE the scrollable middle, any growth here just
+        # scrolls — the footer in ROW_FOOTER is untouched.
+        self._detail_frame = ctk.CTkFrame(content, fg_color="transparent")
+        self._detail_frame.pack(anchor="w", fill="x", pady=0)
+        self._detail_label = ctk.CTkLabel(
+            self._detail_frame, text="Detail:", font=FONT_SMALL,
+            text_color=COLOR_TEXT_MUTED)
+        self._detail_entry = ctk.CTkEntry(
+            self._detail_frame,
+            fg_color=COLOR_SURFACE_HIGH, border_width=1,
+            border_color=COLOR_BORDER, text_color=COLOR_TEXT, font=FONT_BODY)
 
     def _on_employee_change(self, _label):
         for w in self._dates_scroll.winfo_children():
@@ -307,11 +309,14 @@ class BatchResolveDialog(ctk.CTkToplevel):
     def _on_cat_change(self, _label):
         """Show / hide the detail label + entry inside _detail_frame.
 
-        v15.2: btn_row's position is fixed by grid row, so this toggle has
-        zero effect on it. No pack_forget+repack dance, no update_idletasks
-        belt-and-suspenders, no risk of reflow skip. _detail_frame stays in
-        its grid slot (ROW_DETAIL_FRAME=8); its children get pack-toggled
-        within it, but the frame itself never moves.
+        v15.3: _detail_frame lives inside the scrollable middle content,
+        completely separate from the footer's grid row. Toggling its
+        children pack/pack_forget can only affect content layout — at
+        worst it adds a scrollable row. The footer (btn_row in ROW_FOOTER)
+        is structurally untouched.
+
+        On top of that — even after a cat-change, fire the diagnostic
+        dump so we can see how btn_row positioning evolves over time.
         """
         key = self._label_to_key.get(self._cat_var.get(), "")
         self._detail_label.pack_forget()
@@ -319,6 +324,85 @@ class BatchResolveDialog(ctk.CTkToplevel):
         if key in REASON_NEEDS_DETAIL:
             self._detail_label.pack(anchor="w")
             self._detail_entry.pack(anchor="w", fill="x", pady=(SPACE_XS, 0))
+        # v15.3 diagnostic: re-dump on cat-change so we can compare
+        # before/after geometry around the previously-failing toggle.
+        self.after(50, lambda: self._dump_geometry_to_log(
+            tag=f"after _on_cat_change({key!r})"))
+
+    def _dump_geometry_to_log(self, tag: str = "open"):
+        """v15.3 diagnostic — dump actual rendered dialog and btn_row
+        geometry to ``~/.hr-absensi-dialog-debug.log``.
+
+        Three prior fix attempts (v15.0/15.1/15.2) failed to make btn_row
+        visible across all category selections. The user's screenshots
+        showed the dialog rendering at sizes much larger than the requested
+        520x600 geometry, with btn_row apparently off-screen or clipped.
+        This logger captures the ACTUAL runtime numbers so we can diagnose
+        from data instead of from speculation.
+
+        Will be removed in v15.4+ once root cause is confirmed and the
+        layout is verified stable across category toggles.
+        """
+        try:
+            import os
+            import datetime
+            log_path = os.path.expanduser("~/.hr-absensi-dialog-debug.log")
+
+            # CustomTkinter scaling factors (may not be accessible on all
+            # versions; wrapped in try/except).
+            window_scale = "n/a"
+            widget_scale = "n/a"
+            try:
+                tracker = ctk.ScalingTracker
+                window_scale = tracker.get_window_scaling(self)
+                widget_scale = tracker.get_widget_scaling(self)
+            except Exception:
+                pass
+
+            lines = [
+                "",
+                "=" * 70,
+                f"[{datetime.datetime.now().isoformat()}] BatchResolveDialog [{tag}]",
+                f"  Requested:        {DIALOG_W}x{DIALOG_H} (logical)",
+                f"  geometry():       {self.geometry()}",
+                f"  dialog winfo:     w={self.winfo_width()} h={self.winfo_height()} "
+                f"x={self.winfo_x()} y={self.winfo_y()}",
+                f"  screen winfo:     w={self.winfo_screenwidth()} h={self.winfo_screenheight()}",
+                f"  CTk window scale: {window_scale}",
+                f"  CTk widget scale: {widget_scale}",
+            ]
+            if hasattr(self, "_btn_row") and self._btn_row.winfo_exists():
+                lines.extend([
+                    f"  btn_row winfo:    w={self._btn_row.winfo_width()} "
+                    f"h={self._btn_row.winfo_height()} "
+                    f"x={self._btn_row.winfo_x()} y={self._btn_row.winfo_y()}",
+                    f"  btn_row mapped:   {bool(self._btn_row.winfo_ismapped())}",
+                    f"  btn_row viewable: {bool(self._btn_row.winfo_viewable())}",
+                    f"  btn_row manager:  {self._btn_row.winfo_manager()}",
+                    f"  btn_row grid:     {self._btn_row.grid_info()}",
+                    f"  btn_row rootxy:   x={self._btn_row.winfo_rootx()} "
+                    f"y={self._btn_row.winfo_rooty()}",
+                ])
+            else:
+                lines.append("  btn_row:          (not yet built or destroyed)")
+            if hasattr(self, "_submit_btn") and self._submit_btn.winfo_exists():
+                lines.extend([
+                    f"  submit_btn:       w={self._submit_btn.winfo_width()} "
+                    f"h={self._submit_btn.winfo_height()} "
+                    f"mapped={bool(self._submit_btn.winfo_ismapped())} "
+                    f"rooty={self._submit_btn.winfo_rooty()}",
+                ])
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+        except Exception as e:
+            # Diagnostic must never crash the dialog
+            try:
+                import os
+                with open(os.path.expanduser("~/.hr-absensi-dialog-debug.log"),
+                          "a", encoding="utf-8") as f:
+                    f.write(f"\n[diag failed in _dump_geometry_to_log: {e!r}]\n")
+            except Exception:
+                pass
 
     def _checked_ids(self) -> list:
         return [aid for aid, var in self._date_vars.items() if var.get()]

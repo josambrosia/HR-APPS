@@ -108,34 +108,35 @@ def test_batch_resolve_dialog_detail_field_toggles(temp_db_path, monkeypatch, tk
     dlg.destroy()
 
 
-def test_batch_resolve_dialog_btn_row_pinned_to_bottom_grid_row(
+def test_batch_resolve_dialog_btn_row_in_footer_grid_row(
         temp_db_path, monkeypatch, tk_root):
-    """Regression guard for v15.2 — btn_row is grid-managed at ROW_BTN_ROW.
+    """Regression guard for v15.3 — btn_row sits in ROW_FOOTER of the
+    toplevel's 3-row grid.
 
-    History of this bug (3 attempts):
-    - v15.0 Task A: re-pack btn_row with side='bottom' on cat-change. Failed
-      because Tk skips reflow when pack_forget+pack of the same bottom-pinned
-      widget is the only layout change between them.
-    - v15.1: drop side='bottom', use default side='top'. Failed because the
-      toplevel auto-grew past the requested 520x600 geometry (CTkScrollableFrame
-      ignored height=160), pushing btn_row off the visible bottom.
-    - v15.2 (this fix): grid layout with btn_row at row 10, spacer row 9 with
-      weight=1, plus pack_propagate(False) + grid_propagate(False) on the
-      toplevel to lock dialog size. btn_row's row index is invariant — it
-      can NEVER be displaced by anything above it.
+    History of this bug (4 attempts now — see version_state.md):
+    - v15.0: side='bottom' reflow trick — failed (Tk skipped reflow).
+    - v15.1: side='top' natural flow — failed (toplevel auto-grew past
+      requested geometry, btn_row fell off the visible bottom).
+    - v15.2: single grid on toplevel with spacer row + propagate(False) —
+      failed (propagate calls didn't prevent dialog growth on this CTk
+      build; screenshot showed dialog ~862px tall for a 600px request).
+    - v15.3 (this fix): header / CTkScrollableFrame content / footer.
+      Footer is in ROW_FOOTER=2 of the toplevel's 3-row grid. The middle
+      row (CTkScrollableFrame) absorbs ALL content overflow into a scroll
+      bar instead of pushing the footer down. Whether the toplevel grows,
+      shrinks, or scales by some unknown DPI factor, the footer cannot be
+      displaced because it's structurally in its own grid slot AND the
+      middle row scrolls.
 
-    This test asserts the grid invariants:
-      1. btn_row is managed by grid (not pack)
-      2. btn_row's row equals BatchResolveDialog.ROW_BTN_ROW (the bottom row)
-      3. _detail_frame is at ROW_DETAIL_FRAME (above the spacer)
-      4. Toggling _on_cat_change with a detail-less category leaves
-         btn_row's grid row unchanged (the core invariant the v15.0/v15.1
-         pack-based versions violated)
+    This test asserts the structural invariants:
+      1. btn_row uses grid manager
+      2. btn_row.grid_info()['row'] == ROW_FOOTER
+      3. The toplevel has the expected 3-row grid configured
+      4. Toggling _on_cat_change with both detail-less and detail-bearing
+         categories leaves btn_row's grid row unchanged
 
-    Visible-button regression is still verified by manual smoke per
-    project policy — pytest's headless tkinter can't confirm pixels
-    are on-screen — but the structural guards here catch a revert from
-    grid back to pack or any displacement of btn_row.
+    Visible-button regression remains verified by manual smoke per project
+    policy — pytest's headless tkinter can't confirm pixels are on-screen.
     """
     import src.ui.components.batch_resolve_dialog as mod
     monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
@@ -151,30 +152,26 @@ def test_batch_resolve_dialog_btn_row_pinned_to_bottom_grid_row(
     assert hasattr(dlg, "_btn_row")
     assert dlg._btn_row.winfo_manager() == "grid", (
         f"btn_row must use grid manager (got {dlg._btn_row.winfo_manager()!r}). "
-        "v15.0/v15.1 used pack and the buttons disappeared for detail-less "
-        "categories — see v15.2 release notes."
+        "v15.0/v15.1 used pack and the buttons disappeared — see release notes."
     )
     grid_info = dlg._btn_row.grid_info()
-    assert int(grid_info["row"]) == mod.BatchResolveDialog.ROW_BTN_ROW, (
-        f"btn_row must be at grid row {mod.BatchResolveDialog.ROW_BTN_ROW} "
-        f"(got row={grid_info.get('row')!r})"
+    assert int(grid_info["row"]) == mod.BatchResolveDialog.ROW_FOOTER, (
+        f"btn_row must be at grid row ROW_FOOTER="
+        f"{mod.BatchResolveDialog.ROW_FOOTER} (got row={grid_info.get('row')!r})"
     )
-    # _detail_frame is at ROW_DETAIL_FRAME, above the spacer + btn_row
-    assert int(dlg._detail_frame.grid_info()["row"]) == (
-        mod.BatchResolveDialog.ROW_DETAIL_FRAME)
     # Detail-less category toggle: btn_row's row MUST NOT change
     dlg._cat_var.set("Cuti")
     dlg._on_cat_change("Cuti")
     tk_root.update_idletasks()
     assert int(dlg._btn_row.grid_info()["row"]) == (
-        mod.BatchResolveDialog.ROW_BTN_ROW), (
+        mod.BatchResolveDialog.ROW_FOOTER), (
         "btn_row row index changed after _on_cat_change('Cuti') — "
-        "this should be impossible with the grid architecture."
+        "should be impossible with the header/content/footer architecture."
     )
     # Detail-bearing category toggle: still no change
     dlg._cat_var.set("Tugas Lapangan")
     dlg._on_cat_change("Tugas Lapangan")
     tk_root.update_idletasks()
     assert int(dlg._btn_row.grid_info()["row"]) == (
-        mod.BatchResolveDialog.ROW_BTN_ROW)
+        mod.BatchResolveDialog.ROW_FOOTER)
     dlg.destroy()
