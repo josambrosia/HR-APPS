@@ -100,6 +100,17 @@ class BatchResolveDialog(ctk.CTkToplevel):
         y = (sh - h) // 2
         self.geometry(f"{w}x{h}+{x}+{y}")
 
+        # v15.2: lock the toplevel at the requested geometry. Without these
+        # propagate calls, Tk auto-grows the window to fit natural child
+        # sizes — which in v15.0/v15.1 caused the bottom button row to fall
+        # below the visible area on some configurations (e.g., CTkScrollableFrame
+        # not honoring height=160 and pushing everything down). Locking the
+        # window forces children to fit within 520x600 and the grid manager
+        # to place btn_row at row 10 regardless of upstream growth.
+        self.pack_propagate(False)
+        self.grid_propagate(False)
+        self.grid_columnconfigure(0, weight=1)
+
         self._on_done = on_done
 
         with get_connection(DB_PATH) as conn:
@@ -120,87 +131,137 @@ class BatchResolveDialog(ctk.CTkToplevel):
         self.bind("<Escape>", lambda _e: self._on_cancel())
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
 
+    # Grid row constants — exposed so tests can assert btn_row stays at the
+    # bottom row regardless of what's toggled above it.
+    ROW_HEADING       = 0
+    ROW_SUBTITLE      = 1
+    ROW_EMP_LABEL     = 2
+    ROW_EMP_COMBO     = 3
+    ROW_DATES_LABEL   = 4
+    ROW_DATES_SCROLL  = 5
+    ROW_CAT_LABEL     = 6
+    ROW_CAT_COMBO     = 7
+    ROW_DETAIL_FRAME  = 8
+    ROW_SPACER        = 9   # weight=1 absorbs all extra vertical space
+    ROW_BTN_ROW       = 10  # always at the bottom — protected by spacer above
+
     def _build(self):
+        """Build the dialog using GRID layout (v15.2 architectural fix).
+
+        Pack-based layouts in v15/v15.1 were fragile because mixing top/bottom
+        sides with dynamically toggled widgets exposed Tk reflow quirks
+        (detail-less categories left btn_row geometrically lost). Grid is
+        fully deterministic: each widget gets a fixed row index, and the
+        spacer row (ROW_SPACER, weight=1) absorbs all extra vertical space
+        so btn_row stays pinned at ROW_BTN_ROW no matter what changes above.
+        """
+        # Heading + subtitle (always shown)
         ctk.CTkLabel(
             self, text="Resolve Massal",
-            font=FONT_HEADING, text_color=COLOR_TEXT,
-        ).pack(anchor="w", padx=SPACE_XL, pady=(SPACE_LG, SPACE_XS))
+            font=FONT_HEADING, text_color=COLOR_TEXT, anchor="w",
+        ).grid(row=self.ROW_HEADING, column=0, sticky="ew",
+               padx=SPACE_XL, pady=(SPACE_LG, SPACE_XS))
         ctk.CTkLabel(
             self, text="Selesaikan beberapa issue sekaligus untuk satu karyawan.",
-            font=FONT_BODY, text_color=COLOR_TEXT_DIM,
-        ).pack(anchor="w", padx=SPACE_XL, pady=(0, SPACE_MD))
+            font=FONT_BODY, text_color=COLOR_TEXT_DIM, anchor="w",
+        ).grid(row=self.ROW_SUBTITLE, column=0, sticky="ew",
+               padx=SPACE_XL, pady=(0, SPACE_MD))
 
         if not self._groups:
+            # Empty state — center the message, put Tutup button in the
+            # standard btn_row slot (ROW_BTN_ROW) for layout consistency.
             ctk.CTkLabel(
                 self, text="Tidak ada issue terbuka di periode ini.",
                 font=FONT_BODY, text_color=COLOR_TEXT_MUTED,
-            ).pack(pady=60, padx=SPACE_XL)
+            ).grid(row=self.ROW_EMP_LABEL, column=0, sticky="ew",
+                   padx=SPACE_XL, pady=60)
+            self.grid_rowconfigure(self.ROW_SPACER, weight=1)
+            self._btn_row = ctk.CTkFrame(self, fg_color="transparent")
+            self._btn_row.grid(row=self.ROW_BTN_ROW, column=0, sticky="ew",
+                               padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG))
             ctk.CTkButton(
-                self, text="Tutup", command=self._on_cancel,
+                self._btn_row, text="Tutup", command=self._on_cancel,
                 fg_color="transparent", border_width=1, border_color=COLOR_INFO,
                 text_color=COLOR_INFO, hover_color=COLOR_SURFACE_HIGH,
                 width=160, height=40, font=FONT_BODY_BOLD, corner_radius=RADIUS_MD,
-            ).pack(side="bottom", pady=(0, SPACE_LG))
+            ).pack(side="right")
             return
 
+        # KARYAWAN
         ctk.CTkLabel(self, text="KARYAWAN", font=FONT_LABEL,
-                     text_color=COLOR_TEXT_MUTED).pack(
-            anchor="w", padx=SPACE_XL, pady=(0, SPACE_XS))
+                     text_color=COLOR_TEXT_MUTED, anchor="w").grid(
+            row=self.ROW_EMP_LABEL, column=0, sticky="ew",
+            padx=SPACE_XL, pady=(0, SPACE_XS))
         self._emp_var = ctk.StringVar(value="")
         ctk.CTkComboBox(
             self, values=list(self._by_label.keys()),
-            variable=self._emp_var, width=DIALOG_W - 2 * SPACE_XL,
+            variable=self._emp_var,
             command=self._on_employee_change,
             fg_color=COLOR_SURFACE_HIGH, button_color=COLOR_ACCENT,
             button_hover_color=COLOR_ACCENT_HOVER, border_color=COLOR_BORDER,
             text_color=COLOR_TEXT, font=FONT_BODY,
-        ).pack(anchor="w", padx=SPACE_XL, pady=(0, SPACE_MD))
+        ).grid(row=self.ROW_EMP_COMBO, column=0, sticky="ew",
+               padx=SPACE_XL, pady=(0, SPACE_MD))
 
-        ctk.CTkLabel(self, text="TANGGAL DENGAN ISSUE TERBUKA", font=FONT_LABEL,
-                     text_color=COLOR_TEXT_MUTED).pack(
-            anchor="w", padx=SPACE_XL, pady=(0, SPACE_XS))
+        # TANGGAL — dates_scroll wrapped in a fixed-height container so
+        # CTkScrollableFrame's unreliable height parameter can't push
+        # subsequent rows down. The container's pack_propagate(False)
+        # locks it at 160px regardless of inner content size.
+        ctk.CTkLabel(self, text="TANGGAL DENGAN ISSUE TERBUKA",
+                     font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
+                     anchor="w").grid(
+            row=self.ROW_DATES_LABEL, column=0, sticky="ew",
+            padx=SPACE_XL, pady=(0, SPACE_XS))
+        dates_container = ctk.CTkFrame(self, fg_color="transparent",
+                                       height=160)
+        dates_container.grid(row=self.ROW_DATES_SCROLL, column=0, sticky="ew",
+                             padx=SPACE_XL, pady=(0, SPACE_MD))
+        dates_container.pack_propagate(False)
+        dates_container.grid_propagate(False)
         self._dates_scroll = ctk.CTkScrollableFrame(
-            self, fg_color=COLOR_SURFACE, height=160)
-        self._dates_scroll.pack(fill="x", padx=SPACE_XL, pady=(0, SPACE_MD))
+            dates_container, fg_color=COLOR_SURFACE)
+        self._dates_scroll.pack(fill="both", expand=True)
 
+        # KATEGORI
         ctk.CTkLabel(self, text="KATEGORI ALASAN", font=FONT_LABEL,
-                     text_color=COLOR_TEXT_MUTED).pack(
-            anchor="w", padx=SPACE_XL, pady=(0, SPACE_XS))
+                     text_color=COLOR_TEXT_MUTED, anchor="w").grid(
+            row=self.ROW_CAT_LABEL, column=0, sticky="ew",
+            padx=SPACE_XL, pady=(0, SPACE_XS))
         self._cat_var = ctk.StringVar(value="")
         ctk.CTkComboBox(
             self, values=list(REASON_LABELS.values()),
-            variable=self._cat_var, width=DIALOG_W - 2 * SPACE_XL,
+            variable=self._cat_var,
             command=self._on_cat_change,
             fg_color=COLOR_SURFACE_HIGH, button_color=COLOR_ACCENT,
             button_hover_color=COLOR_ACCENT_HOVER, border_color=COLOR_BORDER,
             text_color=COLOR_TEXT, font=FONT_BODY,
-        ).pack(anchor="w", padx=SPACE_XL, pady=(0, SPACE_XS))
+        ).grid(row=self.ROW_CAT_COMBO, column=0, sticky="ew",
+               padx=SPACE_XL, pady=(0, SPACE_XS))
 
-        # Detail field lives in a dedicated frame packed ONCE at a fixed
-        # position (directly below the category combo, above btn_row) so its
-        # placement is deterministic regardless of when _on_cat_change runs.
+        # Detail frame — fixed row slot. Children (label + entry) get
+        # toggled via pack/pack_forget but the frame's row position is
+        # invariant, so it can NEVER displace btn_row below it.
         self._detail_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self._detail_frame.pack(anchor="w", fill="x", padx=SPACE_XL, pady=0)
+        self._detail_frame.grid(row=self.ROW_DETAIL_FRAME, column=0,
+                                sticky="ew", padx=SPACE_XL, pady=0)
         self._detail_label = ctk.CTkLabel(
             self._detail_frame, text="Detail:", font=FONT_SMALL,
             text_color=COLOR_TEXT_MUTED)
         self._detail_entry = ctk.CTkEntry(
-            self._detail_frame, width=DIALOG_W - 2 * SPACE_XL,
+            self._detail_frame,
             fg_color=COLOR_SURFACE_HIGH, border_width=1,
             border_color=COLOR_BORDER, text_color=COLOR_TEXT, font=FONT_BODY)
 
-        # v15.1: btn_row uses default side="top" (flows naturally after
-        # _detail_frame), matching the working pattern in issues.py
-        # _lay_out_form. The previous side="bottom" architecture was
-        # fragile — Tk's pack manager skipped real reflow on
-        # pack_forget+pack of the same bottom-pinned widget when the only
-        # other layout change between them was a no-op (the case when
-        # detail-less categories selected detail label/entry pack_forget
-        # that did nothing). Result: btn_row stayed in a broken geometric
-        # state and the Resolve/Batal buttons disappeared. Top-side
-        # packing flows like every other widget and reflows reliably.
+        # Spacer row absorbs all unused vertical space — pushes btn_row
+        # to the visual bottom of the dialog.
+        self.grid_rowconfigure(self.ROW_SPACER, weight=1)
+
+        # btn_row pinned to the bottom row (10). NEVER reflows. The Resolve
+        # button is on the right, Batal next to it, preview label on the
+        # left.
         self._btn_row = ctk.CTkFrame(self, fg_color="transparent")
-        self._btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG))
+        self._btn_row.grid(row=self.ROW_BTN_ROW, column=0, sticky="ew",
+                           padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG))
         self._submit_btn = ctk.CTkButton(
             self._btn_row, text="Resolve", command=self._on_submit,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
@@ -244,19 +305,20 @@ class BatchResolveDialog(ctk.CTkToplevel):
         self._update_preview()
 
     def _on_cat_change(self, _label):
+        """Show / hide the detail label + entry inside _detail_frame.
+
+        v15.2: btn_row's position is fixed by grid row, so this toggle has
+        zero effect on it. No pack_forget+repack dance, no update_idletasks
+        belt-and-suspenders, no risk of reflow skip. _detail_frame stays in
+        its grid slot (ROW_DETAIL_FRAME=8); its children get pack-toggled
+        within it, but the frame itself never moves.
+        """
         key = self._label_to_key.get(self._cat_var.get(), "")
         self._detail_label.pack_forget()
         self._detail_entry.pack_forget()
         if key in REASON_NEEDS_DETAIL:
             self._detail_label.pack(anchor="w")
-            self._detail_entry.pack(anchor="w", pady=(SPACE_XS, 0))
-        # Re-pack btn_row (top-side) after toggling detail widgets so it
-        # always renders below any newly-packed detail entry. update_idletasks
-        # forces the layout flush immediately — belt-and-suspenders for
-        # consistent rendering across Tk versions.
-        self._btn_row.pack_forget()
-        self._btn_row.pack(fill="x", padx=SPACE_XL, pady=(SPACE_LG, SPACE_LG))
-        self.update_idletasks()
+            self._detail_entry.pack(anchor="w", fill="x", pady=(SPACE_XS, 0))
 
     def _checked_ids(self) -> list:
         return [aid for aid, var in self._date_vars.items() if var.get()]
