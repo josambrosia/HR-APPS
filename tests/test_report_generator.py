@@ -206,9 +206,10 @@ def test_generate_na_for_open_issues_in_alasan_column():
 
 
 def test_generate_monthly_report_holiday_row(tmp_path):
-    """Holiday row: G='Libur', E='Hari Kerja', count columns blank, and it
-    does not contribute to Total Personal."""
+    """Holiday row (v15 format): E='Hari Libur', G+H blank, count columns blank,
+    yellow HOLIDAY_FILL applied to all cells, no contribution to Total Personal."""
     from src.db.holidays import mark_holidays
+    from src.core.report_generator import HOLIDAY_FILL
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     conn.executescript(DDL)
@@ -238,11 +239,13 @@ def test_generate_monthly_report_holiday_row(tmp_path):
         if ws.cell(row=r, column=1).value == "Total Personal:":
             total_row = r
     assert holiday_row is not None and total_row is not None
-    assert ws.cell(row=holiday_row, column=5).value == "Hari Kerja"   # E Tipe
-    assert ws.cell(row=holiday_row, column=7).value == "Libur"        # G Masuk
-    assert ws.cell(row=holiday_row, column=8).value in (None, "")     # H Keluar
-    assert ws.cell(row=holiday_row, column=12).value in (None, "")    # L Terlambat
-    assert ws.cell(row=total_row, column=12).value == 30             # only April 1
+    assert ws.cell(row=holiday_row, column=5).value == "Hari Libur"   # E Tipe
+    assert ws.cell(row=holiday_row, column=7).value in (None, "")      # G Masuk -> empty
+    assert ws.cell(row=holiday_row, column=8).value in (None, "")      # H Keluar -> empty
+    assert ws.cell(row=holiday_row, column=12).value in (None, "")     # L Terlambat
+    assert ws.cell(row=total_row, column=12).value == 30              # only April 1
+    # Fill check: holiday row cell A must carry HOLIDAY_FILL color
+    assert ws.cell(row=holiday_row, column=1).fill.fgColor.rgb == HOLIDAY_FILL.fgColor.rgb
 
 
 def test_generate_applies_effective_masuk_for_work_justified_late(tmp_path):

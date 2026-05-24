@@ -35,6 +35,7 @@ IJIN_CATEGORIES = tuple(c for c in REASON_CATEGORIES if c not in ("na", "libur")
 # Gray fill for Total Personal rows — matches reference Laporan Bulanan April.xlsx
 # (light gray #C0C0C0 distinguishes total rows from data rows visually).
 TOTAL_PERSONAL_FILL = PatternFill(fill_type="solid", fgColor="FFC0C0C0")
+HOLIDAY_FILL = PatternFill(fill_type="solid", fgColor="FFFFF2CC")  # light cream/calendar yellow
 
 
 @dataclass
@@ -145,17 +146,17 @@ def _write_data_row(ws, row_num: int, db_row, derived: dict, styles: list, *, is
             pass
 
     if is_holiday:
-        # Holiday row: marker "Libur" in column G only; Tipe shown as
-        # "Hari Kerja" (matches the reference Laporan Bulanan April); all
-        # count columns + Alasan Ijin left blank.
+        # Holiday row (v15): Tipe='Hari Libur' in column E, Masuk/Keluar/count
+        # columns all blank, and a light yellow fill overlay (HOLIDAY_FILL) so
+        # holiday rows pop visually when scrolling the export.
         values = [
             db_row["nama"],              # A Nama
             db_row.get("dept") or "",     # B Dept
             tanggal_val,                 # C Tanggal
             db_row.get("hari") or "",     # D Hari
-            "Hari Kerja",                # E Tipe (override)
+            "Hari Libur",                # E Tipe — was "Hari Kerja"
             db_row.get("jadwal") or "",   # F Jadwal
-            "Libur",                     # G Masuk -> marker
+            "",                          # G Masuk — was "Libur" marker
             "",                          # H Keluar
             "", "", "", "", "", "", "", "",  # I-P counts blank
             "",                          # Q Alasan Ijin blank
@@ -163,6 +164,13 @@ def _write_data_row(ws, row_num: int, db_row, derived: dict, styles: list, *, is
         for col, val in enumerate(values, start=1):
             ws.cell(row=row_num, column=col, value=val)
         _apply_row_styles(ws, row_num, styles)
+        # Overlay holiday fill on top of base styles. Mirrors the pattern used
+        # for TOTAL_PERSONAL_FILL in _write_total_row. MergedCell guard prevents
+        # accidental writes to merged regions.
+        for col in range(1, 18):
+            cell = ws.cell(row=row_num, column=col)
+            if not isinstance(cell, MergedCell):
+                cell.fill = HOLIDAY_FILL
         return
 
     has_issue = db_row.get("has_issue") == 1
