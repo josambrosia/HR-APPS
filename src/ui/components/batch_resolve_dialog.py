@@ -128,11 +128,6 @@ class BatchResolveDialog(ctk.CTkToplevel):
         self._build()
 
         self.after(50, lambda: (self.grab_set(), self.focus_set()))
-        # v15.3 diagnostic — dump actual rendered geometry to a log file so
-        # we can see WHY the dialog grows / where btn_row actually lands on
-        # the user's monitor. To be removed in v15.4 once root cause is
-        # confirmed. See _dump_geometry_to_log for details.
-        self.after(250, self._dump_geometry_to_log)
         self.bind("<Escape>", lambda _e: self._on_cancel())
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
 
@@ -314,9 +309,6 @@ class BatchResolveDialog(ctk.CTkToplevel):
         children pack/pack_forget can only affect content layout — at
         worst it adds a scrollable row. The footer (btn_row in ROW_FOOTER)
         is structurally untouched.
-
-        On top of that — even after a cat-change, fire the diagnostic
-        dump so we can see how btn_row positioning evolves over time.
         """
         key = self._label_to_key.get(self._cat_var.get(), "")
         self._detail_label.pack_forget()
@@ -324,85 +316,6 @@ class BatchResolveDialog(ctk.CTkToplevel):
         if key in REASON_NEEDS_DETAIL:
             self._detail_label.pack(anchor="w")
             self._detail_entry.pack(anchor="w", fill="x", pady=(SPACE_XS, 0))
-        # v15.3 diagnostic: re-dump on cat-change so we can compare
-        # before/after geometry around the previously-failing toggle.
-        self.after(50, lambda: self._dump_geometry_to_log(
-            tag=f"after _on_cat_change({key!r})"))
-
-    def _dump_geometry_to_log(self, tag: str = "open"):
-        """v15.3 diagnostic — dump actual rendered dialog and btn_row
-        geometry to ``~/.hr-absensi-dialog-debug.log``.
-
-        Three prior fix attempts (v15.0/15.1/15.2) failed to make btn_row
-        visible across all category selections. The user's screenshots
-        showed the dialog rendering at sizes much larger than the requested
-        520x600 geometry, with btn_row apparently off-screen or clipped.
-        This logger captures the ACTUAL runtime numbers so we can diagnose
-        from data instead of from speculation.
-
-        Will be removed in v15.4+ once root cause is confirmed and the
-        layout is verified stable across category toggles.
-        """
-        try:
-            import os
-            import datetime
-            log_path = os.path.expanduser("~/.hr-absensi-dialog-debug.log")
-
-            # CustomTkinter scaling factors (may not be accessible on all
-            # versions; wrapped in try/except).
-            window_scale = "n/a"
-            widget_scale = "n/a"
-            try:
-                tracker = ctk.ScalingTracker
-                window_scale = tracker.get_window_scaling(self)
-                widget_scale = tracker.get_widget_scaling(self)
-            except Exception:
-                pass
-
-            lines = [
-                "",
-                "=" * 70,
-                f"[{datetime.datetime.now().isoformat()}] BatchResolveDialog [{tag}]",
-                f"  Requested:        {DIALOG_W}x{DIALOG_H} (logical)",
-                f"  geometry():       {self.geometry()}",
-                f"  dialog winfo:     w={self.winfo_width()} h={self.winfo_height()} "
-                f"x={self.winfo_x()} y={self.winfo_y()}",
-                f"  screen winfo:     w={self.winfo_screenwidth()} h={self.winfo_screenheight()}",
-                f"  CTk window scale: {window_scale}",
-                f"  CTk widget scale: {widget_scale}",
-            ]
-            if hasattr(self, "_btn_row") and self._btn_row.winfo_exists():
-                lines.extend([
-                    f"  btn_row winfo:    w={self._btn_row.winfo_width()} "
-                    f"h={self._btn_row.winfo_height()} "
-                    f"x={self._btn_row.winfo_x()} y={self._btn_row.winfo_y()}",
-                    f"  btn_row mapped:   {bool(self._btn_row.winfo_ismapped())}",
-                    f"  btn_row viewable: {bool(self._btn_row.winfo_viewable())}",
-                    f"  btn_row manager:  {self._btn_row.winfo_manager()}",
-                    f"  btn_row grid:     {self._btn_row.grid_info()}",
-                    f"  btn_row rootxy:   x={self._btn_row.winfo_rootx()} "
-                    f"y={self._btn_row.winfo_rooty()}",
-                ])
-            else:
-                lines.append("  btn_row:          (not yet built or destroyed)")
-            if hasattr(self, "_submit_btn") and self._submit_btn.winfo_exists():
-                lines.extend([
-                    f"  submit_btn:       w={self._submit_btn.winfo_width()} "
-                    f"h={self._submit_btn.winfo_height()} "
-                    f"mapped={bool(self._submit_btn.winfo_ismapped())} "
-                    f"rooty={self._submit_btn.winfo_rooty()}",
-                ])
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write("\n".join(lines) + "\n")
-        except Exception as e:
-            # Diagnostic must never crash the dialog
-            try:
-                import os
-                with open(os.path.expanduser("~/.hr-absensi-dialog-debug.log"),
-                          "a", encoding="utf-8") as f:
-                    f.write(f"\n[diag failed in _dump_geometry_to_log: {e!r}]\n")
-            except Exception:
-                pass
 
     def _checked_ids(self) -> list:
         return [aid for aid, var in self._date_vars.items() if var.get()]
