@@ -157,6 +157,7 @@ class HRApp(ctk.CTk):
             ]),
             ("SYSTEM", [
                 ("⚙", "Settings", "Settings"),
+                ("ℹ", "About", "About"),
             ]),
         ]
 
@@ -379,6 +380,10 @@ class HRApp(ctk.CTk):
                 pass
 
     def _show(self, name: str):
+        # Dialogs open as overlays without navigating away from the current screen.
+        if name == "About":
+            self._show_about()
+            return
         # Refresh sidebar active-month indicator on every navigation
         self._refresh_active_month_label()
         # Update sidebar nav visual state
@@ -423,3 +428,7 @@ class HRApp(ctk.CTk):
             ctk.CTkLabel(frame, text=name, font=(FONT_FAMILY, 28, "bold")).pack(pady=40)
             ctk.CTkLabel(frame, text=f"Screen '{name}' — to be implemented in next tasks.",
                          font=(FONT_FAMILY, 13)).pack()
+
+    def _show_about(self):
+        from src.ui.dialogs.about_dialog import AboutDialog
+        AboutDialog(self)
