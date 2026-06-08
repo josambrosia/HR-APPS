@@ -103,6 +103,14 @@
   /* Print */
   .page-break{break-before:page;page-break-before:always}
   .empty-state{padding:14px;background:#fafafa;border:1px dashed #e5e5e5;border-radius:6px;text-align:center;color:#737373;font-size:11px}
+
+  /* Resolution strip (4d) */
+  .b-resolution{background:#fef9fb;border:1px solid #f4c2cd;padding:8px 12px;border-radius:4px;font-size:10.5px;color:#525252;margin-bottom:18px}
+  .b-resolution .pct{color:#10b981;font-weight:700}
+  .b-resolution .delta{margin-left:10px;font-size:9.5px;color:#737373}
+
+  /* Outlier transparency line (4e) */
+  .outlier-note{font-size:10px;color:#7c3aed;background:#f5f3ff;border-left:3px solid #a855f7;padding:6px 10px;margin-bottom:10px;border-radius:0 4px 4px 0}
 </style>
 </head>
 <body>
@@ -131,6 +139,15 @@
     <div class="k cyan"><div class="l">Rata-rata / Kejadian</div><div class="n">{{ '%.0f' % kpi.avg_min }}<span class="u">min</span></div><div class="delta delta-{{ kpi_deltas.avg_min.color_class }}">{% if kpi_deltas.avg_min.delta is none %}—{% else %}{{ kpi_deltas.avg_min.arrow }} {{ kpi_deltas.avg_min.delta|abs }} min dari {{ kpi_deltas.avg_min.period_word }}{% endif %}</div></div>
     <div class="k violet"><div class="l">Coaching</div><div class="n">{{ kpi.coaching_count }}</div><div class="delta delta-{{ kpi_deltas.coaching.color_class }}">{% if kpi_deltas.coaching.delta is none %}—{% else %}{{ kpi_deltas.coaching.arrow }} {{ kpi_deltas.coaching.delta|abs }} dari {{ kpi_deltas.coaching.period_word }}{% endif %}</div></div>
     <div class="k emerald"><div class="l">Teladan</div><div class="n">{{ kpi.teladan_count }}</div><div class="delta delta-{{ kpi_deltas.teladan.color_class }}">{% if kpi_deltas.teladan.delta is none %}—{% else %}{{ kpi_deltas.teladan.arrow }} {{ kpi_deltas.teladan.delta|abs }} dari {{ kpi_deltas.teladan.period_word }}{% endif %}</div></div>
+  </div>
+  <div class="b-resolution">
+    <strong>Status Issues:</strong>
+    {{ resolution.open }} open ·
+    {{ resolution.resolved }} resolved ·
+    <span class="pct">{{ '%.0f' % resolution.rate_pct }}% resolved</span>
+    {% if resolution_delta_pct is not none %}
+    <span class="delta">{{ resolution_delta_arrow }} {{ (resolution_delta_pct|abs)|round(0)|int }}% dari {{ period_word }}</span>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -208,6 +225,11 @@
     <h2>Ranking Lengkap &middot; {{ ranking|length }} Karyawan</h2>
     <div class="sub">// {{ period_label }} &middot; sort by total menit terlambat</div>
   </div>
+  {% if outlier_count > 0 %}
+  <div class="outlier-note">
+    {{ outlier_count }} karyawan dikecualikan dari analisa: {{ outlier_names }}
+  </div>
+  {% endif %}
   {% if ranking %}
   <table class="b-table">
     <thead><tr><th>#</th><th>Nama</th><th>Dept</th><th style="text-align:right">Menit</th><th style="text-align:right">Kejadian</th><th style="text-align:right">Tidak Hadir</th></tr></thead>
