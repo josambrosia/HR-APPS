@@ -58,3 +58,34 @@ def test_issues_screen_writes_period_state_on_change(temp_db_path, monkeypatch, 
     tk_root.update_idletasks()
     assert period_state.get() == "minggu_3"
     screen.destroy()
+
+
+def test_issues_apply_filter_reduces_visible_rows(temp_db_path, monkeypatch, tk_root):
+    """Setting a filter query that doesn't match anyone hides all rows;
+    setting one that matches one employee shows only that employee."""
+    import src.ui.screens.issues as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        set_setting(conn, "current_month", "2026-05")
+        a = upsert_employee(conn, no_staff="1", nama="BUDI", dept="X")
+        b = upsert_employee(conn, no_staff="2", nama="ANI", dept="Y")
+        for eid in (a, b):
+            upsert_attendance(
+                conn, employee_id=eid, tanggal="2026-05-04", hari="Senin",
+                tipe="Hari Kerja", jadwal="08.00 - 16.00",
+                masuk=None, keluar="16:00", kerja_jam=None,
+                lembur_jam=None, terlambat_menit=None,
+                has_issue=1, imported_from="W1.xls",
+            )
+    screen = mod.IssuesScreen(tk_root)
+    tk_root.update_idletasks()
+    assert len(screen.open_tree.get_children()) == 2
+    screen._apply_filter("budi")
+    tk_root.update_idletasks()
+    visible = screen.open_tree.get_children()
+    assert len(visible) == 1
+    screen._apply_filter("")
+    tk_root.update_idletasks()
+    assert len(screen.open_tree.get_children()) == 2
+    screen.destroy()

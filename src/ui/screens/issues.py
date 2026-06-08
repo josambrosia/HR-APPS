@@ -14,6 +14,7 @@ from src.core.session_state import period_state
 from src.core.reason_mapper import REASON_LABELS, REASON_NEEDS_DETAIL, render_alasan_ijin
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.ui.components.kpi_card import KPICard
+from src.ui.components.search_bar import SearchBar
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.theme import (
     FONT_FAMILY,
@@ -42,6 +43,7 @@ class IssuesScreen(ctk.CTkFrame):
 
         self.selected_id = None
         self._row_cache = {}
+        self._search_query = ""
 
         self._setup_treeview_style()
         self._build_header()
@@ -104,6 +106,11 @@ class IssuesScreen(ctk.CTkFrame):
             on_change=self._on_period_change, initial=period_state.get(),
         )
         self.nav.pack(side="left")
+        self._search = SearchBar(
+            header, on_change=self._apply_filter,
+            placeholder="🔍 Cari karyawan...", width=240,
+        )
+        self._search.pack(side="left", padx=(SPACE_LG, SPACE_LG))
         ctk.CTkButton(
             header, text="+ Resolve Massal", command=self._on_batch_resolve,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
@@ -405,14 +412,53 @@ class IssuesScreen(ctk.CTkFrame):
                 return start, end
         return full_month_range(self._current_month)
 
+    def _render_rows(self, query: str):
+        """Re-render Open + Resolved treeviews from self._row_cache,
+        filtering by employee name (case-insensitive substring)."""
+        q = query.lower().strip()
+        for tv in (self.open_tree, self.resolved_tree):
+            for iid in tv.get_children():
+                tv.delete(iid)
+        visible_open = visible_resolved = total_open = total_resolved = 0
+        for row in self._row_cache.values():
+            is_resolved = row["reason_category"] is not None
+            if is_resolved:
+                total_resolved += 1
+            else:
+                total_open += 1
+            if q and q not in row["nama"].lower():
+                continue
+            if is_resolved:
+                try:
+                    alasan = render_alasan_ijin(row["reason_category"], row["reason_detail"])
+                except Exception:
+                    alasan = row["reason_category"] or "-"
+                self.resolved_tree.insert(
+                    "", "end", iid=str(row["id"]),
+                    values=(row["nama"], row["dept"] or "-", row["tanggal"],
+                            row["hari"] or "-", row["masuk"] or "—",
+                            row["keluar"] or "—", alasan),
+                    tags=("resolved_row",),
+                )
+                visible_resolved += 1
+            else:
+                self.open_tree.insert(
+                    "", "end", iid=str(row["id"]),
+                    values=(row["nama"], row["dept"] or "-", row["tanggal"],
+                            row["hari"] or "-", row["masuk"] or "—",
+                            row["keluar"] or "—"),
+                    tags=("open_row",),
+                )
+                visible_open += 1
+        self._search.set_count(visible_open + visible_resolved, total_open + total_resolved)
+
+    def _apply_filter(self, query: str):
+        self._search_query = query
+        self._render_rows(query)
+
     def _reload(self):
         start, end = self._active_range()
         self._row_cache = {}
-
-        for item in self.open_tree.get_children():
-            self.open_tree.delete(item)
-        for item in self.resolved_tree.get_children():
-            self.resolved_tree.delete(item)
 
         with get_connection(DB_PATH) as conn:
             counts = count_issues_for_period(conn, start, end)
@@ -424,25 +470,9 @@ class IssuesScreen(ctk.CTkFrame):
         for r in open_rows:
             d = dict(r)
             self._row_cache[d["id"]] = d
-            self.open_tree.insert(
-                "", "end", iid=str(d["id"]),
-                values=(d["nama"], d["dept"] or "-", d["tanggal"],
-                        d["hari"] or "-", d["masuk"] or "—",
-                        d["keluar"] or "—"),
-                tags=("open_row",),
-            )
 
         for r in resolved_rows:
             d = dict(r)
             self._row_cache[d["id"]] = d
-            try:
-                alasan = render_alasan_ijin(d["reason_category"], d["reason_detail"])
-            except Exception:
-                alasan = d["reason_category"] or "-"
-            self.resolved_tree.insert(
-                "", "end", iid=str(d["id"]),
-                values=(d["nama"], d["dept"] or "-", d["tanggal"],
-                        d["hari"] or "-", d["masuk"] or "—",
-                        d["keluar"] or "—", alasan),
-                tags=("resolved_row",),
-            )
+
+        self._render_rows(self._search_query)
