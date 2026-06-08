@@ -74,6 +74,37 @@ def test_issues_screen_binds_ctrl_f(temp_db_path, monkeypatch, tk_root):
     screen.destroy()
 
 
+def test_issues_resolve_panel_binds_return(temp_db_path, monkeypatch, tk_root):
+    """When an issue is selected the right-panel form binds Return → _on_save."""
+    from src.db.settings import set_setting
+    import src.ui.screens.issues as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        upsert_attendance(
+            conn, employee_id=a, tanggal="2026-04-07", hari="Selasa",
+            tipe="Hari Kerja", jadwal="08.00 - 16.00",
+            masuk=None, keluar="16:00", kerja_jam=None,
+            lembur_jam=None, terlambat_menit=None,
+            has_issue=1, imported_from="W1.xls",
+        )
+        set_setting(conn, "current_month", "2026-04")
+        conn.commit()
+    screen = mod.IssuesScreen(tk_root)
+    tk_root.update_idletasks()
+    # Simulate selecting the first open issue to build the form panel
+    children = screen.open_tree.get_children()
+    assert children, "Expected at least one open issue row"
+    screen.open_tree.selection_set(children[0])
+    screen._on_select_open(None)
+    tk_root.update_idletasks()
+    # After selection the right panel should bind Return
+    assert screen.right.bind("<Return>") != "", (
+        "Return binding must be present on the right panel after issue selection")
+    screen.destroy()
+
+
 def test_issues_apply_filter_reduces_visible_rows(temp_db_path, monkeypatch, tk_root):
     """Setting a filter query that doesn't match anyone hides all rows;
     setting one that matches one employee shows only that employee."""

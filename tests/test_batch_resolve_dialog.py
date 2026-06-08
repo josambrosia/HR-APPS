@@ -108,6 +108,24 @@ def test_batch_resolve_dialog_detail_field_toggles(temp_db_path, monkeypatch, tk
     dlg.destroy()
 
 
+def test_batch_resolve_dialog_binds_esc_and_return(temp_db_path, monkeypatch, tk_root):
+    """Structural: Esc and Return bindings must be present on the dialog."""
+    import src.ui.components.batch_resolve_dialog as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        _issue(conn, a, "2026-04-07", "Selasa")
+        conn.commit()
+    dlg = mod.BatchResolveDialog(
+        tk_root, period_start="2026-04-01", period_end="2026-04-30",
+        on_done=lambda: None)
+    tk_root.update_idletasks()
+    assert dlg.bind("<Escape>") != "", "Escape binding must be present"
+    assert dlg.bind("<Return>") != "", "Return binding must be present"
+    dlg.destroy()
+
+
 def test_batch_resolve_dialog_btn_row_in_footer_grid_row(
         temp_db_path, monkeypatch, tk_root):
     """Regression guard for v15.3 — btn_row sits in ROW_FOOTER of the

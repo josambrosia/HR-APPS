@@ -311,6 +311,8 @@ class IssuesScreen(ctk.CTkFrame):
 
         # Initial layout (Save below the optional detail)
         self._lay_out_form(initial_cat=current)
+        # Enter submits the form when focus is on the right panel.
+        self.right.bind("<Return>", lambda _e: (self._on_save(), "break")[1])
 
     def _lay_out_form(self, initial_cat: str | None):
         """(Re)pack detail widgets and Save button at top of panel; unresolve

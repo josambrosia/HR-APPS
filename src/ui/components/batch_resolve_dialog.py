@@ -129,6 +129,7 @@ class BatchResolveDialog(ctk.CTkToplevel):
 
         self.after(50, lambda: (self.grab_set(), self.focus_set()))
         self.bind("<Escape>", lambda _e: self._on_cancel())
+        self.bind("<Return>", lambda _e: (self._on_submit(), "break")[1])
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
 
     # Grid row constants for the toplevel itself. Three rows — header
