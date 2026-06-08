@@ -38,7 +38,8 @@ def test_render_html_contains_key_sections(temp_db_path, tmp_path):
     assert out.exists()
     content = out.read_text(encoding="utf-8")
     # New template content (single Light theme)
-    assert "WEEKLY REPORT" in content
+    # No period_type passed → defaults to "monthly" → badge reads MONTHLY REPORT
+    assert "MONTHLY REPORT" in content
     assert "HR Absensi Dashboard" in content
     # KPI labels
     assert "Total Terlambat" in content
@@ -265,3 +266,45 @@ def test_coaching_section_fallback_when_no_working_days(temp_db_path, tmp_path):
     assert "tanpa data hari kerja" in html
     # Formula MUST NOT appear when working_days == 0
     assert "mnt/hari ×" not in html and "mnt/hari &times;" not in html
+
+
+def test_dashboard_html_badge_weekly(tmp_path, temp_db_path):
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        html_path = render_dashboard_html(
+            conn,
+            period_start="2026-05-01", period_end="2026-05-07",
+            period_label="M1 Mei 2026", out_dir=tmp_path,
+            period_type="weekly",
+        )
+    html = html_path.read_text(encoding="utf-8")
+    assert "WEEKLY REPORT" in html
+
+
+def test_dashboard_html_badge_monthly(tmp_path, temp_db_path):
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        html_path = render_dashboard_html(
+            conn,
+            period_start="2026-05-01", period_end="2026-05-31",
+            period_label="Mei 2026", out_dir=tmp_path,
+            period_type="monthly",
+        )
+    html = html_path.read_text(encoding="utf-8")
+    assert "MONTHLY REPORT" in html
+
+
+def test_dashboard_html_period_label_in_h1(tmp_path, temp_db_path):
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        html_path = render_dashboard_html(
+            conn,
+            period_start="2026-05-01", period_end="2026-05-31",
+            period_label="Mei 2026", out_dir=tmp_path,
+            period_type="monthly",
+        )
+    html = html_path.read_text(encoding="utf-8")
+    import re
+    h1_match = re.search(r"<h1[^>]*>(.+?)</h1>", html, re.DOTALL)
+    assert h1_match, "<h1> tag must exist"
+    assert "Mei 2026" in h1_match.group(1)

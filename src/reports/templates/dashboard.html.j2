@@ -111,12 +111,11 @@
   {# === HEADER === #}
   <div class="b-head">
     <div>
-      <div class="badge">WEEKLY REPORT</div>
-      <h1>HR Absensi Dashboard</h1>
+      <div class="badge">{{ period_badge_text }}</div>
+      <h1>HR Absensi Dashboard <span style="color:#a3a3a3;font-weight:500"> · </span> <span style="color:#22d3ee">{{ period_label }}</span></h1>
       <div style="font-size:11px;color:#737373;margin-top:4px">{{ ranking|length }} karyawan</div>
     </div>
     <div class="meta">
-      <div class="lg">{{ period_label }}</div>
       <div>{{ period_start }} — {{ period_end }}</div>
       <div>Gen: {{ generated_at }}</div>
     </div>

@@ -527,6 +527,7 @@ class DashboardScreen(ctk.CTkFrame):
         start, end, label = self._period_range()
         threshold_info = self._dynamic_coaching_threshold(start, end)
         out_dir = Path(tempfile.gettempdir())
+        period_type = "monthly" if self.nav.active == "semua" else "weekly"
         try:
             with get_connection(DB_PATH) as conn:
                 html_path = render_dashboard_html(
@@ -534,6 +535,7 @@ class DashboardScreen(ctk.CTkFrame):
                     period_label=label, out_dir=out_dir,
                     sections=sections,
                     threshold_info=threshold_info,
+                    period_type=period_type,
                 )
         except Exception as e:
             messagebox.showerror("Error generating PDF", str(e))

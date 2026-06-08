@@ -61,6 +61,7 @@ def render_dashboard_html(
     out_dir: Path,
     threshold_info: Optional[dict] = None,
     sections: Optional[dict] = None,
+    period_type: str = "monthly",
 ) -> Path:
     """Render the dashboard HTML print output and return its path.
 
@@ -103,6 +104,11 @@ def render_dashboard_html(
     hr_officer_name = get_setting(conn, "hr_officer_name", default="")
     brand_lockup_svg = _load_brand_lockup()
 
+    period_badge_text = {
+        "weekly": "WEEKLY REPORT",
+        "monthly": "MONTHLY REPORT",
+    }.get(period_type, "PERIOD REPORT")
+
     env = _build_env()
     tmpl = env.get_template(TEMPLATE_FILE)
     html = tmpl.render(
@@ -128,6 +134,7 @@ def render_dashboard_html(
         sections=sections,
         hr_officer_name=hr_officer_name,
         brand_lockup_svg=brand_lockup_svg,
+        period_badge_text=period_badge_text,
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
