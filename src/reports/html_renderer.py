@@ -5,7 +5,7 @@ Page 1: Executive summary (KPI strip + Top 5 + Teladan + Coaching + Pola Jam Mas
 Page 2: Ranking Lengkap (all employees with menit + kejadian + tidak hadir).
 """
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -50,6 +50,52 @@ def _load_brand_lockup() -> str:
     if svg.lstrip().startswith("<?xml"):
         svg = svg.split("?>", 1)[1]
     return svg.strip()
+
+
+def _previous_period(start: str, end: str, period_type: str) -> tuple[str, str]:
+    """Compute (prev_start, prev_end) for the previous comparable period.
+
+    Weekly: shift back by (end - start + 1) days.
+    Monthly: previous calendar month, full range.
+    """
+    s = date.fromisoformat(start)
+    e = date.fromisoformat(end)
+    if period_type == "weekly":
+        delta_days = (e - s).days + 1
+        prev_e = s - timedelta(days=1)
+        prev_s = prev_e - timedelta(days=delta_days - 1)
+        return prev_s.isoformat(), prev_e.isoformat()
+    # monthly
+    if s.month == 1:
+        prev_s = date(s.year - 1, 12, 1)
+    else:
+        prev_s = date(s.year, s.month - 1, 1)
+    if prev_s.month == 12:
+        prev_e = date(prev_s.year, 12, 31)
+    else:
+        prev_e = date(prev_s.year, prev_s.month + 1, 1) - timedelta(days=1)
+    return prev_s.isoformat(), prev_e.isoformat()
+
+
+def _kpi_delta(curr: int, prev: int, direction_good: str) -> dict:
+    """Return {delta, arrow, color_class, period_word}.
+
+    `direction_good` is "up" if a higher value is better, "down" if lower is better.
+    Returns arrow="—" and delta=None when both periods are empty (zero).
+    """
+    if prev == 0 and curr == 0:
+        return {"delta": None, "arrow": "—", "color_class": "neutral", "period_word": ""}
+    delta = curr - prev
+    if delta == 0:
+        return {"delta": 0, "arrow": "→", "color_class": "neutral", "period_word": ""}
+    if delta > 0:
+        arrow = "▲"
+        good = (direction_good == "up")
+    else:
+        arrow = "▼"
+        good = (direction_good == "down")
+    color_class = "good" if good else "bad"
+    return {"delta": delta, "arrow": arrow, "color_class": color_class, "period_word": ""}
 
 
 def render_dashboard_html(
@@ -101,6 +147,27 @@ def render_dashboard_html(
     total_min = sum(r['total_terlambat'] for r in ranking)
     teladan_count = len(teladan)
 
+    # Previous-period KPI deltas
+    prev_start, prev_end = _previous_period(period_start, period_end, period_type)
+    prev_ranking = terlambat_ranking(conn, prev_start, prev_end)
+    prev_coaching = coaching_flag(conn, prev_start, prev_end, threshold=threshold_effective)
+    prev_teladan = [
+        r for r in prev_ranking
+        if r['total_terlambat'] == 0 and r['hari_telat'] == 0 and r['absent_count'] == 0
+    ]
+    prev_avg_min = avg_minutes_per_late_event(conn, prev_start, prev_end)
+    prev_total_terlambat = sum(r['hari_telat'] for r in prev_ranking)
+
+    period_word = "minggu lalu" if period_type == "weekly" else "bulan lalu"
+    kpi_deltas = {
+        "total_terlambat": _kpi_delta(total_terlambat, prev_total_terlambat, "down"),
+        "avg_min":         _kpi_delta(int(avg_min), int(prev_avg_min), "down"),
+        "coaching":        _kpi_delta(len(coaching), len(prev_coaching), "down"),
+        "teladan":         _kpi_delta(teladan_count, len(prev_teladan), "up"),
+    }
+    for d in kpi_deltas.values():
+        d["period_word"] = period_word
+
     hr_officer_name = get_setting(conn, "hr_officer_name", default="")
     brand_lockup_svg = _load_brand_lockup()
 
@@ -132,6 +199,7 @@ def render_dashboard_html(
         jam_masuk=jam_masuk,
         ranking=ranking,
         sections=sections,
+        kpi_deltas=kpi_deltas,
         hr_officer_name=hr_officer_name,
         brand_lockup_svg=brand_lockup_svg,
         period_badge_text=period_badge_text,

@@ -241,8 +241,6 @@ def test_coaching_section_shows_formula_when_working_days_present(temp_db_path, 
             threshold_info={"daily": 15, "working_days": 3, "effective": 45},
         )
     html = out.read_text(encoding="utf-8")
-    # KPI delta uses effective + working days
-    assert "&ge; 45 mnt / 3 hari" in html or ">= 45 mnt / 3 hari" in html
     # Coaching panel footer shows the full formula
     assert "Threshold" in html
     assert "45 mnt" in html
@@ -263,7 +261,6 @@ def test_coaching_section_fallback_when_no_working_days(temp_db_path, tmp_path):
         )
     html = out.read_text(encoding="utf-8")
     assert "Belum ada data hari kerja periode ini." in html
-    assert "tanpa data hari kerja" in html
     # Formula MUST NOT appear when working_days == 0
     assert "mnt/hari ×" not in html and "mnt/hari &times;" not in html
 
@@ -308,3 +305,52 @@ def test_dashboard_html_period_label_in_h1(tmp_path, temp_db_path):
     h1_match = re.search(r"<h1[^>]*>(.+?)</h1>", html, re.DOTALL)
     assert h1_match, "<h1> tag must exist"
     assert "Mei 2026" in h1_match.group(1)
+
+
+def test_dashboard_html_kpi_delta_renders_when_prev_period_exists(
+        tmp_path, temp_db_path):
+    """When data exists in both the current AND previous period, KPI deltas
+    are rendered with an arrow + value."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="BUDI", dept="X")
+        upsert_attendance(
+            conn, employee_id=a, tanggal="2026-04-15", hari="Rabu",
+            tipe="Hari Kerja", jadwal="08.00 - 16.00",
+            masuk="08:30", keluar="16:00", kerja_jam=7.5,
+            lembur_jam=0, terlambat_menit=30,
+            has_issue=0, imported_from="W1.xls",
+        )
+        upsert_attendance(
+            conn, employee_id=a, tanggal="2026-05-15", hari="Jumat",
+            tipe="Hari Kerja", jadwal="08.00 - 16.00",
+            masuk="08:20", keluar="16:00", kerja_jam=7.7,
+            lembur_jam=0, terlambat_menit=20,
+            has_issue=0, imported_from="W1.xls",
+        )
+        html_path = render_dashboard_html(
+            conn,
+            period_start="2026-05-01", period_end="2026-05-31",
+            period_label="Mei 2026", out_dir=tmp_path,
+            period_type="monthly",
+        )
+    html = html_path.read_text(encoding="utf-8")
+    assert ("▼" in html) or ("▲" in html), \
+        "delta arrow should be rendered when prev period exists"
+    assert "bulan lalu" in html
+
+
+def test_dashboard_html_kpi_delta_em_dash_when_no_prev_period(
+        tmp_path, temp_db_path):
+    """When no previous period data exists, delta renders as em-dash."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        html_path = render_dashboard_html(
+            conn,
+            period_start="2026-05-01", period_end="2026-05-31",
+            period_label="Mei 2026", out_dir=tmp_path,
+            period_type="monthly",
+        )
+    html = html_path.read_text(encoding="utf-8")
+    assert "Total Terlambat" in html
+    assert "—" in html

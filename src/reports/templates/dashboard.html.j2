@@ -28,6 +28,9 @@
   .b-kpi .k .n{font-family:Consolas,monospace;font-size:28px;color:#171717;font-weight:700;line-height:1}
   .b-kpi .k .n .u{font-size:14px;color:#737373;font-weight:500;margin-left:3px}
   .b-kpi .k .delta{font-size:10px;color:#525252;margin-top:4px}
+  .b-kpi .k .delta.delta-good{color:#10b981}
+  .b-kpi .k .delta.delta-bad{color:#ec4899}
+  .b-kpi .k .delta.delta-neutral{color:#737373}
 
   /* Sections */
   .b-section{margin-bottom:22px;break-inside:avoid}
@@ -124,10 +127,10 @@
   {# === KPI === #}
   {% if sections.kpi %}
   <div class="b-kpi">
-    <div class="k"><div class="l">Total Terlambat</div><div class="n">{{ kpi.total_terlambat }}</div><div class="delta">kejadian</div></div>
-    <div class="k cyan"><div class="l">Rata-rata / Kejadian</div><div class="n">{{ '%.0f' % kpi.avg_min }}<span class="u">min</span></div><div class="delta">{{ kpi.total_min }} menit &divide; {{ kpi.total_terlambat }}</div></div>
-    <div class="k violet"><div class="l">Coaching</div><div class="n">{{ kpi.coaching_count }}</div><div class="delta">{% if coaching_working_days > 0 %}&ge; {{ coaching_threshold_effective }} mnt / {{ coaching_working_days }} hari{% else %}tanpa data hari kerja{% endif %}</div></div>
-    <div class="k emerald"><div class="l">Teladan</div><div class="n">{{ kpi.teladan_count }}</div><div class="delta">hadir penuh</div></div>
+    <div class="k"><div class="l">Total Terlambat</div><div class="n">{{ kpi.total_terlambat }}</div><div class="delta delta-{{ kpi_deltas.total_terlambat.color_class }}">{% if kpi_deltas.total_terlambat.delta is none %}—{% else %}{{ kpi_deltas.total_terlambat.arrow }} {{ kpi_deltas.total_terlambat.delta|abs }} dari {{ kpi_deltas.total_terlambat.period_word }}{% endif %}</div></div>
+    <div class="k cyan"><div class="l">Rata-rata / Kejadian</div><div class="n">{{ '%.0f' % kpi.avg_min }}<span class="u">min</span></div><div class="delta delta-{{ kpi_deltas.avg_min.color_class }}">{% if kpi_deltas.avg_min.delta is none %}—{% else %}{{ kpi_deltas.avg_min.arrow }} {{ kpi_deltas.avg_min.delta|abs }} min dari {{ kpi_deltas.avg_min.period_word }}{% endif %}</div></div>
+    <div class="k violet"><div class="l">Coaching</div><div class="n">{{ kpi.coaching_count }}</div><div class="delta delta-{{ kpi_deltas.coaching.color_class }}">{% if kpi_deltas.coaching.delta is none %}—{% else %}{{ kpi_deltas.coaching.arrow }} {{ kpi_deltas.coaching.delta|abs }} dari {{ kpi_deltas.coaching.period_word }}{% endif %}</div></div>
+    <div class="k emerald"><div class="l">Teladan</div><div class="n">{{ kpi.teladan_count }}</div><div class="delta delta-{{ kpi_deltas.teladan.color_class }}">{% if kpi_deltas.teladan.delta is none %}—{% else %}{{ kpi_deltas.teladan.arrow }} {{ kpi_deltas.teladan.delta|abs }} dari {{ kpi_deltas.teladan.period_word }}{% endif %}</div></div>
   </div>
   {% endif %}
 
