@@ -16,6 +16,7 @@ from src.core.insights import (
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.reports.html_renderer import render_dashboard_html
 from src.ui.components.week_nav import WeekNavBar
+from src.core.session_state import period_state
 from src.ui.theme import (
     FONT_FAMILY, FONT_MONO,
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
@@ -124,7 +125,7 @@ class DashboardScreen(ctk.CTkFrame):
 
         self.nav = WeekNavBar(
             header, current_month=self._current_month,
-            on_change=self._on_period_change, initial="semua",
+            on_change=self._on_period_change, initial=period_state.get(),
         )
         self.nav.pack(side="left")
 
@@ -380,6 +381,7 @@ class DashboardScreen(ctk.CTkFrame):
     # ──────────────────────────────────────────────────── Data updates
 
     def _on_period_change(self, _key):
+        period_state.set(_key)
         self._update_data()
 
     def _apply_layout(self, is_bulanan: bool):
