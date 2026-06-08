@@ -4,6 +4,7 @@ from tkinter import ttk
 import customtkinter as ctk
 
 from src.config import DB_PATH
+from src.core.session_state import period_state
 from src.core.week_utils import weeks_in_month
 from src.db.coaching import (
     list_coaching_for_week, mark_coached, unmark_coached,
@@ -87,12 +88,13 @@ class CoachingScreen(ctk.CTkFrame):
                      text_color=COLOR_TEXT).pack(side="left", padx=(0, SPACE_LG))
         self.nav = WeekNavBar(
             header, current_month=self._current_month,
-            on_change=self._on_period_change, initial="minggu_1",
+            on_change=self._on_period_change, initial=period_state.get(),
             include_all=False,
         )
         self.nav.pack(side="left")
 
     def _on_period_change(self, _key):
+        period_state.set(_key)
         self._reload()
 
     def _build_stats(self):
