@@ -10,6 +10,7 @@ from src.db.attendance import (
     unresolve_issue,
 )
 from src.core.insights import resolution_rate
+from src.core.session_state import period_state
 from src.core.reason_mapper import REASON_LABELS, REASON_NEEDS_DETAIL, render_alasan_ijin
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.ui.components.kpi_card import KPICard
@@ -100,7 +101,7 @@ class IssuesScreen(ctk.CTkFrame):
                      text_color=COLOR_TEXT).pack(side="left", padx=(0, SPACE_LG))
         self.nav = WeekNavBar(
             header, current_month=self._current_month,
-            on_change=self._on_period_change, initial="semua",
+            on_change=self._on_period_change, initial=period_state.get(),
         )
         self.nav.pack(side="left")
         ctk.CTkButton(
@@ -110,6 +111,7 @@ class IssuesScreen(ctk.CTkFrame):
         ).pack(side="right")
 
     def _on_period_change(self, _key):
+        period_state.set(_key)
         self._reload()
 
     def _on_batch_resolve(self):
