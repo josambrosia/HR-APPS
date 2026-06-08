@@ -84,10 +84,10 @@ tasklist | grep -i HR-Absensi || echo "not running"
 
 ## Current state (as of last commit)
 
-- Latest milestone: `v15` (commit `cc761de`) — Resolve Massal bug fix + Lupa Absen split (datang/pulang) + Laporan Bulanan holiday format
-- Test baseline: **256 passing**
-- Latest installer artifact: `Installers/HR-Absensi-Setup-v15.0.0.exe` (33.4 MB) — canonical distributable
-- Backup installer: `Installers/HR-Absensi-Setup-v14.0.0.exe` (33.4 MB) — for rollback
-- Production `.exe` at `D:\Gawe\Project X\HR App\dist\HR-Absensi\` is v15 with 2-level rotation backup of v14
+- Latest milestone: `v16` (commit `675ae2a`, LOCAL only — awaiting push authorization) — UX polish bundle: cross-screen week (SessionPeriodState), Search/filter (Issues + Outlier), Keyboard shortcuts (Ctrl+F / Esc / Enter), About dialog (sidebar), Print dashboard improvements (dynamic badge + period in H1 + KPI deltas + resolution strip + outlier line)
+- Test baseline: **293 passing** (was 256 baseline, +37 net new)
+- Latest installer artifact: `Installers/HR-Absensi-Setup-v16.0.0.exe` (33.4 MB) — canonical distributable
+- Backup installer: `Installers/HR-Absensi-Setup-v15.3.0.exe` (33.4 MB) — for rollback (older versions also preserved)
+- Production `.exe` at `D:\Gawe\Project X\HR App\dist\HR-Absensi\` is v16 with `.bak` of v15.3 (1-level rotation this round — no prior `.bak` existed in production tree)
 
-Subsequent work forks from `v15`. New features → new `vN+1` milestone following the 3-rule framework above.
+Subsequent work forks from `v16`. New features → new `vN+1` milestone following the 3-rule framework above.
