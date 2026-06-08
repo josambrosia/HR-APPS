@@ -87,3 +87,13 @@ def tk_root():
     root.withdraw()
     yield root
     root.destroy()
+
+
+@pytest.fixture(autouse=True)
+def reset_period_state():
+    """Reset the cross-screen period state singleton between every test
+    so screen-construction tests don't bleed state into each other."""
+    from src.core.session_state import period_state
+    period_state.reset()
+    yield
+    period_state.reset()
