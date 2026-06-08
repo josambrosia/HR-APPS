@@ -13,6 +13,7 @@ from src.db.outlier import (
     month_roster, list_active_exclusions,
     exclude_employee, revert_employee, revert_all,
 )
+from src.ui.components.search_bar import SearchBar
 from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
     COLOR_BORDER, COLOR_BORDER_STRONG,
@@ -38,6 +39,9 @@ class OutlierScreen(ctk.CTkFrame):
         with get_connection(DB_PATH) as conn:
             self._month = get_setting(conn, "current_month") or ""
 
+        self._search_query = ""
+        self._disertakan_rows: list = []
+
         self._build_header()
         self._build_scroll()
         self._render()
@@ -57,6 +61,11 @@ class OutlierScreen(ctk.CTkFrame):
             text="Kecualikan karyawan tertentu dari analisis Dashboard & Coaching",
             font=FONT_SMALL, text_color=COLOR_TEXT_DIM,
         ).pack(anchor="w", pady=(2, 0))
+        self._search = SearchBar(
+            header, on_change=self._apply_filter,
+        )
+        self._search.pack(side="right", padx=(SPACE_SM, SPACE_SM))
+
         if self._month:
             badge = ctk.CTkFrame(
                 header, fg_color="#08222B",
@@ -81,6 +90,7 @@ class OutlierScreen(ctk.CTkFrame):
     def _render(self):
         for child in self.scroll.winfo_children():
             child.destroy()
+        self._disertakan_rows = []
 
         if not self._month:
             self._render_empty(
@@ -125,6 +135,8 @@ class OutlierScreen(ctk.CTkFrame):
 
         if excluded_rows:
             self._render_footer(len(excluded_rows))
+
+        self._apply_filter(self._search_query)
 
     def _render_empty(self, title: str, hint: str):
         box = ctk.CTkFrame(
@@ -179,6 +191,9 @@ class OutlierScreen(ctk.CTkFrame):
             corner_radius=RADIUS_MD,
         )
         card.pack(fill="x", pady=2, padx=SPACE_XS)
+        if not excluded:
+            card._employee_name = emp["nama"]
+            self._disertakan_rows.append(card)
 
         ctk.CTkLabel(
             card, text=emp["nama"][:1].upper(),
@@ -233,6 +248,22 @@ class OutlierScreen(ctk.CTkFrame):
             font=FONT_SMALL,
             command=self._on_revert_all,
         ).pack(side="right")
+
+    def _apply_filter(self, query: str):
+        """Show/hide Disertakan rows based on name substring match.
+        Dikecualikan section is unaffected."""
+        self._search_query = query
+        q = query.lower().strip()
+        visible = 0
+        for row in self._disertakan_rows:
+            nama = getattr(row, "_employee_name", "")
+            if not q or q in nama.lower():
+                row.pack(fill="x", pady=2, padx=SPACE_XS)
+                visible += 1
+            else:
+                row.pack_forget()
+        total = len(self._disertakan_rows)
+        self._search.set_count(visible, total)
 
     # -- actions --
     def _on_exclude(self, employee_id: int):
