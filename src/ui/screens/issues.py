@@ -51,6 +51,10 @@ class IssuesScreen(ctk.CTkFrame):
         self._build_tables_and_panel()
         self._reload()
 
+        # Ctrl+F focuses the search input. Bound on the screen frame
+        # (not bind_all) so the shortcut is scoped to the visible screen.
+        self.bind("<Control-f>", lambda _e: self._search.focus())
+
     def _setup_treeview_style(self):
         style = ttk.Style()
         try:

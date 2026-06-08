@@ -48,6 +48,17 @@ def test_outlier_screen_constructs_with_no_active_month(temp_db_path, monkeypatc
     screen.destroy()
 
 
+def test_outlier_screen_binds_ctrl_f(temp_db_path, monkeypatch, tk_root):
+    import src.ui.screens.outlier as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    screen = mod.OutlierScreen(tk_root)
+    tk_root.update_idletasks()
+    bindings = screen.bind("<Control-f>")
+    assert bindings != ""
+    screen.destroy()
+
+
 def test_outlier_search_filters_disertakan_only(temp_db_path, monkeypatch, tk_root):
     """SearchBar filters Disertakan section by name; Dikecualikan stays
     untouched (the latter is short by design and excluding a hidden

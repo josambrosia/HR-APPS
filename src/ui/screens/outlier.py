@@ -46,6 +46,10 @@ class OutlierScreen(ctk.CTkFrame):
         self._build_scroll()
         self._render()
 
+        # Ctrl+F focuses the search input. Bound on the screen frame
+        # (not bind_all) so the shortcut is scoped to the visible screen.
+        self.bind("<Control-f>", lambda _e: self._search.focus())
+
     # -- layout scaffold --
     def _build_header(self):
         header = ctk.CTkFrame(self, fg_color="transparent")

@@ -60,6 +60,20 @@ def test_issues_screen_writes_period_state_on_change(temp_db_path, monkeypatch, 
     screen.destroy()
 
 
+def test_issues_screen_binds_ctrl_f(temp_db_path, monkeypatch, tk_root):
+    """Structural: the Ctrl-f binding exists on the screen frame.
+    Actual focus side effect is verified by manual smoke per project
+    policy (headless tkinter doesn't move focus reliably)."""
+    import src.ui.screens.issues as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    screen = mod.IssuesScreen(tk_root)
+    tk_root.update_idletasks()
+    bindings = screen.bind("<Control-f>")
+    assert bindings != "", "Ctrl+F binding should be present on IssuesScreen"
+    screen.destroy()
+
+
 def test_issues_apply_filter_reduces_visible_rows(temp_db_path, monkeypatch, tk_root):
     """Setting a filter query that doesn't match anyone hides all rows;
     setting one that matches one employee shows only that employee."""
