@@ -310,3 +310,19 @@ def count_overlap(conn: sqlite3.Connection, pending_rows: list) -> dict:
         else:
             new_count += 1
     return {"new": new_count, "overwrite": overwrite_count}
+
+
+def list_attendance_matrix(conn, start, end):
+    """All attendance rows in [start,end] joined with employee, for the heatmap.
+    Returns only rows that exist; the renderer fills missing (employee,date)
+    cells. Sorted by nama, tanggal."""
+    sql = """
+        SELECT ar.employee_id, e.nama, e.dept, ar.tanggal, ar.hari, ar.tipe,
+               ar.masuk, ar.keluar, ar.terlambat_menit,
+               ar.reason_category, ar.reason_detail, ar.has_issue
+          FROM attendance_records ar
+          JOIN employees e ON ar.employee_id = e.id
+         WHERE ar.tanggal BETWEEN ? AND ?
+         ORDER BY e.nama ASC, ar.tanggal ASC
+    """
+    return [dict(r) for r in conn.execute(sql, (start, end)).fetchall()]
