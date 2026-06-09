@@ -137,6 +137,7 @@ DEFAULT_SCHEDULE_START = "08.00"
 DEFAULT_SCHEDULE_END = "16.00"
 DEFAULT_COACHING_THRESHOLD_PER_DAY = 15
 DEFAULT_LUPA_PENALTY_MIN = 15
+DEFAULT_SEVERE_LATENESS_THRESHOLD_MIN = 60
 
 # Reason categories (canonical IDs used in DB and UI)
 REASON_CATEGORIES = (
@@ -150,6 +151,20 @@ REASON_CATEGORIES = (
     "lupa_absen_datang",
     "lupa_absen_pulang",
     "libur",
+    "na",
+)
+
+# Reason categories shown in the Severe Lateness resolve panel — a subset of
+# REASON_CATEGORIES relevant when BOTH punches are present (so lupa_absen_* and
+# libur are excluded). terlambat_kerja is in COACHING_EXCLUDED (justified late →
+# dropped from coaching); terlambat_lain is not (stays counted, just annotated).
+SEVERE_LATENESS_CATEGORIES = (
+    "tugas_lapangan",
+    "tugas_paparan",
+    "terlambat_kerja",
+    "terlambat_lain",
+    "izin_sakit",
+    "cuti",
     "na",
 )
 
