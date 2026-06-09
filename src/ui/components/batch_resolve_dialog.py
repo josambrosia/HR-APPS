@@ -85,7 +85,7 @@ class BatchResolveDialog(ctk.CTkToplevel):
     """Modal — resolve many open issues for one employee in one action."""
 
     def __init__(self, parent, *, period_start: str, period_end: str,
-                 on_done: Callable[[], None]):
+                 on_done: Callable[[], None], lister_fn=None):
         super().__init__(parent)
         self.title("Resolve Massal")
         self.resizable(False, False)
@@ -112,10 +112,11 @@ class BatchResolveDialog(ctk.CTkToplevel):
         self.grid_rowconfigure(2, weight=0)  # footer — fixed
 
         self._on_done = on_done
+        self._lister_fn = lister_fn or (
+            lambda c, s, e: list_issues_for_period(c, s, e, resolved=False))
 
         with get_connection(DB_PATH) as conn:
-            rows = list_issues_for_period(
-                conn, period_start, period_end, resolved=False)
+            rows = self._lister_fn(conn, period_start, period_end)
         self._groups = group_open_issues_by_employee(rows)
         self._by_label = {
             f"{g['nama']} ({g['dept'] or '-'}) — {len(g['issues'])} issue terbuka": g
