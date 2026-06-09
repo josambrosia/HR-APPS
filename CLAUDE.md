@@ -84,11 +84,12 @@ tasklist | grep -i HR-Absensi || echo "not running"
 
 ## Current state (as of last commit)
 
-- Latest milestone: `v16.0.1` hotfix (commit `10c967d`, LOCAL only — awaiting push authorization) — fixes Resolve Massal button regression introduced in v16.0.0 T6 (SearchBar pack order pushed button off-screen). Otherwise same as v16.0.0 below.
+- Latest milestone: `v16.0.2` hotfix (commit `eef2e5c`, LOCAL only — awaiting push authorization) — relocates SearchBar out of crowded headers (Issues + Outlier) AND fixes invisible placeholder (StringVar trace was suppressing CTkEntry placeholder lifecycle; switched to KeyRelease binding + explicit `placeholder_text_color=COLOR_TEXT_DIM`).
+- v16.0.1 hotfix (commit `10c967d`) = pack-order fix for + Resolve Massal button regression.
 - v16.0.0 bundle (commit `23c7bf1`) = UX polish: cross-screen week (SessionPeriodState), Search/filter (Issues + Outlier), Keyboard shortcuts (Ctrl+F / Esc / Enter), About dialog (sidebar), Print dashboard improvements (dynamic badge + period in H1 + KPI deltas + resolution strip + outlier line)
-- Test baseline: **295 passing** (was 256 baseline; +37 from v16.0.0 + 2 from v16.0.1 regression guard)
-- Latest installer artifact: `Installers/HR-Absensi-Setup-v16.0.1.exe` (33.4 MB) — canonical distributable
-- Backup installer: `Installers/HR-Absensi-Setup-v16.0.0.exe` (33.4 MB) — for rollback (older v15.x also preserved)
-- Production `.exe` at `D:\Gawe\Project X\HR App\dist\HR-Absensi\` is v16.0.1 with `.bak` of v16.0.0 + `.bak.old` of v15.3 (full 2-level rotation)
+- Test baseline: **295 passing** (was 256 baseline; +39 net new across v16.0.0/0.1/0.2 — some test names rotated)
+- Latest installer artifact: `Installers/HR-Absensi-Setup-v16.0.2.exe` (33.4 MB) — canonical distributable
+- Backup installer: `Installers/HR-Absensi-Setup-v16.0.1.exe` (33.4 MB) — for rollback (v16.0.0 + older v15.x also preserved)
+- Production `.exe` at `D:\Gawe\Project X\HR App\dist\HR-Absensi\` is v16.0.2 with `.bak` of v16.0.1 + `.bak.old` of v16.0.0 (full 2-level rotation)
 
-Subsequent work forks from `v16.0.1`. New features → new `vN+1` milestone following the 3-rule framework above.
+Subsequent work forks from `v16.0.2`. New features → new `vN+1` milestone following the 3-rule framework above.
