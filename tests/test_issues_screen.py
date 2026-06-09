@@ -138,28 +138,23 @@ def test_issues_apply_filter_reduces_visible_rows(temp_db_path, monkeypatch, tk_
     screen.destroy()
 
 
-def test_issues_header_resolve_massal_packed_before_searchbar(temp_db_path, monkeypatch, tk_root):
-    """Regression guard for v16 hotfix: in `_build_header`, the
-    `+ Resolve Massal` button (side='right', width=160) MUST be packed
-    BEFORE the SearchBar (side='left', natural width ~300px).
+def test_issues_header_has_resolve_massal_no_searchbar(temp_db_path, monkeypatch, tk_root):
+    """Regression guard for v16.0.2 hotfix: SearchBar must NOT be in the
+    Issues header. The header contains the title, week-nav, and the
+    `+ Resolve Massal` CTA (side='right'). SearchBar lives below in the
+    tables area (row 2), inline with the OPEN ISSUES label, anchored to
+    the content it filters.
 
-    Why: Tk's pack manager claims slots in CALL ORDER. If the SearchBar
-    packs side='left' FIRST, it consumes the horizontal slot the right-
-    side button needs at runtime window width — the button gets pushed
-    off-screen. Reordering so the button packs first guarantees its
-    rightmost slot is claimed before SearchBar competes for left-side
-    space.
-
-    Asserting `pack_slaves()` index is the structural guard:
-    pre-fix code (button packed AFTER search) → index(btn) > index(search)
-    post-fix code (button packed BEFORE search) → index(btn) < index(search)
+    This prevents reintroducing the v16.0.1 layout where SearchBar
+    competed with the CTA for horizontal space in the header.
     """
+    from src.ui.components.search_bar import SearchBar
     import src.ui.screens.issues as mod
     monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
     init_db(temp_db_path)
     screen = mod.IssuesScreen(tk_root)
     tk_root.update_idletasks()
-    # The header is the FIRST CTkFrame child of screen (row 0 of the grid)
+    # The header is the CTkFrame child of screen at grid row 0
     header = None
     for child in screen.winfo_children():
         info = child.grid_info() if hasattr(child, "grid_info") else {}
@@ -168,7 +163,7 @@ def test_issues_header_resolve_massal_packed_before_searchbar(temp_db_path, monk
             break
     assert header is not None, "Header frame (grid row 0) must exist"
 
-    # Find the + Resolve Massal button
+    # Find the + Resolve Massal button in the header
     btn = None
     for w in header.winfo_children():
         if isinstance(w, ctk.CTkButton):
@@ -179,24 +174,41 @@ def test_issues_header_resolve_massal_packed_before_searchbar(temp_db_path, monk
             except Exception:
                 pass
     assert btn is not None, "+ Resolve Massal button must exist as header child"
-
-    # Button must be packed side='right'
     assert btn.pack_info().get("side") == "right", \
         f"button must be packed side='right', got {btn.pack_info().get('side')}"
 
-    # SearchBar must be packed side='left' as the search input
-    assert screen._search.pack_info().get("side") == "left", \
-        f"SearchBar must be packed side='left', got {screen._search.pack_info().get('side')}"
+    # SearchBar must NOT be a child of the header (structural invariant)
+    header_slaves = header.pack_slaves()
+    for w in header_slaves:
+        assert not isinstance(w, SearchBar), \
+            "SearchBar must NOT be in the Issues header (relocated v16.0.2)"
 
-    # CRITICAL invariant: pack-call order. The button MUST appear before
-    # the SearchBar in pack_slaves() so its right-edge slot is claimed
-    # first by the pack manager (and not pushed off-screen at runtime).
-    slaves = header.pack_slaves()
-    btn_idx = slaves.index(btn)
-    search_idx = slaves.index(screen._search)
-    assert btn_idx < search_idx, (
-        f"+ Resolve Massal button must be packed BEFORE SearchBar "
-        f"(got button at index {btn_idx}, search at index {search_idx}). "
-        f"Pre-fix code packed search first → button got pushed off-screen."
-    )
+    # SearchBar must still exist on the screen — somewhere under the
+    # tables area (the row 2 child of the screen grid).
+    assert hasattr(screen, "_search"), "screen._search must exist"
+    assert isinstance(screen._search, SearchBar)
+
+    # Walk children of the row-2 frame to confirm SearchBar lives there.
+    tables_frame = None
+    for child in screen.winfo_children():
+        info = child.grid_info() if hasattr(child, "grid_info") else {}
+        if isinstance(child, ctk.CTkFrame) and info.get("row") == 2 and info.get("column") == 0:
+            tables_frame = child
+            break
+    assert tables_frame is not None, "Tables area (grid row 2 col 0) must exist"
+
+    def _contains_search(widget):
+        try:
+            children = widget.winfo_children()
+        except Exception:
+            return False
+        for c in children:
+            if c is screen._search:
+                return True
+            if _contains_search(c):
+                return True
+        return False
+
+    assert _contains_search(tables_frame), \
+        "SearchBar must be a descendant of the tables area (row 2)"
     screen.destroy()

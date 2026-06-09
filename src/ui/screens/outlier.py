@@ -34,7 +34,7 @@ class OutlierScreen(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent, fg_color="transparent")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=1)
 
         with get_connection(DB_PATH) as conn:
             self._month = get_setting(conn, "current_month") or ""
@@ -43,6 +43,7 @@ class OutlierScreen(ctk.CTkFrame):
         self._disertakan_rows: list = []
 
         self._build_header()
+        self._build_filter_row()
         self._build_scroll()
         self._render()
 
@@ -65,10 +66,6 @@ class OutlierScreen(ctk.CTkFrame):
             text="Kecualikan karyawan tertentu dari analisis Dashboard & Coaching",
             font=FONT_SMALL, text_color=COLOR_TEXT_DIM,
         ).pack(anchor="w", pady=(2, 0))
-        self._search = SearchBar(
-            header, on_change=self._apply_filter,
-        )
-        self._search.pack(side="right", padx=(SPACE_SM, SPACE_SM))
 
         if self._month:
             badge = ctk.CTkFrame(
@@ -86,9 +83,20 @@ class OutlierScreen(ctk.CTkFrame):
                 font=FONT_BODY_BOLD, text_color=COLOR_INFO,
             ).pack(anchor="e", padx=SPACE_MD, pady=(0, SPACE_XS))
 
+    def _build_filter_row(self):
+        """Slim row between header and scroll content containing the
+        SearchBar (right-aligned). Anchored above the list it filters."""
+        row = ctk.CTkFrame(self, fg_color="transparent")
+        row.grid(row=1, column=0, sticky="ew", pady=(0, SPACE_SM))
+        row.grid_columnconfigure(0, weight=1)
+        self._search = SearchBar(
+            row, on_change=self._apply_filter, width=240,
+        )
+        self._search.grid(row=0, column=1, sticky="e")
+
     def _build_scroll(self):
         self.scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_BG)
-        self.scroll.grid(row=1, column=0, sticky="nsew")
+        self.scroll.grid(row=2, column=0, sticky="nsew")
 
     # -- render --
     def _render(self):

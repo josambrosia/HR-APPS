@@ -21,8 +21,14 @@ class SearchBar(ctk.CTkFrame):
 
     Layout: [🔍 input field] [✕] [12 dari 47]
 
-    Caller passes `on_change(query: str)` which is invoked on every
+    Caller passes on_change(query: str) which is invoked on every
     keystroke with the current query text.
+
+    NOTE on placeholder lifecycle: we deliberately do NOT use a
+    textvariable here. CTkEntry's placeholder is suppressed when a
+    bound StringVar fires a write trace during construction, which
+    leaves the field looking blank. KeyRelease binding gives us the
+    same per-keystroke callback without that side-effect.
     """
 
     def __init__(
@@ -36,13 +42,10 @@ class SearchBar(ctk.CTkFrame):
         super().__init__(parent, fg_color="transparent", **kwargs)
         self._on_change = on_change
 
-        self._query_var = ctk.StringVar(value="")
-        self._query_var.trace_add("write", self._on_var_change)
-
         self._entry = ctk.CTkEntry(
             self,
-            textvariable=self._query_var,
             placeholder_text=placeholder,
+            placeholder_text_color=COLOR_TEXT_DIM,
             width=width, height=30,
             fg_color=COLOR_SURFACE_HIGH,
             border_color=COLOR_BORDER, border_width=1,
@@ -51,6 +54,7 @@ class SearchBar(ctk.CTkFrame):
             corner_radius=RADIUS_MD,
         )
         self._entry.pack(side="left", padx=(0, SPACE_XS))
+        self._entry.bind("<KeyRelease>", self._on_key_release)
 
         self._clear_btn = ctk.CTkButton(
             self, text="✕", command=self.clear,
@@ -70,14 +74,29 @@ class SearchBar(ctk.CTkFrame):
         )
         self._counter_label.pack(side="left")
 
-    def _on_var_change(self, *_args):
+    def _on_key_release(self, _e=None):
         self._on_change(self.get())
 
     def get(self) -> str:
-        return self._query_var.get()
+        return self._entry.get()
+
+    def set(self, value: str) -> None:
+        """Programmatically set the query value. Used by tests to
+        simulate typing; production code should never call this."""
+        self._entry.delete(0, "end")
+        if value:
+            self._entry.insert(0, value)
+        self._on_change(self.get())
 
     def clear(self) -> None:
-        self._query_var.set("")  # triggers _on_var_change → on_change("")
+        self._entry.delete(0, "end")
+        # Re-activate placeholder display after programmatic clear
+        if hasattr(self._entry, "_activate_placeholder"):
+            try:
+                self._entry._activate_placeholder()
+            except Exception:
+                pass
+        self._on_change("")
 
     def set_count(self, visible: int, total: int) -> None:
         if total == 0:

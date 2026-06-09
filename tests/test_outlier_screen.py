@@ -96,11 +96,16 @@ def test_outlier_search_filters_disertakan_only(temp_db_path, monkeypatch, tk_ro
     screen.destroy()
 
 
-def test_outlier_header_badge_present(temp_db_path, monkeypatch, tk_root):
-    """Regression (v16 T7 companion check): when an active month is set,
-    the BULAN AKTIF badge and SearchBar in the header must both be packed
-    side='right' so neither is squeezed off by the elastic left frame.
-    Validates the safe pack-order documented in the v16 hotfix audit."""
+def test_outlier_header_has_badge_no_searchbar(temp_db_path, monkeypatch, tk_root):
+    """Regression guard for v16.0.2 hotfix: the BULAN AKTIF badge must
+    be in the Outlier header (side='right'), and SearchBar must NOT be
+    in the header — it has been relocated to a slim filter row between
+    the header and the scrollable content.
+
+    Prevents reintroducing the v16.0.1 layout where SearchBar competed
+    with the badge for right-side space.
+    """
+    from src.ui.components.search_bar import SearchBar
     import src.ui.screens.outlier as mod
     monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
     init_db(temp_db_path)
@@ -109,26 +114,50 @@ def test_outlier_header_badge_present(temp_db_path, monkeypatch, tk_root):
         conn.commit()
     screen = mod.OutlierScreen(tk_root)
     tk_root.update_idletasks()
-    # SearchBar should be packed side='right'
-    pi_search = screen._search.pack_info()
-    assert pi_search.get("side") == "right", \
-        f"SearchBar must be packed side='right', got {pi_search.get('side')}"
-    # Walk the header (row 0 child of screen) and find the BULAN AKTIF badge
-    badges = []
+
+    # Locate header (grid row 0 child of screen).
+    header = None
     for child in screen.winfo_children():
-        if isinstance(child, ctk.CTkFrame):
-            for grandchild in child.winfo_children():
-                if isinstance(grandchild, ctk.CTkFrame):
-                    for label in grandchild.winfo_children():
-                        try:
-                            if isinstance(label, ctk.CTkLabel) and \
-                               "BULAN AKTIF" in str(label.cget("text")):
-                                badges.append(grandchild)
-                                break
-                        except Exception:
-                            pass
+        info = child.grid_info() if hasattr(child, "grid_info") else {}
+        if isinstance(child, ctk.CTkFrame) and info.get("row") == 0:
+            header = child
+            break
+    assert header is not None, "Header frame (grid row 0) must exist"
+
+    # SearchBar must NOT be among header's children.
+    def _has_searchbar(widget):
+        try:
+            children = widget.winfo_children()
+        except Exception:
+            return False
+        for c in children:
+            if isinstance(c, SearchBar):
+                return True
+            if _has_searchbar(c):
+                return True
+        return False
+
+    assert not _has_searchbar(header), \
+        "SearchBar must NOT be in the Outlier header (relocated v16.0.2)"
+
+    # BULAN AKTIF badge must be in header, packed side='right'.
+    badges = []
+    for grandchild in header.winfo_children():
+        if isinstance(grandchild, ctk.CTkFrame):
+            for label in grandchild.winfo_children():
+                try:
+                    if isinstance(label, ctk.CTkLabel) and \
+                       "BULAN AKTIF" in str(label.cget("text")):
+                        badges.append(grandchild)
+                        break
+                except Exception:
+                    pass
     assert len(badges) >= 1, "BULAN AKTIF badge must exist in header"
     pi_badge = badges[0].pack_info()
     assert pi_badge.get("side") == "right", \
         f"BULAN AKTIF badge must be packed side='right', got {pi_badge.get('side')}"
+
+    # SearchBar must exist somewhere on the screen (relocated to filter row).
+    assert hasattr(screen, "_search"), "screen._search must exist"
+    assert isinstance(screen._search, SearchBar)
     screen.destroy()

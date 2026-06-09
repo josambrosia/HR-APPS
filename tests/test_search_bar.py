@@ -15,7 +15,7 @@ def test_search_bar_callback_fires_on_typing(tk_root):
     captured = []
     bar = SearchBar(tk_root, on_change=captured.append)
     tk_root.update_idletasks()
-    bar._query_var.set("budi")
+    bar.set("budi")
     tk_root.update_idletasks()
     assert captured[-1] == "budi"
     assert bar.get() == "budi"
@@ -26,7 +26,7 @@ def test_search_bar_clear_resets_and_fires(tk_root):
     captured = []
     bar = SearchBar(tk_root, on_change=captured.append)
     tk_root.update_idletasks()
-    bar._query_var.set("budi")
+    bar.set("budi")
     tk_root.update_idletasks()
     bar.clear()
     tk_root.update_idletasks()

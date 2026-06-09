@@ -110,22 +110,11 @@ class IssuesScreen(ctk.CTkFrame):
             on_change=self._on_period_change, initial=period_state.get(),
         )
         self.nav.pack(side="left")
-        # NOTE (v16 T6 regression fix): pack the right-side CTA BEFORE the
-        # left-side SearchBar so the button reserves its rightmost slot
-        # before SearchBar competes for horizontal space. Otherwise, at
-        # production window width the ~316px SearchBar (entry + clear +
-        # counter) consumes the slot and the 160px "+ Resolve Massal"
-        # button gets pushed off-screen.
         ctk.CTkButton(
             header, text="+ Resolve Massal", command=self._on_batch_resolve,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
             text_color=COLOR_BG, font=FONT_BODY_BOLD, width=160,
         ).pack(side="right")
-        self._search = SearchBar(
-            header, on_change=self._apply_filter,
-            placeholder="🔍 Cari karyawan...", width=240,
-        )
-        self._search.pack(side="left", padx=(SPACE_LG, SPACE_LG))
 
     def _on_period_change(self, _key):
         period_state.set(_key)
@@ -189,10 +178,21 @@ class IssuesScreen(ctk.CTkFrame):
         left.grid_rowconfigure(1, weight=2)
         left.grid_rowconfigure(3, weight=1)
 
-        ctk.CTkLabel(left, text="OPEN ISSUES",
-                     font=FONT_LABEL,
-                     text_color=COLOR_WARN
-                     ).grid(row=0, column=0, sticky="w", pady=(0, SPACE_XS))
+        # Row 0: filter row — "OPEN ISSUES" label on the left, SearchBar on the right.
+        # The SearchBar filters BOTH Open and Resolved treeviews; placing it
+        # inline with the OPEN ISSUES label visually anchors it to the table
+        # content it filters and avoids competing with header widgets.
+        filter_row = ctk.CTkFrame(left, fg_color="transparent")
+        filter_row.grid(row=0, column=0, sticky="ew", pady=(0, SPACE_XS))
+        filter_row.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            filter_row, text="OPEN ISSUES",
+            font=FONT_LABEL, text_color=COLOR_WARN,
+        ).grid(row=0, column=0, sticky="w")
+        self._search = SearchBar(
+            filter_row, on_change=self._apply_filter, width=240,
+        )
+        self._search.grid(row=0, column=1, sticky="e")
         self.open_tree = self._make_tree(left, style_name="Open.Treeview", show_reason=False)
         self.open_tree.grid(row=1, column=0, sticky="nsew")
         # Subtle rose tint on OPEN rows for stronger differentiation
