@@ -2,6 +2,7 @@ import sqlite3
 from typing import Optional
 
 from src.config import DEFAULT_LUPA_PENALTY_MIN
+from src.config import DEFAULT_SEVERE_LATENESS_THRESHOLD_MIN
 
 
 def get_setting(
@@ -35,3 +36,14 @@ def read_lupa_penalty_min(conn: sqlite3.Connection) -> int:
         return int(raw)
     except (ValueError, TypeError):
         return DEFAULT_LUPA_PENALTY_MIN
+
+
+def read_severe_lateness_threshold(conn) -> int:
+    """Read severe_lateness_threshold_min as int; fall back to the default on
+    missing or non-integer values."""
+    raw = get_setting(conn, "severe_lateness_threshold_min",
+                      default=str(DEFAULT_SEVERE_LATENESS_THRESHOLD_MIN))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_SEVERE_LATENESS_THRESHOLD_MIN
