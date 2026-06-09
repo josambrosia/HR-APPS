@@ -87,6 +87,7 @@ DEFAULT_SETTINGS = {
     "schedule_start": "08.00",
     "schedule_end": "16.00",
     "coaching_threshold_per_day": "15",
+    "severe_lateness_threshold_min": "60",
 }
 
 
