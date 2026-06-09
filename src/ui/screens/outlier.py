@@ -60,6 +60,14 @@ class OutlierScreen(ctk.CTkFrame):
             self.winfo_toplevel().bind_all("<Control-f>", self._focus_search)
         except Exception:
             pass
+        # Click anywhere outside the search bar releases its focus. This
+        # both lets the user escape "search mode" naturally and gives the
+        # CTkEntry's placeholder a chance to re-activate (it only fires on
+        # FocusOut). The bind uses add="+" so it doesn't replace any other
+        # Button-1 handlers Tk may have registered.
+        top = self.winfo_toplevel()
+        self._click_bind_id = top.bind(
+            "<Button-1>", self._on_click_outside_search, add="+")
         self.bind("<Destroy>", self._on_destroy_cleanup)
 
     def _focus_search(self, _e=None):
@@ -67,9 +75,35 @@ class OutlierScreen(ctk.CTkFrame):
             self._search.focus()
         return "break"
 
+    def _on_click_outside_search(self, event):
+        """Release search-bar focus when user clicks anywhere outside it."""
+        if not hasattr(self, "_search"):
+            return
+        target = event.widget
+        # Walk up parent chain; if any ancestor is the SearchBar, we're inside it.
+        while target is not None:
+            if target is self._search:
+                return
+            try:
+                target = target.master
+            except Exception:
+                break
+        # Click was outside the search bar — drop focus.
+        try:
+            self.focus_set()
+        except Exception:
+            pass
+
     def _on_destroy_cleanup(self, _e=None):
         try:
             self.winfo_toplevel().unbind_all("<Control-f>")
+        except Exception:
+            pass
+        # Also unbind the click-outside handler so it doesn't leak when
+        # the user navigates away from this screen.
+        try:
+            if getattr(self, "_click_bind_id", None):
+                self.winfo_toplevel().unbind("<Button-1>", self._click_bind_id)
         except Exception:
             pass
 

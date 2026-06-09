@@ -90,12 +90,14 @@ class SearchBar(ctk.CTkFrame):
 
     def clear(self) -> None:
         self._entry.delete(0, "end")
-        # Re-activate placeholder display after programmatic clear
-        if hasattr(self._entry, "_activate_placeholder"):
-            try:
-                self._entry._activate_placeholder()
-            except Exception:
-                pass
+        # Move focus away from the entry so CTkEntry naturally re-activates
+        # its placeholder on the FocusOut event. Avoids the ghost-placeholder
+        # bug where our manual _activate_placeholder() raced with CTkEntry's
+        # internal placeholder state.
+        try:
+            self.winfo_toplevel().focus_set()
+        except Exception:
+            pass
         self._on_change("")
 
     def set_count(self, visible: int, total: int) -> None:
