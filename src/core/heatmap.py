@@ -76,6 +76,8 @@ _INDO_MONTHS = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
 _SUMMARY_OF = {"hadir": "H", "dinas": "D", "sedang": "TR", "parah": "TB",
                "sakit": "S", "cuti": "C", "lupa": "LA", "mangkir": "X", "na": "X"}
 _SUMMARY_KEYS = ["H", "D", "TR", "TB", "S", "C", "LA", "X"]
+_SUMMARY_STATUS = {"H": "hadir", "D": "dinas", "TR": "sedang", "TB": "parah",
+                   "S": "sakit", "C": "cuti", "LA": "lupa", "X": "mangkir"}
 _LEGEND_ORDER = ["hadir", "dinas", "sedang", "parah", "sakit", "cuti",
                  "lupa", "mangkir", "na", "libur", "nodata"]
 
@@ -140,6 +142,7 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers):
                 alasan = "—"
             cells[d] = {
                 "status": status, "code": STATUS_CODES[status],
+                "label": STATUS_LABELS[status],
                 "color": color, "text_color": _text_color(color), "date": d,
                 "masuk": (row["masuk"] if row and row["masuk"] else "—"),
                 "keluar": (row["keluar"] if row and row["keluar"] else "—"),
@@ -155,6 +158,14 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers):
             "employee_id": eid, "nama": e["nama"], "dept": e.get("dept") or "",
             "hk": hk, "summary": summary, "cells": cells,
         })
+
+    # Week segments for the print matrix header (M1, M2, ...) + separators.
+    print_weeks = []
+    for d in range(1, n_days + 1):
+        if d == 1 or weekday_of[d] == 0:
+            print_weeks.append({"label": f"M{len(print_weeks) + 1}", "days": []})
+        print_weeks[-1]["days"].append(d)
+    wsep_days = [seg["days"][0] for seg in print_weeks[1:]]
 
     prev_m, next_m = _prev_next_month(year_month)
     legend = [{"code": STATUS_CODES[s], "color": STATUS_COLORS[s],
@@ -172,5 +183,9 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers):
         "is_empty": not rows,
         "legend": legend,
         "summary_keys": _SUMMARY_KEYS,
+        "summary_meta": [{"code": k, "color": STATUS_COLORS[_SUMMARY_STATUS[k]]}
+                         for k in _SUMMARY_KEYS],
+        "print_weeks": print_weeks,
+        "wsep_days": wsep_days,
         "employees": out_emps,
     }

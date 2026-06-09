@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<title>Cetak Heatmap Kehadiran — {{ month_label }}</title>
+<style>
+  @page{ size:A4 landscape; margin:10mm; }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e9e9ee;color:#111;font-family:"Segoe UI",Arial,sans-serif}
+  .toolbar{max-width:277mm;margin:10px auto 0;text-align:right}
+  .btn{background:#DB2777;color:#fff;border:0;border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer}
+  .sheet{background:#fff;width:277mm;min-height:190mm;margin:16px auto;padding:10mm;box-shadow:0 4px 20px rgba(0,0,0,.25)}
+  .bar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:6px}
+  .bar h1{font-size:16px;margin:0}
+  .bar .meta{font-size:11px;color:#444;text-align:right;line-height:1.5}
+  h2.sec{font-size:12px;margin:14px 0 4px;border-bottom:1px solid #999;padding-bottom:3px}
+  table{border-collapse:collapse;table-layout:fixed}
+  table.mx{width:100%;margin-top:8px;font-size:8px}
+  table.mx th,table.mx td{border:.5px solid #dcdce2;text-align:center;height:18px;overflow:hidden;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  table.mx col.nm{width:106px} table.mx col.d{width:16px} table.mx col.sep{width:7px}
+  table.mx col.sm{width:18px} table.mx col.hkc{width:34px}
+  table.mx th.nm,table.mx td.nm{text-align:left;padding-left:5px;font-size:9px;font-weight:700;white-space:nowrap;border-right:1.6px solid #333}
+  table.mx td.nm .dept{font-size:7px;color:#666;font-weight:400}
+  table.mx thead th{background:#eef0f4;font-weight:700;color:#333}
+  table.mx th.wk{background:#222;color:#fff;font-size:8px;letter-spacing:.4px}
+  table.mx th.we{background:#fff;color:#c9c9c9}
+  table.mx .wsep{border-left:1.6px solid #9aa0aa}
+  table.mx tbody tr:nth-child(even) td.nm,table.mx tbody tr:nth-child(even) td.sm{background:#f5f5f9}
+  table.mx td.cell{font-weight:700}
+  table.mx th.smh{background:#222;color:#fff;font-size:7px}
+  table.mx td.sm{font-weight:700;color:#111} table.mx td.sm.hk{font-weight:700}
+  .hknote{font-size:9px;color:#444;margin-top:7px;line-height:1.4}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:10px 0 4px;font-size:9px}
+  .legend .it{display:flex;align-items:center;gap:5px}
+  .legend .sw{width:18px;height:13px;border:.5px solid #bbb;display:inline-flex;align-items:center;justify-content:center;
+    font-size:7px;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  table.det{width:100%;font-size:9px;margin-top:4px}
+  table.det th,table.det td{border:.5px solid #ccc;padding:3px 6px;text-align:left}
+  table.det thead th{background:#222;color:#fff;font-weight:700}
+  table.det td.c{text-align:center} table.det td.nmcell{font-weight:700}
+  table.det td.stcell{padding:2px 4px}
+  table.det .stpill{display:block;width:100%;box-sizing:border-box;border-radius:7px;padding:2px 6px;text-align:center;font-weight:700;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  table.det tr.grp td{border-top:1.6px solid #333}
+  table.det tr.alt td{background:#f6f6fa}
+  .foot{margin-top:14px;font-size:9px;color:#555;display:flex;justify-content:space-between}
+  .note{font-size:10px;color:#555;margin-top:6px}
+  @media print{ body{background:#fff} .sheet{box-shadow:none;margin:0;width:auto} .toolbar{display:none} }
+</style>
+</head>
+<body>
+<div class="toolbar"><button class="btn" onclick="window.print()">🖨️ Cetak / Simpan PDF</button></div>
+<div class="sheet">
+  <div class="bar">
+    <h1>LAPORAN HEATMAP KEHADIRAN — {{ month_label }}</h1>
+    <div class="meta">Josaphat Tech Solution · HR Absensi<br>HR Officer: ____________</div>
+  </div>
+
+  {% if is_empty %}
+  <div class="note">Belum ada data untuk bulan ini — import data fingerprint dulu.</div>
+  {% else %}
+
+  {% if scope != 'lampiran' %}
+  <table class="mx">
+    <colgroup><col class="nm">{% for d in days %}<col class="d">{% endfor %}<col class="sep"><col class="hkc">{% for k in summary_keys %}<col class="sm">{% endfor %}</colgroup>
+    <thead>
+      <tr><th class="nm"></th>{% for seg in print_weeks %}<th class="wk {{ 'wsep' if not loop.first }}" colspan="{{ seg.days|length }}">{{ seg.label }}</th>{% endfor %}<th></th><th class="smh"></th>{% for k in summary_keys %}<th class="smh"></th>{% endfor %}</tr>
+      <tr><th class="nm">Nama</th>{% for d in days %}<th class="{{ 'we' if weekday_of[d] >= 5 }} {{ 'wsep' if d in wsep_days }}">{{ d }}</th>{% endfor %}<th></th><th class="smh">HK</th>{% for k in summary_keys %}<th class="smh">{{ k }}</th>{% endfor %}</tr>
+      <tr><th class="nm" style="font-size:7px;color:#999">(hari)</th>{% for d in days %}<th class="{{ 'we' if weekday_of[d] >= 5 }} {{ 'wsep' if d in wsep_days }}" style="font-weight:400;color:#999">{{ weekday_labels[weekday_of[d]] }}</th>{% endfor %}<th></th><th class="smh"></th>{% for k in summary_keys %}<th class="smh"></th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+    {% for e in employees %}
+      <tr>
+        <td class="nm">{{ e.nama }}<div class="dept">{{ e.dept }}</div></td>
+        {% for d in days %}{% set c = e.cells[d] %}<td class="cell {{ 'wsep' if d in wsep_days }}" style="background:{{ c.color }};color:{{ c.text_color }}">{{ c.code }}</td>{% endfor %}
+        <td></td><td class="sm hk">{{ e.hk }}</td>{% for k in summary_keys %}<td class="sm">{{ e.summary[k] }}</td>{% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="hknote"><b>Hari kerja efektif {{ month_label }}: {{ eff_hari_kerja }} hari.</b>
+    Kolom <b>HK</b> = jumlah hari kerja yang <b>dihadiri</b> (Hadir, Terlambat, Dinas, Lupa absen);
+    Sakit / Cuti / Absen tidak dihitung. Sel <b>abu-abu</b> = hari kerja yang datanya belum tersedia.</div>
+  <div class="legend">
+    {% for l in legend %}<div class="it"><span class="sw" style="background:{{ l.color }};color:{{ l.text_color }}">{{ l.code }}</span>{{ l.label }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if scope != 'matrix' %}
+  <h2 class="sec">Lampiran — Detail Hari Kerja (selain hadir normal &amp; libur)</h2>
+  {% set ns = namespace(any=false) %}
+  <table class="det">
+    <thead><tr><th>Nama</th><th>Dept</th><th>Tanggal</th><th>Status</th><th>Masuk</th><th>Keluar</th><th>Telat</th><th>Alasan</th></tr></thead>
+    <tbody>
+    {% for e in employees %}
+      {% set emp_alt = (loop.index0 % 2 == 1) %}
+      {% set row_ns = namespace(first=true) %}
+      {% for d in days %}{% set c = e.cells[d] %}
+        {% if c.status not in ('hadir', 'libur', 'nodata') %}
+          {% set ns.any = true %}
+          <tr class="{% if row_ns.first %}grp {% endif %}{% if emp_alt %}alt{% endif %}">
+            <td class="nmcell">{{ e.nama }}</td><td>{{ e.dept }}</td><td class="c">{{ d }} {{ month_label }}</td>
+            <td class="stcell"><span class="stpill" style="background:{{ c.color }};color:{{ c.text_color }}">{{ c.code }} · {{ c.label }}</span></td>
+            <td class="c">{{ c.masuk }}</td><td class="c">{{ c.keluar }}</td><td class="c">{{ c.telat }}</td><td>{{ c.alasan }}</td>
+          </tr>
+          {% set row_ns.first = false %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not ns.any %}<div class="note">Tidak ada hari kerja abnormal bulan ini.</div>{% endif %}
+  {% endif %}
+
+  <div class="foot"><span>HR Absensi · Heatmap</span><span>{{ month_label }}</span></div>
+  {% endif %}
+</div>
+</body>
+</html>
