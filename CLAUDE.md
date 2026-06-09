@@ -31,9 +31,12 @@ The release sequence is fixed:
 4. **Copy installer to `D:\Gawe\Project X\HR App\Installers\HR-Absensi-Setup-v{VERSION}.exe`** (distributable pickup point)
 5. **Smoke test** (manual, even briefly)
 6. Update local `vN` branch → `git push origin vN`
-7. Update `memory/version_state.md`
+7. **Update the `latest` pointer branch → `git push origin <vN-HEAD>:latest`** (force-fast-forward). `latest` is the repo's **default branch** on GitHub — it ALWAYS tracks the newest released version so the repo landing page shows current work without manual default-branch changes. Every release MUST advance it.
+8. Update `memory/version_state.md`
 
 Never push before steps 2-5. The bundle (rotated .exe + Installers/ copy) is the proof the milestone is real.
+
+**`latest` branch convention:** `origin/latest` is a permanent pointer that mirrors the newest `vN` (currently `v16` @ `6070a4c`). It is set as GitHub's default branch ONCE (manually, in repo Settings → Branches). Thereafter, step 7 keeps it current. Do NOT delete it. To advance: `GIT_SSH_COMMAND="C:/Windows/System32/OpenSSH/ssh.exe" git push origin v{N}:latest`.
 
 ### 3. Auto-approve execution; use best judgment
 
