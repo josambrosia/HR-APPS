@@ -36,25 +36,37 @@ _INSTALL_PATHS = [
 ]
 
 
-def open_html_in_browser(html_path: Path) -> Tuple[bool, str]:
-    """Open an HTML file in a real browser. Returns (success, browser_name)."""
+def open_html_in_browser(target: "Path | str") -> Tuple[bool, str]:
+    """Open an HTML file (Path) or an http(s) URL (str) in a real browser.
+
+    Returns (success, browser_name). For a URL the string is passed straight
+    through (as the Popen arg / to webbrowser.open); for a Path the existing
+    file behaviour is preserved (str(path) for Popen, path.as_uri() for
+    webbrowser).
+    """
+    is_url = isinstance(target, str) and target.startswith("http")
+    # What to hand the browser executable as its arg:
+    popen_arg = target if is_url else str(target)
+    # What to hand webbrowser.open() in the non-win32 / fallback branches:
+    web_arg = target if is_url else target.as_uri()
+
     if sys.platform != "win32":
-        webbrowser.open(html_path.as_uri())
+        webbrowser.open(web_arg)
         return True, "default"
 
     # 1) Try PATH lookup
     for name, exe in _PATH_CANDIDATES:
         located = shutil.which(exe)
         if located:
-            subprocess.Popen([located, str(html_path)])
+            subprocess.Popen([located, popen_arg])
             return True, name
 
     # 2) Try hard-coded install paths
     for name, path in _INSTALL_PATHS:
         if Path(path).exists():
-            subprocess.Popen([path, str(html_path)])
+            subprocess.Popen([path, popen_arg])
             return True, name
 
     # 3) Last resort — may open the file-associated app (VSCode etc.)
-    webbrowser.open(html_path.as_uri())
+    webbrowser.open(web_arg)
     return False, "default app for .html"
