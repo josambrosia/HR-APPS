@@ -138,32 +138,65 @@ def test_issues_apply_filter_reduces_visible_rows(temp_db_path, monkeypatch, tk_
     screen.destroy()
 
 
-def test_issues_header_resolve_massal_button_present(temp_db_path, monkeypatch, tk_root):
-    """Regression: + Resolve Massal button must remain visible in header
-    even after SearchBar was added (v16 T6). The button should still be
-    a child of the header frame, packed side='right'."""
+def test_issues_header_resolve_massal_packed_before_searchbar(temp_db_path, monkeypatch, tk_root):
+    """Regression guard for v16 hotfix: in `_build_header`, the
+    `+ Resolve Massal` button (side='right', width=160) MUST be packed
+    BEFORE the SearchBar (side='left', natural width ~300px).
+
+    Why: Tk's pack manager claims slots in CALL ORDER. If the SearchBar
+    packs side='left' FIRST, it consumes the horizontal slot the right-
+    side button needs at runtime window width — the button gets pushed
+    off-screen. Reordering so the button packs first guarantees its
+    rightmost slot is claimed before SearchBar competes for left-side
+    space.
+
+    Asserting `pack_slaves()` index is the structural guard:
+    pre-fix code (button packed AFTER search) → index(btn) > index(search)
+    post-fix code (button packed BEFORE search) → index(btn) < index(search)
+    """
     import src.ui.screens.issues as mod
     monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
     init_db(temp_db_path)
     screen = mod.IssuesScreen(tk_root)
     tk_root.update_idletasks()
-    # Find header (row 0) and its CTkButton children
-    header_buttons = []
+    # The header is the FIRST CTkFrame child of screen (row 0 of the grid)
+    header = None
     for child in screen.winfo_children():
-        if isinstance(child, ctk.CTkFrame):
-            for grandchild in child.winfo_children():
-                if isinstance(grandchild, ctk.CTkButton):
-                    try:
-                        text = grandchild.cget("text")
-                        if "Resolve Massal" in text:
-                            header_buttons.append(grandchild)
-                    except Exception:
-                        pass
-    assert len(header_buttons) >= 1, \
-        "+ Resolve Massal button must exist as a header child"
-    btn = header_buttons[0]
-    # Pack info should show side="right" (its slot is right-edge)
-    pi = btn.pack_info()
-    assert pi.get("side") == "right", \
-        f"button must be packed side='right', got {pi.get('side')}"
+        info = child.grid_info() if hasattr(child, "grid_info") else {}
+        if isinstance(child, ctk.CTkFrame) and info.get("row") == 0:
+            header = child
+            break
+    assert header is not None, "Header frame (grid row 0) must exist"
+
+    # Find the + Resolve Massal button
+    btn = None
+    for w in header.winfo_children():
+        if isinstance(w, ctk.CTkButton):
+            try:
+                if "Resolve Massal" in w.cget("text"):
+                    btn = w
+                    break
+            except Exception:
+                pass
+    assert btn is not None, "+ Resolve Massal button must exist as header child"
+
+    # Button must be packed side='right'
+    assert btn.pack_info().get("side") == "right", \
+        f"button must be packed side='right', got {btn.pack_info().get('side')}"
+
+    # SearchBar must be packed side='left' as the search input
+    assert screen._search.pack_info().get("side") == "left", \
+        f"SearchBar must be packed side='left', got {screen._search.pack_info().get('side')}"
+
+    # CRITICAL invariant: pack-call order. The button MUST appear before
+    # the SearchBar in pack_slaves() so its right-edge slot is claimed
+    # first by the pack manager (and not pushed off-screen at runtime).
+    slaves = header.pack_slaves()
+    btn_idx = slaves.index(btn)
+    search_idx = slaves.index(screen._search)
+    assert btn_idx < search_idx, (
+        f"+ Resolve Massal button must be packed BEFORE SearchBar "
+        f"(got button at index {btn_idx}, search at index {search_idx}). "
+        f"Pre-fix code packed search first → button got pushed off-screen."
+    )
     screen.destroy()
