@@ -88,6 +88,8 @@ class SettingsScreen(ctk.CTkFrame):
             threshold = get_setting(conn, "coaching_threshold_per_day", default="15")
             lupa_penalty = get_setting(conn, "lupa_absen_datang_penalty_min",
                                        default="15")
+            severe = get_setting(conn, "severe_lateness_threshold_min",
+                                 default="60")
 
         row = ctk.CTkFrame(
             parent, fg_color=COLOR_SURFACE,
@@ -153,6 +155,26 @@ class SettingsScreen(ctk.CTkFrame):
         self.lupa_penalty_var = ctk.StringVar(value=lupa_penalty)
         ctk.CTkEntry(
             row4, textvariable=self.lupa_penalty_var, width=80,
+            fg_color=COLOR_SURFACE_HIGH,
+            border_width=1, border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_BODY,
+            placeholder_text_color=COLOR_TEXT_MUTED,
+        ).pack(side="left")
+
+        row5 = ctk.CTkFrame(
+            parent, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER,
+            corner_radius=RADIUS_MD,
+        )
+        row5.pack(fill="x", pady=SPACE_SM)
+        ctk.CTkLabel(
+            row5, text="Severe Lateness Threshold (menit):",
+            font=FONT_BODY, text_color=COLOR_TEXT,
+        ).pack(side="left", padx=SPACE_MD, pady=SPACE_SM + 2)
+        self.severe_var = ctk.StringVar(value=severe)
+        ctk.CTkEntry(
+            row5, textvariable=self.severe_var, width=80,
             fg_color=COLOR_SURFACE_HIGH,
             border_width=1, border_color=COLOR_BORDER,
             text_color=COLOR_TEXT,
@@ -307,10 +329,26 @@ class SettingsScreen(ctk.CTkFrame):
                 f"{penalty} di luar rentang yang diizinkan. "
                 f"Penalti harus antara 0 dan 999 menit.")
             return
+        # Validate Severe Lateness threshold: integer in [1, 999]
+        raw_sev = self.severe_var.get().strip()
+        try:
+            severe = int(raw_sev)
+        except ValueError:
+            messagebox.showwarning(
+                "Threshold tidak valid",
+                f"'{raw_sev}' bukan angka. Threshold harus bilangan bulat "
+                f"antara 1 dan 999.")
+            return
+        if severe < 1 or severe > 999:
+            messagebox.showwarning(
+                "Threshold di luar rentang",
+                f"{severe} di luar rentang. Threshold harus antara 1 dan 999 menit.")
+            return
         with get_connection(DB_PATH) as conn:
             set_setting(conn, "current_month", self.month_var.get().strip())
             set_setting(conn, "coaching_threshold_per_day", self.thr_var.get().strip())
             set_setting(conn, "lupa_absen_datang_penalty_min", str(penalty))
+            set_setting(conn, "severe_lateness_threshold_min", str(severe))
         messagebox.showinfo("Tersimpan", "Pengaturan disimpan.")
 
     def _save_profil(self):
