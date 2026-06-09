@@ -78,15 +78,15 @@ def fill_monthly_report(
             continue
         if row["tipe"] == "Hari Libur":
             continue  # holiday row — skip; do not write Alasan Ijin
-        if row["has_issue"] != 1:
-            continue  # skip non-issue rows entirely
 
         if row["reason_category"]:
             text = render_alasan_ijin(row["reason_category"], row["reason_detail"])
             summary.filled_count += 1
-        else:
+        elif row["has_issue"] == 1:
             text = "NA / Belum ada kabar"
             summary.na_count += 1
+        else:
+            continue  # non-issue, unresolved → no Alasan
 
         target = ws.cell(row=r, column=ALASAN_IJIN_COL)
         if isinstance(target, MergedCell):
