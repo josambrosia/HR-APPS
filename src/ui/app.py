@@ -148,6 +148,7 @@ class HRApp(ctk.CTk):
             ]),
             ("WORKFLOW", [
                 ("🚩", "Issues", "Issues"),
+                ("◷", "Severe Lateness", "SevereLateness"),
                 ("💬", "WhatsApp Assistant", "WhatsAppAssistant"),
                 ("🎯", "Coaching", "Coaching"),
             ]),
@@ -400,6 +401,9 @@ class HRApp(ctk.CTk):
         elif name == "Issues":
             from src.ui.screens.issues import IssuesScreen
             IssuesScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "SevereLateness":
+            from src.ui.screens.severe_lateness import SevereLatenessScreen
+            SevereLatenessScreen(self.content).grid(row=0, column=0, sticky="nsew")
         elif name == "WhatsAppAssistant":
             from src.ui.screens.whatsapp_assistant import WhatsAppAssistantScreen
             WhatsAppAssistantScreen(self.content).grid(row=0, column=0, sticky="nsew")
