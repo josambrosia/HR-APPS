@@ -50,6 +50,29 @@ This is the project's standing instruction for `auto mode` behavior. It does NOT
 - Destructive ops (`git reset --hard`, `rm -rf` outside worktree, force-push to main) — still ask first
 - Anything that touches production `data/hr.db` — never write to it without explicit instruction
 
+### 4. Every new version updates APP_CHANGELOG
+
+The About dialog shows users a scrollable changelog of what changed
+per version. **Every new vN release (including patch hotfixes like
+v16.0.1 / v16.0.2) MUST prepend an entry to `APP_CHANGELOG` in
+`src/config.py`** documenting additions, removals, changes, and bug
+fixes in user-facing terms (Indonesian, brief, action-oriented).
+
+Format:
+- Newest entry at the top of the list
+- Each entry: `{"version", "date" (YYYY-MM-DD), "changes" (list of tuples)}`
+- Each change is a `(kind, description)` tuple
+- Kinds:
+  - `"feat"` — fitur baru
+  - `"fix"` — perbaikan bug
+  - `"change"` — perubahan/penyesuaian perilaku yang ada
+  - `"remove"` — penghapusan fitur
+
+Why: users running the installer want to know what they're getting.
+The changelog is also a forcing function for honest release notes —
+if you can't describe a change in user-facing language, you probably
+haven't thought hard enough about its impact.
+
 ## Where to look for more detail
 
 User-level memory (auto-loaded by Claude Code on this project):

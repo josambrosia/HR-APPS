@@ -2,10 +2,83 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "16.0.2"
+APP_VERSION = "16.1.0"
 APP_BUILD_DATE = "2026-06-09"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
+
+# Changelog displayed in the About dialog.
+# Format: list of dicts with 'version', 'date' (YYYY-MM-DD), 'changes' list.
+# Each change is a (kind, description) tuple. Kinds:
+#   "feat"   — fitur baru
+#   "fix"    — perbaikan bug
+#   "change" — perubahan / penyesuaian perilaku
+#   "remove" — penghapusan fitur
+#
+# DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
+APP_CHANGELOG = [
+    {
+        "version": "16.1.0",
+        "date": "2026-06-09",
+        "changes": [
+            ("feat", "Menu About sekarang menampilkan changelog tiap versi (apa yang baru / berubah / diperbaiki)."),
+            ("fix", "Ctrl+F sekarang berfungsi dari mana saja di Issues & Outlier — sebelumnya tidak nyala kalau fokus ada di tabel."),
+            ("fix", "Enter submit Save di panel kanan Issues sekarang berfungsi saat fokus ada di field kategori / detail."),
+            ("remove", "Strip 'Status Issues' di print dashboard dihilangkan (informasi sudah cukup dari KPI cards)."),
+        ],
+    },
+    {
+        "version": "16.0.2",
+        "date": "2026-06-09",
+        "changes": [
+            ("change", "Search bar dipindah dari header ke dekat tabel (Issues) dan ke baris bawah header (Outlier) agar tidak crowding."),
+            ("fix", "Placeholder 'Cari karyawan...' sekarang terlihat (sebelumnya tampak kosong karena bug CTkEntry + StringVar)."),
+        ],
+    },
+    {
+        "version": "16.0.1",
+        "date": "2026-06-09",
+        "changes": [
+            ("fix", "Tombol + Resolve Massal yang hilang dari header Issues — sebelumnya ter-push off-screen oleh search bar."),
+        ],
+    },
+    {
+        "version": "16.0.0",
+        "date": "2026-06-09",
+        "changes": [
+            ("feat", "Cross-screen week selection — pilihan minggu nempel saat pindah antar menu (Issues / Dashboard / Coaching)."),
+            ("feat", "Search/filter karyawan di Issues (Open + Resolved) dan Outlier (section Disertakan)."),
+            ("feat", "Keyboard shortcuts: Ctrl+F fokus search, Esc tutup dialog, Enter submit di dialog."),
+            ("feat", "Menu About di sidebar (info versi, build, Python, database path)."),
+            ("feat", "Print dashboard: badge dinamis WEEKLY/MONTHLY, period inline di judul, KPI delta vs periode sebelumnya, garis transparansi outlier."),
+        ],
+    },
+    {
+        "version": "15.3.0",
+        "date": "2026-05-25",
+        "changes": [
+            ("fix", "Tombol Resolve / Batal yang hilang di dialog Resolve Massal saat pilih kategori tanpa kolom detail — arsitektur header/scrollable/footer."),
+        ],
+    },
+    {
+        "version": "15.0.0",
+        "date": "2026-05-24",
+        "changes": [
+            ("feat", "Kategori 'Lupa Absen' dipecah jadi Lupa Absen Datang (kena penalti) dan Lupa Absen Pulang (tidak)."),
+            ("feat", "Penalti Lupa Absen Datang bisa diatur di Settings (default 15 menit, validasi 0-999)."),
+            ("change", "Format baris Hari Libur di Laporan Bulanan: Tipe='Hari Libur', Masuk/Keluar kosong, fill kuning krim."),
+            ("fix", "Awal upaya perbaikan tombol Resolve Massal (selesai di v15.3)."),
+        ],
+    },
+    {
+        "version": "14.0.0",
+        "date": "2026-05-23",
+        "changes": [
+            ("feat", "Coaching threshold dinamis: kuota mnt/hari × jumlah hari kerja periode."),
+            ("feat", "Windows installer (per-user install, Start Menu shortcut, Add/Remove Programs)."),
+        ],
+    },
+]
 
 
 def _resource_root() -> Path:

@@ -356,37 +356,6 @@ def test_dashboard_html_kpi_delta_em_dash_when_no_prev_period(
     assert "—" in html
 
 
-def test_dashboard_html_resolution_strip_renders(tmp_path, temp_db_path):
-    """Resolution strip shows Status Issues with open/resolved counts."""
-    from src.db.attendance import set_reason
-    init_db(temp_db_path)
-    with get_connection(temp_db_path) as conn:
-        a = upsert_employee(conn, no_staff="1", nama="BUDI", dept="X")
-        for d in ("2026-05-04", "2026-05-05"):
-            upsert_attendance(
-                conn, employee_id=a, tanggal=d, hari="Senin",
-                tipe="Hari Kerja", jadwal="08.00 - 16.00",
-                masuk=None, keluar="16:00", kerja_jam=None,
-                lembur_jam=None, terlambat_menit=None,
-                has_issue=1, imported_from="W1.xls",
-            )
-        row = conn.execute(
-            "SELECT id FROM attendance_records WHERE tanggal='2026-05-04'"
-        ).fetchone()
-        set_reason(conn, attendance_id=row["id"],
-                   category="lupa_absen_datang", detail=None)
-        html_path = render_dashboard_html(
-            conn,
-            period_start="2026-05-01", period_end="2026-05-31",
-            period_label="Mei 2026", out_dir=tmp_path,
-            period_type="monthly",
-        )
-    html = html_path.read_text(encoding="utf-8")
-    assert "Status Issues" in html
-    assert "open" in html
-    assert "resolved" in html
-
-
 def test_dashboard_html_outlier_line_when_count_gt_zero(tmp_path, temp_db_path):
     """Outlier transparency line lists excluded employees when count > 0."""
     from src.db.outlier import exclude_employee

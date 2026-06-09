@@ -14,7 +14,7 @@ from jinja2 import Environment, FileSystemLoader
 from src.config import BRAND_LOCKUP_LIGHT_SVG
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
-    avg_minutes_per_late_event, pola_jam_masuk, resolution_rate,
+    avg_minutes_per_late_event, pola_jam_masuk,
 )
 from src.db.outlier import list_active_exclusions
 from src.db.settings import get_setting
@@ -161,18 +161,6 @@ def render_dashboard_html(
 
     period_word = "minggu lalu" if period_type == "weekly" else "bulan lalu"
 
-    # Resolution rate strip (4d)
-    res = resolution_rate(conn, period_start, period_end)
-    res["open"] = res["total"] - res["resolved"]
-    prev_res = resolution_rate(conn, prev_start, prev_end)
-    if prev_res["total"] > 0:
-        resolution_delta_pct = res["rate_pct"] - prev_res["rate_pct"]
-        resolution_delta_arrow = "▲" if resolution_delta_pct > 0 else (
-            "▼" if resolution_delta_pct < 0 else "→")
-    else:
-        resolution_delta_pct = None
-        resolution_delta_arrow = "—"
-
     # Outlier transparency line (4e)
     active_outliers = list_active_exclusions(conn)
     outlier_names = ", ".join(o["nama"] for o in active_outliers)
@@ -222,9 +210,6 @@ def render_dashboard_html(
         hr_officer_name=hr_officer_name,
         brand_lockup_svg=brand_lockup_svg,
         period_badge_text=period_badge_text,
-        resolution=res,
-        resolution_delta_pct=resolution_delta_pct,
-        resolution_delta_arrow=resolution_delta_arrow,
         outlier_count=outlier_count,
         outlier_names=outlier_names,
         period_word=period_word,

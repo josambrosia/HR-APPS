@@ -51,9 +51,31 @@ class IssuesScreen(ctk.CTkFrame):
         self._build_tables_and_panel()
         self._reload()
 
-        # Ctrl+F focuses the search input. Bound on the screen frame
-        # (not bind_all) so the shortcut is scoped to the visible screen.
-        self.bind("<Control-f>", lambda _e: self._search.focus())
+        # Bind Ctrl+F app-wide while this screen is mounted. Tk's per-widget
+        # bind only fires when the widget itself has focus — we want the
+        # shortcut to work whether focus is in the treeview, an entry, or
+        # anywhere else inside this screen. We register on the underlying
+        # toplevel (CTkFrame blocks bind_all directly) and keep the
+        # per-widget bind as a fallback / structural marker. unbind on
+        # destroy so the global binding doesn't leak when the user
+        # navigates away.
+        self.bind("<Control-f>", self._focus_search)
+        try:
+            self.winfo_toplevel().bind_all("<Control-f>", self._focus_search)
+        except Exception:
+            pass
+        self.bind("<Destroy>", self._on_destroy_cleanup)
+
+    def _focus_search(self, _e=None):
+        if hasattr(self, "_search") and self._search.winfo_exists():
+            self._search.focus()
+        return "break"
+
+    def _on_destroy_cleanup(self, _e=None):
+        try:
+            self.winfo_toplevel().unbind_all("<Control-f>")
+        except Exception:
+            pass
 
     def _setup_treeview_style(self):
         style = ttk.Style()
@@ -278,6 +300,15 @@ class IssuesScreen(ctk.CTkFrame):
             font=FONT_BODY,
         )
         self.cat_combo.pack(anchor="w", padx=SPACE_LG, pady=(SPACE_XS, SPACE_MD))
+        # Bind Enter directly on the combobox AND its inner entry — Tk's
+        # per-widget bind only fires when THAT widget has focus, and
+        # CTkComboBox routes typing through an inner ._entry that owns
+        # the actual focus when the user types into the field.
+        self.cat_combo.bind(
+            "<Return>", lambda _e: (self._on_save(), "break")[1])
+        if hasattr(self.cat_combo, "_entry"):
+            self.cat_combo._entry.bind(
+                "<Return>", lambda _e: (self._on_save(), "break")[1])
 
         # Pre-create detail widgets (hidden by default; shown in _on_cat_change)
         self.detail_label = ctk.CTkLabel(self.right, text="Detail:",
@@ -289,6 +320,9 @@ class IssuesScreen(ctk.CTkFrame):
             border_color=COLOR_BORDER, text_color=COLOR_TEXT,
             font=FONT_BODY,
         )
+        # Enter on the detail entry submits Save (same rationale as combo).
+        self.detail_entry.bind(
+            "<Return>", lambda _e: (self._on_save(), "break")[1])
         if row_data.get("reason_detail"):
             self.detail_entry.insert(0, row_data["reason_detail"])
 
