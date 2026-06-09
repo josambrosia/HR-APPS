@@ -7,6 +7,8 @@ a = Analysis(
     binaries=[],
     datas=[
         ('src/reports/templates/dashboard.html.j2', 'src/reports/templates'),
+        ('src/reports/templates/heatmap.html.j2', 'src/reports/templates'),
+        ('src/reports/templates/heatmap_print.html.j2', 'src/reports/templates'),
         ('assets/templates/laporan_bulanan_template.xlsx', 'assets/templates'),
         # Brand assets (Josaphat Tech Solution) — readable at runtime via src.config.BRAND_*
         ('assets/brand/icon-04E.svg', 'assets/brand'),
@@ -16,7 +18,7 @@ a = Analysis(
         ('assets/brand/animation-02-typing-04E.gif', 'assets/brand'),
         ('assets/brand/icon-04E.ico', 'assets/brand'),
     ],
-    hiddenimports=['customtkinter', 'PIL'],
+    hiddenimports=['customtkinter', 'PIL', 'src.web.heatmap_server'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
