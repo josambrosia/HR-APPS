@@ -3,6 +3,7 @@ from typing import Optional
 
 from src.config import DEFAULT_LUPA_PENALTY_MIN
 from src.config import DEFAULT_SEVERE_LATENESS_THRESHOLD_MIN
+from src.config import DEFAULT_LATE_TOLERANCE_MIN
 
 
 def get_setting(
@@ -47,3 +48,12 @@ def read_severe_lateness_threshold(conn) -> int:
         return int(raw)
     except (TypeError, ValueError):
         return DEFAULT_SEVERE_LATENESS_THRESHOLD_MIN
+
+
+def read_late_tolerance(conn) -> int:
+    raw = get_setting(conn, "late_tolerance_min",
+                      default=str(DEFAULT_LATE_TOLERANCE_MIN))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_LATE_TOLERANCE_MIN
