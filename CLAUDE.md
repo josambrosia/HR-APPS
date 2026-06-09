@@ -107,12 +107,13 @@ tasklist | grep -i HR-Absensi || echo "not running"
 
 ## Current state (as of last commit)
 
-- Latest milestone: `v16.0.2` hotfix (commit `eef2e5c`, LOCAL only — awaiting push authorization) — relocates SearchBar out of crowded headers (Issues + Outlier) AND fixes invisible placeholder (StringVar trace was suppressing CTkEntry placeholder lifecycle; switched to KeyRelease binding + explicit `placeholder_text_color=COLOR_TEXT_DIM`).
-- v16.0.1 hotfix (commit `10c967d`) = pack-order fix for + Resolve Massal button regression.
-- v16.0.0 bundle (commit `23c7bf1`) = UX polish: cross-screen week (SessionPeriodState), Search/filter (Issues + Outlier), Keyboard shortcuts (Ctrl+F / Esc / Enter), About dialog (sidebar), Print dashboard improvements (dynamic badge + period in H1 + KPI deltas + resolution strip + outlier line)
-- Test baseline: **295 passing** (was 256 baseline; +39 net new across v16.0.0/0.1/0.2 — some test names rotated)
-- Latest installer artifact: `Installers/HR-Absensi-Setup-v16.0.2.exe` (33.4 MB) — canonical distributable
-- Backup installer: `Installers/HR-Absensi-Setup-v16.0.1.exe` (33.4 MB) — for rollback (v16.0.0 + older v15.x also preserved)
-- Production `.exe` at `D:\Gawe\Project X\HR App\dist\HR-Absensi\` is v16.0.2 with `.bak` of v16.0.1 + `.bak.old` of v16.0.0 (full 2-level rotation)
+- Latest milestone: `v16.1.0` (commit `fcf04a8`, LOCAL only — awaiting push authorization) — About dialog menampilkan scrollable changelog ("Apa yang baru?") + fix Ctrl+F (bind via `winfo_toplevel().bind_all` karena CTkFrame block bind_all) + fix Enter submit pada input widgets di Issues right panel (bind langsung di cat_combo + ._entry + detail_entry) + hapus resolution strip dari print dashboard. Framework rule #4 baru: setiap version baru wajib prepend entry `APP_CHANGELOG`.
+- v16.0.2 hotfix (commit `eef2e5c`) = SearchBar relocate + placeholder visibility.
+- v16.0.1 hotfix (commit `10c967d`) = pack-order fix untuk + Resolve Massal button.
+- v16.0.0 bundle (commit `23c7bf1`) = UX polish bundle (cross-screen week, search/filter, shortcuts, About, print improvements).
+- Test baseline: **296 passing** (was 256 baseline; +40 net new di seluruh v16 family — beberapa test names di-rotate)
+- Latest installer artifact: `Installers/HR-Absensi-Setup-v16.1.0.exe` (33.4 MB) — canonical distributable
+- Backup installer: `Installers/HR-Absensi-Setup-v16.0.2.exe` (33.4 MB) — untuk rollback (v16.0.1 + v16.0.0 + older v15.x juga preserved)
+- Production `.exe` at `D:\Gawe\Project X\HR App\dist\HR-Absensi\` is v16.1.0 with `.bak` of v16.0.2 + `.bak.old` of v16.0.1 (full 2-level rotation)
 
-Subsequent work forks from `v16.0.2`. New features → new `vN+1` milestone following the 3-rule framework above.
+Subsequent work forks from `v16.1.0`. New features → new `vN+1` milestone following the 4-rule framework above (rule #4 wajib update APP_CHANGELOG).
