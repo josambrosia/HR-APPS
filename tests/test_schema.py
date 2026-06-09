@@ -1,5 +1,5 @@
 import sqlite3
-from src.db.schema import init_db
+from src.db.schema import init_db, DEFAULT_SETTINGS
 
 
 def test_init_db_creates_tables(temp_db_path):
@@ -28,7 +28,9 @@ def test_init_db_idempotent(temp_db_path):
     init_db(temp_db_path)  # second call must not raise
     with sqlite3.connect(temp_db_path) as conn:
         cnt = conn.execute("SELECT COUNT(*) FROM settings").fetchone()[0]
-    assert cnt == 3  # not duplicated
+    # Idempotency invariant: a second init_db must not duplicate rows. The count
+    # equals the number of seeded defaults (robust to new keys being added).
+    assert cnt == len(DEFAULT_SETTINGS)  # not duplicated
 
 
 def test_outlier_exclusions_table_created(temp_db_path):
