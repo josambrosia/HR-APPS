@@ -1,4 +1,6 @@
 """Smoke test for the Issues screen — constructs + Batch Resolve wired."""
+import customtkinter as ctk
+
 from src.db.schema import init_db
 from src.db.connection import get_connection
 from src.db.employees import upsert_employee
@@ -133,4 +135,35 @@ def test_issues_apply_filter_reduces_visible_rows(temp_db_path, monkeypatch, tk_
     screen._apply_filter("")
     tk_root.update_idletasks()
     assert len(screen.open_tree.get_children()) == 2
+    screen.destroy()
+
+
+def test_issues_header_resolve_massal_button_present(temp_db_path, monkeypatch, tk_root):
+    """Regression: + Resolve Massal button must remain visible in header
+    even after SearchBar was added (v16 T6). The button should still be
+    a child of the header frame, packed side='right'."""
+    import src.ui.screens.issues as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    screen = mod.IssuesScreen(tk_root)
+    tk_root.update_idletasks()
+    # Find header (row 0) and its CTkButton children
+    header_buttons = []
+    for child in screen.winfo_children():
+        if isinstance(child, ctk.CTkFrame):
+            for grandchild in child.winfo_children():
+                if isinstance(grandchild, ctk.CTkButton):
+                    try:
+                        text = grandchild.cget("text")
+                        if "Resolve Massal" in text:
+                            header_buttons.append(grandchild)
+                    except Exception:
+                        pass
+    assert len(header_buttons) >= 1, \
+        "+ Resolve Massal button must exist as a header child"
+    btn = header_buttons[0]
+    # Pack info should show side="right" (its slot is right-edge)
+    pi = btn.pack_info()
+    assert pi.get("side") == "right", \
+        f"button must be packed side='right', got {pi.get('side')}"
     screen.destroy()

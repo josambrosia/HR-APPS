@@ -110,16 +110,22 @@ class IssuesScreen(ctk.CTkFrame):
             on_change=self._on_period_change, initial=period_state.get(),
         )
         self.nav.pack(side="left")
-        self._search = SearchBar(
-            header, on_change=self._apply_filter,
-            placeholder="🔍 Cari karyawan...", width=240,
-        )
-        self._search.pack(side="left", padx=(SPACE_LG, SPACE_LG))
+        # NOTE (v16 T6 regression fix): pack the right-side CTA BEFORE the
+        # left-side SearchBar so the button reserves its rightmost slot
+        # before SearchBar competes for horizontal space. Otherwise, at
+        # production window width the ~316px SearchBar (entry + clear +
+        # counter) consumes the slot and the 160px "+ Resolve Massal"
+        # button gets pushed off-screen.
         ctk.CTkButton(
             header, text="+ Resolve Massal", command=self._on_batch_resolve,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
             text_color=COLOR_BG, font=FONT_BODY_BOLD, width=160,
         ).pack(side="right")
+        self._search = SearchBar(
+            header, on_change=self._apply_filter,
+            placeholder="🔍 Cari karyawan...", width=240,
+        )
+        self._search.pack(side="left", padx=(SPACE_LG, SPACE_LG))
 
     def _on_period_change(self, _key):
         period_state.set(_key)

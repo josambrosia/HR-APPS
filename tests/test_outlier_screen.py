@@ -1,6 +1,8 @@
 """Smoke test for the Outlier screen — verifies it constructs without error
 against a temp DB with sample data. Deep UI behaviour is covered by the
 src/db/outlier.py unit tests."""
+import customtkinter as ctk
+
 from src.db.schema import init_db
 from src.db.connection import get_connection
 from src.db.employees import upsert_employee
@@ -91,4 +93,42 @@ def test_outlier_search_filters_disertakan_only(temp_db_path, monkeypatch, tk_ro
     tk_root.update_idletasks()
     visible = [r for r in screen._disertakan_rows if r.winfo_manager() == "pack"]
     assert len(visible) == 3
+    screen.destroy()
+
+
+def test_outlier_header_badge_present(temp_db_path, monkeypatch, tk_root):
+    """Regression (v16 T7 companion check): when an active month is set,
+    the BULAN AKTIF badge and SearchBar in the header must both be packed
+    side='right' so neither is squeezed off by the elastic left frame.
+    Validates the safe pack-order documented in the v16 hotfix audit."""
+    import src.ui.screens.outlier as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        set_setting(conn, "current_month", "2026-04")
+        conn.commit()
+    screen = mod.OutlierScreen(tk_root)
+    tk_root.update_idletasks()
+    # SearchBar should be packed side='right'
+    pi_search = screen._search.pack_info()
+    assert pi_search.get("side") == "right", \
+        f"SearchBar must be packed side='right', got {pi_search.get('side')}"
+    # Walk the header (row 0 child of screen) and find the BULAN AKTIF badge
+    badges = []
+    for child in screen.winfo_children():
+        if isinstance(child, ctk.CTkFrame):
+            for grandchild in child.winfo_children():
+                if isinstance(grandchild, ctk.CTkFrame):
+                    for label in grandchild.winfo_children():
+                        try:
+                            if isinstance(label, ctk.CTkLabel) and \
+                               "BULAN AKTIF" in str(label.cget("text")):
+                                badges.append(grandchild)
+                                break
+                        except Exception:
+                            pass
+    assert len(badges) >= 1, "BULAN AKTIF badge must exist in header"
+    pi_badge = badges[0].pack_info()
+    assert pi_badge.get("side") == "right", \
+        f"BULAN AKTIF badge must be packed side='right', got {pi_badge.get('side')}"
     screen.destroy()
