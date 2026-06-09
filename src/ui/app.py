@@ -140,6 +140,7 @@ class HRApp(ctk.CTk):
         nav_groups = [
             ("INSIGHT", [
                 ("📊", "Dashboard", "Dashboard"),
+                ("⊞", "Heatmap", "Heatmap"),
             ]),
             ("DATA MANAGEMENT", [
                 ("📥", "Import", "Import"),
@@ -395,6 +396,9 @@ class HRApp(ctk.CTk):
         if name == "Dashboard":
             from src.ui.screens.dashboard import DashboardScreen
             DashboardScreen(self.content).grid(row=0, column=0, sticky="nsew")
+        elif name == "Heatmap":
+            from src.ui.screens.heatmap import HeatmapScreen
+            HeatmapScreen(self.content).grid(row=0, column=0, sticky="nsew")
         elif name == "Import":
             from src.ui.screens.import_screen import ImportScreen
             ImportScreen(self.content).grid(row=0, column=0, sticky="nsew")
