@@ -149,6 +149,14 @@ DEFAULT_SCHEDULE_END = "16.00"
 DEFAULT_COACHING_THRESHOLD_PER_DAY = 15
 DEFAULT_LUPA_PENALTY_MIN = 15
 DEFAULT_SEVERE_LATENESS_THRESHOLD_MIN = 60
+DEFAULT_LATE_TOLERANCE_MIN = 12
+
+# Heatmap colour grouping — reasons shown GREEN ("Dinas") on the attendance
+# heatmap. Deliberately BROADER than COACHING_EXCLUDED (adds tugas_belajar):
+# this is a presentation choice and does NOT change coaching/dashboard logic.
+HEATMAP_DINAS_REASONS = (
+    "tugas_lapangan", "tugas_paparan", "tugas_belajar", "terlambat_kerja",
+)
 
 # Reason categories (canonical IDs used in DB and UI)
 REASON_CATEGORIES = (
