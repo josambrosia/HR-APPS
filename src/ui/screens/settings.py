@@ -90,6 +90,7 @@ class SettingsScreen(ctk.CTkFrame):
                                        default="15")
             severe = get_setting(conn, "severe_lateness_threshold_min",
                                  default="60")
+            tol = get_setting(conn, "late_tolerance_min", default="12")
 
         row = ctk.CTkFrame(
             parent, fg_color=COLOR_SURFACE,
@@ -175,6 +176,26 @@ class SettingsScreen(ctk.CTkFrame):
         self.severe_var = ctk.StringVar(value=severe)
         ctk.CTkEntry(
             row5, textvariable=self.severe_var, width=80,
+            fg_color=COLOR_SURFACE_HIGH,
+            border_width=1, border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_BODY,
+            placeholder_text_color=COLOR_TEXT_MUTED,
+        ).pack(side="left")
+
+        row6 = ctk.CTkFrame(
+            parent, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER,
+            corner_radius=RADIUS_MD,
+        )
+        row6.pack(fill="x", pady=SPACE_SM)
+        ctk.CTkLabel(
+            row6, text="Toleransi Telat (menit):",
+            font=FONT_BODY, text_color=COLOR_TEXT,
+        ).pack(side="left", padx=SPACE_MD, pady=SPACE_SM + 2)
+        self.tol_var = ctk.StringVar(value=tol)
+        ctk.CTkEntry(
+            row6, textvariable=self.tol_var, width=80,
             fg_color=COLOR_SURFACE_HIGH,
             border_width=1, border_color=COLOR_BORDER,
             text_color=COLOR_TEXT,
@@ -344,11 +365,27 @@ class SettingsScreen(ctk.CTkFrame):
                 "Threshold di luar rentang",
                 f"{severe} di luar rentang. Threshold harus antara 1 dan 999 menit.")
             return
+        # Validate Toleransi Telat: integer in [0, 999]
+        raw_tol = self.tol_var.get().strip()
+        try:
+            tol = int(raw_tol)
+        except ValueError:
+            messagebox.showwarning(
+                "Toleransi tidak valid",
+                f"'{raw_tol}' bukan angka. Toleransi harus bilangan bulat "
+                f"antara 0 dan 999.")
+            return
+        if tol < 0 or tol > 999:
+            messagebox.showwarning(
+                "Toleransi di luar rentang",
+                f"{tol} di luar rentang. Toleransi harus antara 0 dan 999 menit.")
+            return
         with get_connection(DB_PATH) as conn:
             set_setting(conn, "current_month", self.month_var.get().strip())
             set_setting(conn, "coaching_threshold_per_day", self.thr_var.get().strip())
             set_setting(conn, "lupa_absen_datang_penalty_min", str(penalty))
             set_setting(conn, "severe_lateness_threshold_min", str(severe))
+            set_setting(conn, "late_tolerance_min", str(tol))
         messagebox.showinfo("Tersimpan", "Pengaturan disimpan.")
 
     def _save_profil(self):
