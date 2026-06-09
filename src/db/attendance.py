@@ -149,6 +149,56 @@ def count_issues_for_period(conn: sqlite3.Connection, start: str, end: str):
     }
 
 
+def list_severe_lateness_for_period(conn, start, end, threshold_min, resolved=None):
+    """Hari Kerja rows with both punches present and terlambat_menit >=
+    threshold_min, in [start, end]. resolved=False -> reason_category IS NULL;
+    True -> IS NOT NULL; None -> both. Joined with employees, sorted by name/date."""
+    sql = """
+        SELECT ar.*, e.nama, e.dept, e.no_staff
+          FROM attendance_records ar
+          JOIN employees e ON ar.employee_id = e.id
+         WHERE ar.tipe = 'Hari Kerja'
+           AND ar.masuk IS NOT NULL
+           AND ar.keluar IS NOT NULL
+           AND ar.terlambat_menit >= ?
+           AND ar.tanggal BETWEEN ? AND ?
+    """
+    params = [threshold_min, start, end]
+    if resolved is True:
+        sql += " AND ar.reason_category IS NOT NULL"
+    elif resolved is False:
+        sql += " AND ar.reason_category IS NULL"
+    sql += " ORDER BY e.nama ASC, ar.tanggal ASC"
+    return [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
+def count_severe_lateness_for_period(conn, start, end, threshold_min):
+    """Returns {open, resolved, na, total} over the threshold-filtered set.
+    resolved = reason set AND != 'na'; na = reason == 'na'; open = reason NULL."""
+    row = conn.execute(
+        """
+        SELECT
+          SUM(CASE WHEN reason_category IS NULL THEN 1 ELSE 0 END) AS open,
+          SUM(CASE WHEN reason_category IS NOT NULL AND reason_category != 'na'
+                   THEN 1 ELSE 0 END) AS resolved,
+          SUM(CASE WHEN reason_category = 'na' THEN 1 ELSE 0 END) AS na,
+          COUNT(*) AS total
+          FROM attendance_records
+         WHERE tipe = 'Hari Kerja'
+           AND masuk IS NOT NULL AND keluar IS NOT NULL
+           AND terlambat_menit >= ?
+           AND tanggal BETWEEN ? AND ?
+        """,
+        (threshold_min, start, end),
+    ).fetchone()
+    return {
+        "open": row["open"] or 0,
+        "resolved": row["resolved"] or 0,
+        "na": row["na"] or 0,
+        "total": row["total"] or 0,
+    }
+
+
 def reset_month(conn: sqlite3.Connection) -> None:
     """Wipe all attendance data — legacy 'Mulai Bulan Baru' workflow.
 
