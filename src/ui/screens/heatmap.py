@@ -9,6 +9,7 @@ See docs/superpowers/specs/2026-06-10-v18-heatmap-dashboard-design.md.
 """
 import os
 import tempfile
+from pathlib import Path
 from datetime import date
 
 import tkinter as tk
@@ -65,6 +66,7 @@ class HeatmapScreen(ctk.CTkFrame):
         self._cell_by_item = {}
         self._visible_employees = []
         self._tip = None
+        self._ncols = None
 
         self._build_header()
         self._build_toolbar()
@@ -156,6 +158,7 @@ class HeatmapScreen(ctk.CTkFrame):
         self._canvas.tag_bind("cell", "<Motion>", self._on_cell_motion)
         self._canvas.tag_bind("cell", "<Leave>", lambda e: self._hide_tip())
         self._canvas.tag_bind("cell", "<Button-1>", self._on_cell_click)
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
 
     # ---------- data / nav ----------
     def _load(self):
@@ -194,6 +197,21 @@ class HeatmapScreen(ctk.CTkFrame):
             emps = [e for e in emps if q in (e["nama"] + " " + e.get("dept", "")).lower()]
         return sort_employees(emps, self._sortkey)
 
+    def _card_width(self, nweeks):
+        grid_w = _WD_W + nweeks * (_CELL_W + _CELL_GAP)
+        return (_CARD_PAD + _NAME_W + _COL_GAP + grid_w + _COL_GAP + 8
+                + _SPOT_W + _COL_GAP + _SUM_W + _CARD_PAD)
+
+    def _on_canvas_configure(self, event):
+        # Re-flow into more/fewer columns only when the column count actually
+        # changes (avoids a repaint on every pixel of a window drag).
+        if not self._ctx or self._ctx.get("is_empty"):
+            return
+        card_w = self._card_width(len(self._ctx["weeks"]))
+        ncols = max(1, int((event.width - _PAD) // (card_w + _CARD_GAP)))
+        if ncols != self._ncols:
+            self._repaint()
+
     def _repaint(self):
         c = self._canvas
         c.delete("all")
@@ -214,23 +232,30 @@ class HeatmapScreen(ctk.CTkFrame):
                           text="Tidak ada hasil.")
             c.configure(scrollregion=(0, 0, 0, 80))
             return
-        y = _PAD
-        for e in emps:
-            y = self._paint_card(e, y) + _CARD_GAP
-        c.configure(scrollregion=(0, 0, 0, y + _PAD))
+        ctx = self._ctx
+        card_w = self._card_width(len(ctx["weeks"]))
+        card_h = _HEAD_H + 7 * (_CELL_H + _CELL_GAP) + 2 * _CARD_PAD
+        avail = max(c.winfo_width(), card_w + 2 * _PAD)
+        ncols = max(1, int((avail - _PAD) // (card_w + _CARD_GAP)))
+        self._ncols = ncols
+        for i, e in enumerate(emps):
+            col, r = i % ncols, i // ncols
+            self._paint_card(e, _PAD + col * (card_w + _CARD_GAP),
+                             _PAD + r * (card_h + _CARD_GAP))
+        nrows = (len(emps) + ncols - 1) // ncols
+        c.configure(scrollregion=(0, 0, 0, _PAD + nrows * (card_h + _CARD_GAP)))
 
     def _round_rect(self, x0, y0, x1, y1, r, **kw):
         pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1,
                x1 - r, y1, x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
         return self._canvas.create_polygon(pts, smooth=True, **kw)
 
-    def _paint_card(self, e, y):
+    def _paint_card(self, e, x, y):
         c = self._canvas
         ctx = self._ctx
         weeks = ctx["weeks"]
         nweeks = len(weeks)
         grid_w = _WD_W + nweeks * (_CELL_W + _CELL_GAP)
-        x = _PAD
         gx = x + _CARD_PAD + _NAME_W + _COL_GAP
         sx = gx + grid_w + _COL_GAP + 8
         rx = sx + _SPOT_W + _COL_GAP
@@ -363,7 +388,7 @@ class HeatmapScreen(ctk.CTkFrame):
         fd, path = tempfile.mkstemp(suffix=".html", prefix="heatmap_")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(html)
-        open_html_in_browser(path)
+        open_html_in_browser(Path(path))
 
     # ---------- shortcuts / cleanup ----------
     def _focus_search(self, _e=None):

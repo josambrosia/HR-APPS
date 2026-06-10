@@ -47,8 +47,10 @@ def open_html_in_browser(target: "Path | str") -> Tuple[bool, str]:
     is_url = isinstance(target, str) and target.startswith("http")
     # What to hand the browser executable as its arg:
     popen_arg = target if is_url else str(target)
-    # What to hand webbrowser.open() in the non-win32 / fallback branches:
-    web_arg = target if is_url else target.as_uri()
+    # What to hand webbrowser.open() in the non-win32 / fallback branches.
+    # Path(target) normalises BOTH a Path and a plain string filesystem path
+    # (e.g. from tempfile.mkstemp) so a str file path doesn't crash on .as_uri().
+    web_arg = target if is_url else Path(target).as_uri()
 
     if sys.platform != "win32":
         webbrowser.open(web_arg)
