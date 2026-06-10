@@ -1,27 +1,30 @@
-# v18 Design — Heatmap Kehadiran (Attendance Heatmap Dashboard)
+# v18 Design — Heatmap Kehadiran (Attendance Heatmap)
 
 **Date:** 2026-06-10
-**Status:** Approved from brainstorming · hardened after a 5-lens adversarial review (see §15)
+**Status:** Approved from brainstorming · **REVISED v2 — in-app render** (was browser/loopback-server; see §16) · hardened after a 5-lens adversarial review (§15)
 **Milestone:** v18.0.0
 **Forks from:** local v17 (`02d4bb4`, not yet pushed). v18 builds on top of v17.
 
 ## 1. Summary
 
-A new **Heatmap Kehadiran** dashboard that visualises every active employee's
-day-by-day attendance for a month as a colour-coded grid (à la GitHub activity),
-plus a print-optimised report. Each day's colour encodes its status.
+A new **Heatmap Kehadiran** screen that visualises every active employee's
+day-by-day attendance for a month as a colour-coded grid (à la GitHub activity).
+Each day's colour encodes its status.
 
 Two deliverables:
-- **(A) Interactive dashboard** — an HTML+JS page served on a **local web server**
-  (`127.0.0.1`), opened in the browser from a sidebar menu.
+- **(A) Interactive screen — IN-APP** (customtkinter). The heatmap renders inside
+  the application window (no browser, no local server). The dense grid is drawn on
+  a **`tk.Canvas`** for performance; toolbar / legend / detail strip are normal CTk
+  widgets. Vertical scroll over employee cards.
 - **(B) Print report** — a landscape A4 HTML page (matrix + appendix), reached via
-  a **pre-print dialog** (which tables + outlier inclusion).
+  a **pre-print dialog**. The app renders the print template to a **temporary HTML
+  file** and opens it in the browser for Ctrl-P / Save PDF — **exactly the existing
+  "Cetak Dashboard" pattern** (no server).
 
 No change to the `attendance_records` schema. One new Settings value
 (`late_tolerance_min`). The heatmap's colour logic is a **self-contained
-presentation mapping**; it deliberately matches the app's "justified → not late"
-intent (reason wins over lateness) but does NOT call `effective_attendance()`
-(that function is for export/coaching number adjustment — see §3, §15).
+presentation mapping**; it matches the app's "justified → not late" intent (reason
+wins over lateness) but does NOT call `effective_attendance()` (§3, §15).
 
 ## 2. Status taxonomy, palette & codes
 
@@ -39,299 +42,269 @@ intent (reason wins over lateness) but does NOT call `effective_attendance()`
 | Belum ada data | `#9CA3AF` | `–` | working day with no attendance row yet (grey) |
 
 - Cell text colour is luminance-derived (dark on light fills, light on dark) so
-  every cell is legible, incl. white "Libur" (black date) and grey "no-data".
+  every cell is legible, incl. white "Libur" and grey "no-data".
 - `na` shares the red colour; it is **tallied under the `X` summary column** but
   keeps the literal code `NA` in cell/tooltip/appendix.
+
+*(Unchanged from v1 — already implemented in `src/core/heatmap.py`: `STATUS_COLORS`
+/ `STATUS_CODES` / `STATUS_LABELS`.)*
 
 ## 3. Cell status logic (precedence) — `src/core/heatmap.py`
 
 A **pure** function `cell_status(row_or_None, *, tolerance, severe, is_weekend,
 is_holiday) -> status_key`. It does **NOT** call `effective_attendance()`; it
-applies this precedence directly on the raw row fields. (The reason-over-lateness
-ordering reproduces the same "justified → not telat" result as the rest of the
-app; correctness is verified by tests, not code reuse — §15.)
+applies this precedence directly on raw row fields.
 
 Order (first match wins):
-1. **Libur** → `·` white. `is_weekend` (Sat/Sun) OR `is_holiday` (date in the
-   holidays table) OR `row.tipe == 'Hari Libur'`. Excluded from hari kerja efektif.
-2. **Belum ada data** → `–` grey. `row is None` on a working day (weekday, not
-   holiday). Covers future/unimported days and a new hire's pre-join days.
-3. **Leave/justified reason present** → reason colour (overrides lateness):
+1. **Libur** → `·`. `is_weekend` OR `is_holiday` OR `row.tipe == 'Hari Libur'`.
+2. **Belum ada data** → `–`. `row is None` on a working day.
+3. **Leave/justified reason present** (overrides lateness):
    - reason ∈ `HEATMAP_DINAS_REASONS` = **{tugas_lapangan, tugas_paparan,
-     tugas_belajar, terlambat_kerja}** → 🟢 **D**
-   - `izin_sakit` → 🟦 **S** · `cuti` → 🟪 **C**
-   - `lupa_absen_datang` / `lupa_absen_pulang` → 🟨 **LA**
-   - `na` → 🟥 **X** (red; tallied under X)
-   - `row.tipe`-less reason `libur` → treat as Libur (`·`)
-   - **`terlambat_lain` is NOT a leave reason** → fall through to step 4 (shown
-     by lateness magnitude). It is an "unjustified late" annotation, so it must
-     still read as Telat.
-4. **Present (`masuk` not null), no leave reason, by lateness** — using
-   `terlambat_menit` (NULL → treated as 0, matching `insights.py`'s
-   `COALESCE(terlambat_menit,0)`):
-   - `terlambat ≤ tolerance` → 🟩 **H**
-   - `tolerance < terlambat < severe` → 🩷 **TR**
-   - `terlambat ≥ severe` → 🩷 **TB**
-   (At the defaults: `≤12 → H`, `13..59 → TR`, `≥60 → TB`.)
-5. **Hari Kerja, no `masuk`, no reason** → 🟥 **X** Absen Tanpa Alasan.
+     tugas_belajar, terlambat_kerja}** → **D**
+   - `izin_sakit` → **S** · `cuti` → **C** · `lupa_absen_*` → **LA** · `na` → **X**
+   - `terlambat_lain` is **NOT** a leave reason → falls through to step 4.
+4. **Present, no leave reason, by lateness** (`terlambat_menit` NULL→0):
+   `≤ tolerance → H` · `tolerance < t < severe → TR` · `≥ severe → TB`.
+5. **Hari Kerja, no `masuk`, no reason** → **X**.
 
-> **`HEATMAP_DINAS_REASONS` is a NEW heatmap-only constant** (in `config.py`),
-> deliberately broader than `COACHING_EXCLUDED` (which stays
-> `{tugas_lapangan, tugas_paparan, terlambat_kerja}` and is NOT modified). The
-> green grouping is a colour choice the user requested; it does **not** change
-> Coaching/Dashboard/Issues behaviour. *(If the user later wants `tugas_belajar`
-> coaching-excluded too, that's a separate config change — out of scope here.)*
+> **`HEATMAP_DINAS_REASONS`** is a heatmap-only constant in `config.py`,
+> deliberately broader than `COACHING_EXCLUDED` (unchanged at
+> {tugas_lapangan, tugas_paparan, terlambat_kerja}). The green grouping is a colour
+> choice; it does NOT change Coaching/Dashboard/Issues behaviour.
+
+*(Unchanged from v1 — already implemented + tested.)*
 
 ## 4. Thresholds & Settings
 
-- **`late_tolerance_min`** — NEW setting, default **12**. Boundary Hadir → Telat
-  Ringan.
+- **`late_tolerance_min`** — NEW setting, default **12**. Boundary Hadir → Telat Ringan.
 - **Severe threshold** — REUSE v17 `severe_lateness_threshold_min` (default 60).
-  Boundary Ringan → Berat.
 
-Wiring mirrors v17's severe-threshold exactly:
-1. `config.py`: `DEFAULT_LATE_TOLERANCE_MIN = 12`.
-2. `schema.py` `DEFAULT_SETTINGS`: `"late_tolerance_min": "12"`. The `init_db`
-   loop inserts every key with `INSERT ... ON CONFLICT(key) DO NOTHING`, so new
-   AND existing DBs get the default on next startup (verified for v17 — no
-   separate `_migrate` entry needed; confirm with a test like v17's).
-3. `db/settings.py`: `read_late_tolerance(conn) -> int` (mirror
-   `read_severe_lateness_threshold`, fallback to `DEFAULT_LATE_TOLERANCE_MIN`).
-4. `settings.py` General tab: a new row "Toleransi Telat (menit)", validated
-   `[0, 999]`, saved in `_save()` (validate-then-return pattern).
+Wiring (mirrors v17, already implemented): `config.DEFAULT_LATE_TOLERANCE_MIN`;
+`schema.DEFAULT_SETTINGS["late_tolerance_min"]="12"`; `db.settings.read_late_tolerance`;
+Settings → Umum row "Toleransi Telat (menit)" validated `[0,999]`.
 
-## 5. Data layer
+## 5. Data layer + Sorotan metrics
 
-- **Active employees** — `list_employees(conn, include_inactive=False)`
-  (confirmed: returns `active=1`, `ORDER BY nama`). Single source of truth for
-  who appears; resigned = inactive = absent; new hire = active, grey pre-data days.
-  No join/resign date fields.
-- **Matrix query** — NEW `list_attendance_matrix(conn, start, end)` in
-  `db/attendance.py`: JOIN `attendance_records` × `employees` over `[start,end]`,
-  returning per **existing** (employee,date) row: `{employee_id, nama, dept,
-  tanggal, hari, tipe, masuk, keluar, terlambat_menit, reason_category,
-  reason_detail, has_issue}`. Returns only rows that exist.
-- **Renderer gap-fill (explicit):** the renderer crosses **active employees ×
-  every date in the month**. For each (employee, date): use the row if present;
-  else weekend/holiday → Libur, else working day → "Belum ada data". So the grid
-  always covers the full month even for employees with zero rows.
-- **Holidays** — `holiday_dates_in_month(conn, year_month)` (confirmed, returns a
-  set of ISO dates; sourced from Menu Hari Libur + `restamp_holidays` on import).
-- **Outlier exclusion** — per-employee-per-month, confirmed:
-  `excluded_employee_ids(conn, year_month)` (set of employee_ids) /
-  `list_active_exclusions(conn, year_month)`. Used **only by the print dialog's
-  Kecualikan**: excluded employees are **omitted entirely** (matrix + appendix)
-  for that month. The interactive dashboard always shows all active employees
-  (no outlier filter).
-- **Hari kerja efektif** (bottom note) = weekdays in the month − holidays.
-- **HK (per employee)** = count of that employee's days whose `cell_status` ∈
-  **{H, TR, TB, D, LA}** (attended: present/late/on-duty/forgot-scan; both
-  lupa_absen_datang and lupa_absen_pulang count as attended). Excludes S, C, X,
-  Libur, Belum-ada-data.
+- **Active employees** — `list_employees(conn, include_inactive=False)` (`active=1`,
+  `ORDER BY nama`). Resigned = inactive = absent; new hire = active, grey pre-data days.
+- **Matrix query** — `list_attendance_matrix(conn, start, end)` in `db/attendance.py`
+  (JOIN attendance × employees over `[start,end]`; only rows that exist). *(Done.)*
+- **`build_heatmap_context(conn, year_month, *, exclude_outliers)`** crosses active
+  employees × every date; per cell `cell_status` + colour/code/label + masuk/keluar/
+  telat/alasan. Already returns: `days, weekday_of, weekday_labels, weeks, month_label,
+  prev/next_month, legend, summary_meta, eff_hari_kerja, is_empty, print_weeks,
+  wsep_days`, and per employee `{nama, dept, hk, summary{H..X}, cells{}}`.
+- **Holidays** — `holiday_dates_in_month(conn, year_month)`.
+- **Outlier exclusion** — `excluded_employee_ids(conn, year_month)`. Used by the
+  **print dialog's Kecualikan only**; the in-app screen always shows all active.
+- **Hari kerja efektif** = weekdays − holidays. **HK (per employee)** = days whose
+  status ∈ {H, TR, TB, D, LA}.
 
-## 6. Architecture — local web server
+**NEW for v18 in-app — per-employee `sorotan` sub-dict** (added to
+`build_heatmap_context`, so the metric math is unit-tested, not in the screen):
 
-A small **local HTTP server** the app starts on demand (chosen over in-app
-customtkinter: hundreds of cells render smoothly in a browser + free
-zoom/Ctrl-P/JS search & hover).
+```
+sorotan = {
+  "work_days":  eff_hari_kerja,                       # context-level, copied for convenience
+  "pct_hadir":  round(hk / eff_hari_kerja * 100) or 0,  # 0 when work_days == 0
+  "ontime_days": summary["H"],                        # on-time present days
+  "telat_total": Σ terlambat_menit over cells where status ∈ {sedang(TR), parah(TB)},
+  "telat_days":  summary["TR"] + summary["TB"],
+  "dinas":       summary["D"],
+  "sakit":       summary["S"],
+}
+```
 
-- **Module** `src/web/heatmap_server.py`: `http.server`-based handler in a
-  **daemon thread**, bound to **`127.0.0.1`** on an **OS-assigned ephemeral port**
-  (`bind((127.0.0.1, 0))`; read back the chosen port). `ensure_started() ->
-  base_url` is **idempotent** (stores server+port in module state; returns the
-  existing URL if already running). Daemon thread dies on app exit; the request
-  handler wraps work in try/except so a request during shutdown can't crash the
-  app. Loopback-only → no inbound firewall exposure (verify no Defender prompt on
-  a clean box during smoke).
-- **Routes** (each queries SQLite live, fresh data on refresh):
-  - `GET /heatmap?month=YYYY-MM` → dashboard page.
-  - `GET /heatmap/print?month=YYYY-MM&scope=full|matrix|lampiran&outlier=inc|exc`
-    → print page.
-- **Rendering:** Jinja2, reusing the reports stack. Templates
-  `src/reports/templates/heatmap.html.j2` & `heatmap_print.html.j2`, loaded via
-  **`TEMPLATES_DIR` from `config.py`** (so it resolves in dev AND PyInstaller
-  `--onedir`, exactly like `html_renderer.py`). Server-side renders the grid;
-  client-side JS does search, hover tooltip, click-detail, month nav (`?month=`).
-- **Opening the browser:** `open_html_in_browser` currently accepts only a
-  `Path` and emits `file://` — it **cannot open `http://`**. Change required:
-  generalise it to `open_in_browser(target: str | Path)` (if `str` startswith
-  `http` → pass the URL straight to the browser exe / `webbrowser.open(url)`;
-  else keep the existing `file://` path behaviour), OR add a sibling
-  `open_url_in_browser(url: str)`. Update the existing Dashboard-print caller
-  accordingly. (`src/ui/browser_launcher.py`.)
-- **Status/colour logic** lives in the pure `src/core/heatmap.py`: `cell_status`
-  (§3) + `STATUS_COLORS` / `STATUS_CODES` / `STATUS_LABELS` / `HEATMAP_DINAS_REASONS`
-  dicts (shared by both templates). This is the main unit-test surface.
+`pct_hadir` colour band (for the bar + number): **≥ 90 → green `#10B981`**,
+**75–89 → amber `#FBBF24`**, **< 75 → rose `#EC4899`**.
 
-## 7. (A) Interactive dashboard page
+## 6. Architecture — in-app render (no server)
 
-- **Sticky header** (does NOT scroll): title + month nav `‹ Mei 2026 ›` + SearchBar
-  + legend. Only the employee list scrolls under it.
-  - **Month nav** is free: prev/next always available, links to `?month=YYYY-MM`.
-    Default = active month (`current_month`). A month with no rows renders the
-    empty-state (header + legend still shown).
-- **Body:** one full-width row/card per **active employee** (A–Z): name + dept,
-  GitHub-style grid (weekday rows Sen–Min × week columns, date number in each
-  cell, status colour), and a per-employee **summary** (H/D/TR/TB/S/C/LA/X counts
-  + **HK**).
-- **Search:** real-time, case-insensitive filter on nama/dept (hide non-matches);
-  no match → "Tidak ada hasil"; Esc clears. (Mirror Issues/Outlier search.)
-- **Hover** a cell → tooltip (tanggal, masuk, keluar, telat, alasan).
-- **Click** a cell → **read-only** detail popup (same fields). View-only;
-  resolving stays in Issues / Severe Lateness.
-- **Empty state:** no data / no active employees →
-  "Belum ada data untuk bulan ini — import data fingerprint dulu." (exact text).
-- App dark theme tokens.
+- **`src/core/heatmap.py`** (pure, done + extended with `sorotan`) is the data/colour
+  source of truth — the main unit-test surface.
+- **(A) Interactive** is drawn with customtkinter + one `tk.Canvas`. **No
+  `src/web` server, no dashboard `.j2` template.**
+- **(B) Print** reuses Jinja2: a NEW pure function
+  **`render_heatmap_print_html(conn, year_month, *, scope, outlier) -> str`**
+  (in `src/reports/heatmap_print.py`) builds the context and renders
+  `heatmap_print.html.j2` via the existing `html_renderer._build_env()`
+  (FileSystemLoader on `TEMPLATES_DIR`, PyInstaller-safe). The screen writes the
+  string to a temp `.html` (`tempfile`) and calls `open_html_in_browser(path)`.
+
+## 7. (A) Interactive screen — `HeatmapScreen(ctk.CTkFrame)`
+
+Layout (top→bottom), matching the approved mockup:
+
+- **Header (fixed):** title "Heatmap Kehadiran" + subtitle
+  ("Hover sel untuk tooltip, klik untuk pin detail. Hari kerja efektif {bulan}: N hari.").
+- **Toolbar (fixed):** `SearchBar` (reused v16 component) · month nav `‹ {Bulan Thn} ›`
+  · `🖨 Cetak…` button.
+- **Legend (fixed):** the 10 status chips (code swatch + label), from `context["legend"]`.
+- **Detail strip (fixed):** one line under the legend. Default hint
+  "Klik sel untuk detail". On **click** a cell → fills with
+  `{tanggal} · {status label} · Masuk {…} · Keluar {…} · Telat {…} · Alasan {…}`.
+- **Body (scrollable `tk.Canvas` + vertical scrollbar, mousewheel):** one **card per
+  active employee** (A–Z), painted on the canvas:
+  - **Name + dept** (left).
+  - **Grid**: weekday rows **Sn–Mg** × week columns **M1..M5**; each working-day cell
+    = filled rounded rect + date number (+ code) in luminance-derived text colour;
+    weekend/holiday white, no-data grey.
+  - **Panel Sorotan** (fills the mid gap): **% Kehadiran** (banded colour) + thin
+    progress bar; **Tepat waktu** `ontime_days/work_days` hari; **Telat**
+    `telat_total` mnt · `telat_days` hari; **Dinas** d · **Sakit** s.
+  - **Ringkasan** (right): `HK {hk}` + counts H/D/TR/TB/S/C/LA/X with colour dots.
+  - Bottom note: HK definition + "Sel abu-abu = belum ada data".
+
+**Interactions**
+- **Search** → repaint, case-insensitive substring on nama/dept; `SearchBar`
+  N-of-M counter; no match → "Tidak ada hasil" painted in the body.
+- **Month nav ‹ / ›** → prev/next month (from `current_month` initially); rebuild
+  context + repaint. Empty month → empty-state text (header/legend stay).
+- **Hover** a cell → floating tooltip (one reusable borderless `Toplevel`) near the
+  cursor: tanggal, status, masuk, keluar, telat, alasan.
+- **Click** a cell → fill the **detail strip** (read-only; resolving stays in Issues /
+  Severe Lateness).
+- **Ctrl+F** focuses search; **click-outside** releases search focus — reuse the
+  `bind_all` + walk-parent-chain pattern from `SevereLatenessScreen`; unbind on
+  `<Destroy>`.
+- **Empty state:** "Belum ada data untuk bulan ini — import data fingerprint dulu."
+
+**Rendering approach (why Canvas):** up to ~40 employees × 35 cells ≈ ~1.4k cells.
+One `CTkLabel`/cell ⇒ heavy construction + janky scroll (customtkinter is heavy per
+widget). A single `tk.Canvas` paints all cells as items (rect + text), scrolls
+smoothly, and supports hover/click via `tag_bind`. Toolbar/legend/strip stay CTk.
 
 ## 8. (B) Print report
 
-Reached via a **NEW `HeatmapPrintDialog`** (customtkinter; the existing
-`PrintOptionsDialog` is dashboard-specific and is NOT reused). Fields:
-- **Tabel yang dicetak:** Full / Matrix saja / Lampiran saja.
-- **Karyawan outlier:** Sertakan / Kecualikan.
+Reached via the existing **`HeatmapPrintDialog`** (customtkinter; done). Fields:
+**Tabel** (Full / Matrix saja / Lampiran saja) · **Karyawan outlier** (Sertakan /
+Kecualikan).
 
-The dialog opens `GET /heatmap/print?...` in the browser (landscape A4, light
-theme, `print-color-adjust:exact`); user does Ctrl-P / Save PDF.
+On confirm: `render_heatmap_print_html(conn, month, scope, outlier)` → temp `.html`
+→ `open_html_in_browser(path)` → landscape A4 light theme (`print-color-adjust:exact`)
+→ user Ctrl-P / Save PDF.
 
-**Scope behaviour:** `full` → matrix + appendix · `matrix` → matrix only ·
-`lampiran` → appendix only. `Kecualikan` omits outlier employees from BOTH tables.
+**Scope:** `full` → matrix + appendix · `matrix` → matrix only · `lampiran` →
+appendix only. `Kecualikan` omits outlier employees from BOTH tables.
 
-### Matrix (single design — "padat")
-- Rows = active (non-excluded) employees A–Z; columns = day 1..N.
-- **Week-group header** (M1..M5 spanning each ISO week) + **week separators**
-  (thicker border each Monday).
-- Cell = colour + **code** (`H/TR/TB/D/S/C/LA/X/NA/·/–`); weekend/holiday white
-  `·`, no-data grey `–`. Codes keep it legible printed greyscale.
-- **Bold name column** + thick right border; **zebra** on name+summary cells.
-- **Summary columns** (right): **HK** (plain styling — follows the name-column
-  background, no green) then per-category counts `H TR TB D S C LA X`.
-- **Bottom note (text):** "Hari kerja efektif {bulan}: N hari. HK = jumlah hari
-  kerja yang dihadiri (Hadir, Terlambat, Dinas, Lupa absen); Sakit/Cuti/Absen
-  tidak dihitung. Sel abu-abu = hari kerja yang datanya belum tersedia."
-- **Legend** below the matrix.
+### Matrix (single "padat" design) — *unchanged from v1, already in `heatmap_print.html.j2`*
+Rows = active (non-excluded) A–Z; columns = day 1..N; week-group header (M1..M5) +
+week separators; cell = colour + code; bold name column + thick right border; zebra;
+**HK** column (plain, follows name-column bg) + counts `H TR TB D S C LA X`; bottom
+note (hari kerja efektif + HK definition); legend below.
 
-### Appendix — Detail Hari Kerja (scope ∈ {full, lampiran})
-Every **abnormal working day** (status ∉ {H, Libur, Belum-ada-data}):
-- Columns: **Nama** (leftmost) · Dept · Tanggal · **Status** · Masuk · Keluar ·
-  Telat · Alasan. Sorted **by nama** then date.
-- **Status** cell = a **rounded full-cell pill** (fills the column width).
-- **Per-employee grouping:** thick top border at each new employee + zebra per
-  group + bold name. Employees with zero abnormal days are omitted; a month with
-  zero abnormal days renders a "Tidak ada hari kerja abnormal bulan ini" note.
+### Appendix — Detail Hari Kerja (scope ∈ {full, lampiran}) — *unchanged from v1*
+Every abnormal working day (status ∉ {H, Libur, Belum-ada-data}); columns Nama ·
+Dept · Tanggal · **Status pill** · Masuk · Keluar · Telat · Alasan; sorted by nama
+then date; per-employee grouping (thick top border + zebra + bold name); zero
+abnormal days → "Tidak ada hari kerja abnormal bulan ini".
+
+> Print stays HK-only (no Sorotan %) — the matrix is intentionally dense. (Adding a
+> "%Hadir" column later is a trivial follow-up if wanted.)
 
 ## 9. Sidebar + screen + router
 
-- `app.py nav_groups` **INSIGHT** group (next to Dashboard): `("⊞", "Heatmap",
-  "Heatmap")` (⊞ monochrome theme glyph). `_show("Heatmap")` instantiates
-  `HeatmapScreen`.
-- **`src/ui/screens/heatmap.py`** — a small **launcher** panel (the heatmap lives
-  in the browser): a "🔳 Buka Heatmap di browser" button (ensures server started →
-  opens `/heatmap?month=<active>`), a "🖨️ Cetak…" button (opens
-  `HeatmapPrintDialog`), and a short note that it opens in an external browser
-  window. Uses the active month from `current_month`.
+- `app.py nav_groups` **INSIGHT** group, after Dashboard: `("⊞", "Heatmap",
+  "Heatmap")`. `_show("Heatmap")` instantiates `HeatmapScreen`. *(Done — entry +
+  router already wired.)*
+- **`src/ui/screens/heatmap.py`** — **REWRITTEN** from the v1 browser-launcher into
+  the full in-app screen described in §7. The `🖨 Cetak…` button still opens
+  `HeatmapPrintDialog`; its `on_confirm` now uses the temp-file print path (§8).
 
 ## 10. Schema & changelog
 
-- **No `attendance_records` schema change.** One new Settings key
-  (`late_tolerance_min`) + one new heatmap constant (`HEATMAP_DINAS_REASONS`).
-  `COACHING_EXCLUDED` is **unchanged**.
-- **Rule #4:** prepend `APP_CHANGELOG` v18.0.0 (feat: Heatmap dashboard + print;
-  feat: setting Toleransi Telat). Bump `APP_VERSION = "18.0.0"`, `APP_BUILD_DATE`.
-- Release per framework: build installer → rotate prod `.exe` → copy to
-  `Installers/` → smoke → push `v18` + advance `latest` (with explicit auth).
+- **No `attendance_records` schema change.** One Settings key + one heatmap constant.
+  `COACHING_EXCLUDED` unchanged.
+- **Rule #4 — REVISE the existing v18 changelog entry** so feature #1 says the
+  heatmap is **interaktif di dalam aplikasi** (not "di browser"); keep the Toleransi
+  Telat entry. `APP_VERSION` stays **18.0.0** (never pushed). Mention the per-employee
+  Sorotan (ringkasan kehadiran) in user-facing terms.
+- Release per framework: full pytest green → build installer → rotate prod `.exe` →
+  copy to `Installers/` → smoke → **HOLD push** until user authorises.
 
 ## 11. Testing (TDD)
 
-- **`src/core/heatmap.py` — `cell_status` (primary surface), concrete cases:**
-  - `{masuk:"08:05", terlambat_menit:12, reason:None, tipe:"Hari Kerja"}`, tol=12,
-    sev=60, weekend=F, holiday=F → `H`; same with 13 → `TR`; 59 → `TR`; 60 → `TB`.
-  - `terlambat_menit:None` + masuk present → `H` (NULL→0).
-  - reason `terlambat_kerja` + terlambat 90 → `D` (reason wins over lateness).
-  - reason `tugas_belajar` → `D`; `izin_sakit` → `S`; `cuti` → `C`;
-    `lupa_absen_pulang` → `LA`; `na` → `X`; `terlambat_lain` + terlambat 30 → `TR`
-    (NOT a leave; falls through).
-  - `row=None`, weekday, not holiday → `–`; weekend → `·`; holiday → `·`;
-    `tipe="Hari Libur"` → `·`.
-  - Hari Kerja, masuk None, reason None → `X`.
-  - HK helper: counts cells in {H,TR,TB,D,LA}; STATUS_* dict coverage.
-- **DB** — `list_attendance_matrix` returns expected rows for a range; active-only
-  via `list_employees`; gap-fill produces nodata/libur correctly.
-- **Settings** — `late_tolerance_min` seeded (new + existing DB); `read_late_tolerance`
-  fallback; Settings UI saves + `[0,999]` validation.
-- **Server** — test helper starts the server on a seeded temp-DB; poll `base_url`
-  (≤5×50ms) until up; assert `GET /heatmap` → 200 `text/html`,
-  `GET /heatmap/print?scope=matrix` → 200; `ensure_started()` idempotent (same
-  port twice); binds `127.0.0.1`. Daemon thread → no explicit teardown.
-- **Render** — both templates render without error for: normal month, empty month
-  (empty-state text), month with holidays + nodata, outlier `exc` omits a flagged
-  employee; appendix sorted by nama with grouping; HK attended-only;
-  effective-working-days note present.
+- **`cell_status`** — unchanged suite stays green (tolerance/severe tiers, reason
+  precedence, terlambat_lain fall-through, NULL→0, libur/nodata, X).
+- **`build_heatmap_context` — `sorotan`** (NEW): on a seeded fixture assert
+  `pct_hadir = round(hk/work_days*100)` (and `0` when work_days 0), `ontime_days =
+  summary['H']`, `telat_total = Σ TR/TB minutes`, `telat_days = TR+TB`, `dinas`,
+  `sakit`. Plus existing context tests (grid coverage, HK, empty month).
+- **`render_heatmap_print_html`** (NEW, replaces server route tests): returns HTML
+  containing the month label + a known employee for `scope ∈ {full, matrix, lampiran}`;
+  `matrix` omits the appendix heading, `lampiran` omits the matrix; `outlier='exc'`
+  omits a flagged employee. (Pure string assertions — no browser.)
+- **`HeatmapScreen` smoke** (pattern of other screen tests; `tk_root` + `temp_db`):
+  constructs; canvas has the expected cell-item count (visible employees × working-day
+  cells); `SearchBar` filter hides non-matches (repaint count); month nav ‹/›
+  changes the rendered month. **Patch `messagebox`** where a modal could block.
+- **DB / Settings** — `list_attendance_matrix`, `late_tolerance_min` seed +
+  `read_late_tolerance` + Settings `[0,999]` — already green.
+- **Removed:** `tests/test_heatmap_server.py` (server deleted).
 
 ## 12. Approaches considered
 
-- **(chosen)** Browser page on a loopback server — scales to many cells, free
-  zoom/print/search, reuses Jinja2. Cost: separate browser window + a small server
-  thread (loopback-only, negligible risk).
-- **(rejected)** In-app customtkinter grid — hundreds–thousands of widgets is
-  heavy; search/zoom/print all bespoke.
-- **(rejected)** Static temp-file HTML — simpler but no live refresh; user chose a
-  localhost server.
+- **(chosen v2)** In-app customtkinter + `tk.Canvas` — renders inside the app
+  (user's explicit requirement); Canvas keeps ~1.4k cells smooth; reuses the pure
+  data layer; print via temp-file HTML reuses the app's existing print idiom.
+- **(rejected — was v1)** Browser page on a loopback server — extra window + a server
+  thread; the user wants the heatmap inside the app, not a browser.
+- **(rejected)** One `CTkLabel` per cell — hundreds–thousands of heavy widgets;
+  slow construction + janky scroll.
 
-## 13. Files touched (summary)
+## 13. Files touched (v2)
 
 | File | Change |
 |------|--------|
-| `src/config.py` | `DEFAULT_LATE_TOLERANCE_MIN`, `HEATMAP_DINAS_REASONS`, version + changelog |
-| `src/db/schema.py` | `late_tolerance_min` default in `DEFAULT_SETTINGS` |
-| `src/db/settings.py` | `read_late_tolerance` |
-| `src/db/attendance.py` | `list_attendance_matrix(conn, start, end)` |
-| `src/core/heatmap.py` | **new** — `cell_status` + STATUS_* dicts + HK/summary helpers |
-| `src/web/heatmap_server.py` | **new** — loopback HTTP server + routes |
-| `src/reports/templates/heatmap.html.j2` | **new** — dashboard page |
-| `src/reports/templates/heatmap_print.html.j2` | **new** — print matrix + appendix |
-| `src/ui/screens/heatmap.py` | **new** — launcher panel |
-| `src/ui/components/heatmap_print_dialog.py` | **new** — scope + outlier dialog |
-| `src/ui/browser_launcher.py` | generalise to open `http://` URLs (or add `open_url_in_browser`) + update Dashboard caller |
-| `src/ui/screens/settings.py` | Toleransi Telat row + validation |
-| `src/ui/app.py` | ⊞ Heatmap sidebar entry (INSIGHT) + `_show` handler |
-| `tests/...` | heatmap logic, DB, settings, server, render |
+| `src/config.py` | `DEFAULT_LATE_TOLERANCE_MIN`, `HEATMAP_DINAS_REASONS`, version; **revise v18 changelog wording** (in-app) |
+| `src/db/schema.py` | `late_tolerance_min` default *(done)* |
+| `src/db/settings.py` | `read_late_tolerance` *(done)* |
+| `src/db/attendance.py` | `list_attendance_matrix` *(done)* |
+| `src/core/heatmap.py` | `cell_status` + STATUS_* *(done)*; **add per-employee `sorotan`** |
+| `src/reports/heatmap_print.py` | **new** — `render_heatmap_print_html(conn, ym, *, scope, outlier) -> str` |
+| `src/reports/templates/heatmap_print.html.j2` | keep (print) |
+| `src/ui/screens/heatmap.py` | **rewrite** — in-app Canvas screen (§7) |
+| `src/ui/components/heatmap_print_dialog.py` | keep; `on_confirm` → temp-file print |
+| `src/ui/screens/settings.py` | Toleransi Telat row *(done)* |
+| `src/ui/app.py` | ⊞ Heatmap entry + router *(done)* |
+| `HR-Absensi.spec` | **drop** `heatmap.html.j2` data + `src.web.heatmap_server` hiddenimport; **keep** `heatmap_print.html.j2` |
+| **DELETE** `src/web/heatmap_server.py`, `src/web/__init__.py`, `src/reports/templates/heatmap.html.j2`, `tests/test_heatmap_server.py` | server + dashboard template removed |
+| `src/ui/browser_launcher.py` | http-URL support is now unused but harmless — keep (tested) |
+| `tests/...` | add `sorotan`, `render_heatmap_print_html`, `HeatmapScreen` smoke; remove server test |
 
-## 14. New symbols to create (confirmed absent — expected for a design spec)
+## 14. New symbols to create (v2)
 
-The review confirmed these don't exist yet; they are the build targets, not spec
-errors: `DEFAULT_LATE_TOLERANCE_MIN`, `HEATMAP_DINAS_REASONS`, `late_tolerance_min`
-seed, `read_late_tolerance`, `list_attendance_matrix`, `src/core/heatmap.py`,
-`src/web/heatmap_server.py`, both `.j2` templates, `HeatmapScreen`,
-`HeatmapPrintDialog`, the sidebar entry + router branch, and the
-`browser_launcher` URL support.
+`sorotan` in `build_heatmap_context`; `src/reports/heatmap_print.py` +
+`render_heatmap_print_html`; the rewritten `HeatmapScreen` (Canvas paint + tooltip +
+detail strip + month nav + search). Everything else (settings, query, constants,
+dialog, sidebar) already exists.
 
-## 15. Verification notes (post-review)
+## 15. Verification notes (post-review) — still valid
 
-Hardened against a 5-lens adversarial review of the spec vs. the real code.
-Confirmed-correct integration points: `list_employees`, `attendance_records`
-schema, `holiday_dates_in_month` / `restamp_holidays`, `excluded_employee_ids`
-(per-employee-per-month), `effective_attendance` signature, v17 settings pattern.
-Corrections applied:
+Hardened against a 5-lens adversarial review. Confirmed integration points:
+`list_employees`, `attendance_records` schema, `holiday_dates_in_month`,
+`excluded_employee_ids` (per-employee-per-month), v17 settings pattern. Corrections
+applied (all still hold in v2): (1) `HEATMAP_DINAS_REASONS` ≠ `COACHING_EXCLUDED`;
+(2) no `effective_attendance` reuse — pure `cell_status`; (3) `terlambat_lain` falls
+through to lateness; (4) `terlambat_menit` NULL → 0; (5) outlier filter = print only;
+(6) settings seeded via `DEFAULT_SETTINGS` + `ON CONFLICT DO NOTHING`.
 
-1. **`tugas_belajar` / Dinas group** — the heatmap green group is a NEW explicit
-   constant `HEATMAP_DINAS_REASONS` ({lapangan, paparan, belajar, terlambat_kerja}),
-   NOT `COACHING_EXCLUDED` (which stays 3 categories, unchanged). The earlier spec
-   wrongly equated them.
-2. **No `effective_attendance` reuse** — `cell_status()` is a pure function on raw
-   fields; the reason-over-lateness precedence reproduces the justified-late
-   behaviour; consistency is proven by tests, not by calling that function.
-3. **`terlambat_lain`** is NOT a leave reason → it falls through to the lateness
-   tier (TR/TB), so it still reads as Telat.
-4. **`open_html_in_browser`** only opens `file://` → generalise it (or add
-   `open_url_in_browser`) for the `http://127.0.0.1:PORT` heatmap URL.
-5. **`terlambat_menit` NULL** with masuk present → treated as 0 (on-time),
-   matching `insights.py` COALESCE.
-6. **Outlier** = `excluded_employee_ids(conn, year_month)`; excluded employees are
-   omitted entirely; outlier filter applies to PRINT only (dashboard shows all
-   active).
-7. **Settings migration** — adding to `DEFAULT_SETTINGS` + the `init_db`
-   `ON CONFLICT DO NOTHING` loop seeds both new and existing DBs (verified for
-   v17); a test asserts the seed.
-8. **Server** — OS-assigned ephemeral port via `bind((127.0.0.1,0))`, idempotent
-   `ensure_started`, daemon thread, `TEMPLATES_DIR`-based Jinja2 loading for
-   PyInstaller compatibility.
+## 16. Revision log — browser → in-app (v2)
+
+The v1 spec rendered (A) as an HTML page on a loopback `127.0.0.1` server opened in
+the browser. **User decision (2026-06-10): the heatmap must render *inside the
+application*, not a browser.** v2 changes:
+
+- **Removed** `src/web/heatmap_server.py` + `src/web/__init__.py` +
+  `src/reports/templates/heatmap.html.j2` + `tests/test_heatmap_server.py`; dropped
+  the corresponding `.spec` `datas`/`hiddenimports`.
+- **`HeatmapScreen` rewritten** from a browser launcher into the full in-app screen
+  (§7), grid on a `tk.Canvas`, hover tooltip + click→detail-strip, in-app search +
+  month nav.
+- **Print kept** but server-free: `render_heatmap_print_html` → temp HTML →
+  `open_html_in_browser` (the existing Cetak-Dashboard idiom). Print medium is still
+  the browser (Ctrl-P / Save PDF) — only the *interactive* view moved in-app.
+- **Added Panel Sorotan** per employee (§5/§7): % Kehadiran + bar, tepat waktu, total
+  telat, dinas/sakit — fills the space between grid and ringkasan with real metrics.
+- Core data/colour logic, settings, query, taxonomy, and the print matrix/appendix
+  design are **unchanged** from v1 (already implemented + green).
