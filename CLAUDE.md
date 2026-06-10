@@ -120,12 +120,12 @@ tasklist | grep -i HR-Absensi || echo "not running"
   - **Print** (server-free): `src/reports/heatmap_print.py::render_heatmap_print_html` → temp `.html` → `open_html_in_browser` (Cetak-Dashboard idiom). Appendix shows short `D · Dinas`, wide Alasan / narrow Masuk-Keluar-Telat, and **HR Officer name from Settings** in the header.
   - New setting **Toleransi Telat (menit)** (default 12).
   - Smoke fixes applied: multi-column layout, Cetak→browser (str-path `.as_uri` crash in `browser_launcher`), Dinas short label, appendix column widths, **HR Officer print header** (commit `720672c`).
-- **Test baseline: ~362 passing.** (`../../../.venv/Scripts/python.exe -m pytest -q`)
+- **Test baseline: 363 passing — confirmed green at HEAD `720672c`.** (`../../../.venv/Scripts/python.exe -m pytest -q`)
 - Specs/plans: `docs/superpowers/specs/2026-06-10-v18-heatmap-dashboard-design.md` (revised v2 in-app), `docs/superpowers/plans/2026-06-10-v18-heatmap-inapp.md`.
 
 ### ⚠️ IMMEDIATE NEXT STEPS (do these in the CLI session)
-1. **Confirm full suite green.** Last run reached 93% with everything passing; the slow GUI tail (`test_settings_screen_severe_lateness`, `test_severe_lateness_screen`) is v17 code unaffected by the v18 print-only HR-officer change. Re-run if you want a clean 100%.
-2. **REBUILD the installer** — the current prod `.exe` + `Installers/HR-Absensi-Setup-v18.0.0.exe` were built **before** the HR-Officer-fix commit `720672c`, so they do **NOT** include it yet. Run `export PATH="/c/Program Files (x86)/Inno Setup 6:$PATH" && python -m tools.build_installer` → rotate prod `dist/HR-Absensi/` 2-level (never touch `data/`) → copy to `Installers/HR-Absensi-Setup-v18.0.0.exe`.
+1. **Full suite already green — 363 passed at HEAD `720672c`.** No need to re-run unless you change code.
+2. **REBUILD the installer** ← *start here* — the current prod `.exe` + `Installers/HR-Absensi-Setup-v18.0.0.exe` were built **before** the HR-Officer-fix commit `720672c`, so they do **NOT** include it yet. Run `export PATH="/c/Program Files (x86)/Inno Setup 6:$PATH" && python -m tools.build_installer` → rotate prod `dist/HR-Absensi/` 2-level (never touch `data/`) → copy to `Installers/HR-Absensi-Setup-v18.0.0.exe`.
 3. **HOLD push.** BOTH `v17` and `v18` are unpushed and require **explicit user authorization** (Rule 1). When authorized: `git push origin HEAD:v18`, advance `latest` (`HEAD:latest`), and push/tag `v17` too; then update `memory/version_state.md`.
 
 ### Notes
