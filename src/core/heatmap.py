@@ -189,3 +189,30 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers):
         "wsep_days": wsep_days,
         "employees": out_emps,
     }
+
+
+def pct_band_color(pct):
+    """Colour band for the % Kehadiran bar/number (>=90 green, 75-89 amber, <75 rose)."""
+    if pct >= 90:
+        return "#10B981"
+    if pct >= 75:
+        return "#FBBF24"
+    return "#EC4899"
+
+
+def needs_attention(summary):
+    """True when the employee has an unexcused absence (X) or severe lateness (TB)."""
+    return summary.get("X", 0) > 0 or summary.get("TB", 0) > 0
+
+
+def sort_employees(employees, key):
+    """Stable sort of heatmap employee dicts, tiebreak by nama (case-insensitive).
+    key in {"nama","kehadiran","telat","absen"}; unknown -> nama A-Z."""
+    if key == "kehadiran":
+        return sorted(employees, key=lambda e: (e["sorotan"]["pct_hadir"], e["nama"].lower()))
+    if key == "telat":
+        return sorted(employees, key=lambda e: (-e["sorotan"]["telat_days"],
+                                                -e["sorotan"]["telat_total"], e["nama"].lower()))
+    if key == "absen":
+        return sorted(employees, key=lambda e: (-e["summary"]["X"], e["nama"].lower()))
+    return sorted(employees, key=lambda e: e["nama"].lower())
