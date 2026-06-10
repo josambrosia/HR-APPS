@@ -72,3 +72,10 @@ def test_appendix_dinas_label_is_short():
     assert ">D · Dinas (lapangan" not in html
     # the full explanation is still present once — in the legend
     assert "Dinas (lapangan" in html
+
+
+def test_appendix_narrow_numeric_columns_wide_alasan():
+    with get_connection(_db_dinas()) as conn:
+        html = render_heatmap_print_html(conn, "2026-05", scope="full", outlier="inc")
+    # Masuk(44)/Keluar(44)/Telat(40) narrowed; Alasan = remainder (<col> no width)
+    assert 'width:44px"><col style="width:44px"><col style="width:40px"><col>' in html
