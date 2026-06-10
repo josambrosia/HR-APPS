@@ -101,7 +101,7 @@
           {% set ns.any = true %}
           <tr class="{% if row_ns.first %}grp {% endif %}{% if emp_alt %}alt{% endif %}">
             <td class="nmcell">{{ e.nama }}</td><td>{{ e.dept }}</td><td class="c">{{ d }} {{ month_label }}</td>
-            <td class="stcell"><span class="stpill" style="background:{{ c.color }};color:{{ c.text_color }}">{{ c.code }} · {{ c.label }}</span></td>
+            <td class="stcell"><span class="stpill" style="background:{{ c.color }};color:{{ c.text_color }}">{{ c.code }} · {{ "Dinas" if c.status == "dinas" else c.label }}</span></td>
             <td class="c">{{ c.masuk }}</td><td class="c">{{ c.keluar }}</td><td class="c">{{ c.telat }}</td><td>{{ c.alasan }}</td>
           </tr>
           {% set row_ns.first = false %}
