@@ -24,8 +24,10 @@ APP_CHANGELOG = [
             ("feat", "Menu baru 'Heatmap' (grup INSIGHT): peta kehadiran bulanan "
                      "per karyawan dengan kode warna status (hadir, terlambat, "
                      "dinas, sakit, cuti, lupa absen, absen). Tampil interaktif di "
-                     "browser — bisa cari/sortir nama, hover untuk detail, dan "
-                     "navigasi antar bulan."),
+                     "dalam aplikasi — cari & urutkan nama (kehadiran terendah / "
+                     "paling sering telat / absen), hover & klik sel untuk detail, "
+                     "navigasi antar bulan, plus panel ringkasan kehadiran "
+                     "(% hadir, tepat waktu, total telat) per karyawan."),
             ("feat", "Versi cetak Heatmap (landscape): matriks Karyawan × Hari "
                      "berkode + ringkasan + lampiran detail. Dialog pra-cetak "
                      "untuk memilih tabel (Full / Matrix / Lampiran) dan "
