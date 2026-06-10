@@ -54,7 +54,7 @@
 <div class="sheet">
   <div class="bar">
     <h1>LAPORAN HEATMAP KEHADIRAN — {{ month_label }}</h1>
-    <div class="meta">Josaphat Tech Solution · HR Absensi<br>HR Officer: ____________</div>
+    <div class="meta">Josaphat Tech Solution · HR Absensi<br>HR Officer: {{ hr_officer_name if hr_officer_name else "____________" }}</div>
   </div>
 
   {% if is_empty %}

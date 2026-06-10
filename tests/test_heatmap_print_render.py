@@ -79,3 +79,21 @@ def test_appendix_narrow_numeric_columns_wide_alasan():
         html = render_heatmap_print_html(conn, "2026-05", scope="full", outlier="inc")
     # Masuk(44)/Keluar(44)/Telat(40) narrowed; Alasan = remainder (<col> no width)
     assert 'width:44px"><col style="width:44px"><col style="width:40px"><col>' in html
+
+
+def test_print_shows_hr_officer_from_settings():
+    from src.db.settings import set_setting
+    fd, p = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    p = Path(p)
+    init_db(p)
+    with get_connection(p) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="IT")
+        upsert_attendance(conn, employee_id=a, tanggal="2026-05-04", hari="Senin",
+                          tipe="Hari Kerja", jadwal="", masuk="09:15", keluar="16:30",
+                          kerja_jam=None, lembur_jam=None, terlambat_menit=75,
+                          has_issue=0, imported_from="W")
+        set_setting(conn, "hr_officer_name", "Budi Officer")
+        html = render_heatmap_print_html(conn, "2026-05", scope="full", outlier="inc")
+    assert "HR Officer: Budi Officer" in html
+    assert "____________" not in html

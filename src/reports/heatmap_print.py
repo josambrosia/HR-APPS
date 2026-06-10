@@ -16,5 +16,6 @@ def render_heatmap_print_html(conn, year_month=None, *, scope="full", outlier="i
     if not month:
         month = get_setting(conn, "current_month", default="") or date.today().strftime("%Y-%m")
     ctx = build_heatmap_context(conn, month, exclude_outliers=(outlier == "exc"))
+    ctx["hr_officer_name"] = get_setting(conn, "hr_officer_name", default="")
     env = _build_env()
     return env.get_template("heatmap_print.html.j2").render(scope=scope, **ctx)
