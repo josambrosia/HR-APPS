@@ -118,6 +118,19 @@ sorotan = {
 `pct_hadir` colour band (for the bar + number): **≥ 90 → green `#10B981`**,
 **75–89 → amber `#FBBF24`**, **< 75 → rose `#EC4899`**.
 
+**NEW v18 in-app extras (all pure → unit-tested in `src/core/heatmap.py`):**
+- **`needs_attention(summary) -> bool`** = `summary["X"] > 0 or summary["TB"] > 0`
+  (unexcused absence OR severe lateness). Added per employee as `needs_attention`.
+- **`sort_employees(employees, key) -> list`** — stable sort, tiebreak by nama:
+  - `"nama"` (default) → nama A–Z
+  - `"kehadiran"` → `sorotan.pct_hadir` ascending (worst first)
+  - `"telat"` → `sorotan.telat_days` desc, then `telat_total` desc
+  - `"absen"` → `summary["X"]` desc
+- **`today_day`** — context-level int (the day-of-month) when `year_month` is the
+  current month, else `None`. `build_heatmap_context` gains an injectable
+  `today: date | None = None` param (defaults to `date.today()`); the screen passes
+  `date.today()`, tests pass a fixed date.
+
 ## 6. Architecture — in-app render (no server)
 
 - **`src/core/heatmap.py`** (pure, done + extended with `sorotan`) is the data/colour
@@ -137,18 +150,21 @@ Layout (top→bottom), matching the approved mockup:
 
 - **Header (fixed):** title "Heatmap Kehadiran" + subtitle
   ("Hover sel untuk tooltip, klik untuk pin detail. Hari kerja efektif {bulan}: N hari.").
-- **Toolbar (fixed):** `SearchBar` (reused v16 component) · month nav `‹ {Bulan Thn} ›`
-  · `🖨 Cetak…` button.
+- **Toolbar (fixed):** `SearchBar` (reused v16 component) · **Urutkan** dropdown
+  (`CTkOptionMenu`: Nama A–Z / Kehadiran terendah / Paling sering telat / Paling
+  sering absen → `sort_employees` key) · month nav `‹ {Bulan Thn} ›` · `🖨 Cetak…`.
 - **Legend (fixed):** the 10 status chips (code swatch + label), from `context["legend"]`.
 - **Detail strip (fixed):** one line under the legend. Default hint
   "Klik sel untuk detail". On **click** a cell → fills with
   `{tanggal} · {status label} · Masuk {…} · Keluar {…} · Telat {…} · Alasan {…}`.
 - **Body (scrollable `tk.Canvas` + vertical scrollbar, mousewheel):** one **card per
   active employee** (A–Z), painted on the canvas:
-  - **Name + dept** (left).
-  - **Grid**: weekday rows **Sn–Mg** × week columns **M1..M5**; each working-day cell
-    = filled rounded rect + date number (+ code) in luminance-derived text colour;
-    weekend/holiday white, no-data grey.
+  - **Name + dept** (left). If `needs_attention` → a **red left accent bar** on the
+    card + a small "Perlu perhatian" badge by the name.
+  - **Grid**: weekday rows **Sn–Mg** × week columns **M1..Mk** (5–6); each working-day
+    cell = filled rounded rect + date number (+ code) in luminance-derived text colour;
+    weekend/holiday white, no-data grey. When `today_day` is set, that cell gets a
+    bright **today outline**.
   - **Panel Sorotan** (fills the mid gap): **% Kehadiran** (banded colour) + thin
     progress bar; **Tepat waktu** `ontime_days/work_days` hari; **Telat**
     `telat_total` mnt · `telat_days` hari; **Dinas** d · **Sakit** s.
@@ -158,6 +174,8 @@ Layout (top→bottom), matching the approved mockup:
 **Interactions**
 - **Search** → repaint, case-insensitive substring on nama/dept; `SearchBar`
   N-of-M counter; no match → "Tidak ada hasil" painted in the body.
+- **Urutkan** → repaint via `sort_employees(employees, key)`; default Nama A–Z.
+  Search filter applies on top of the chosen sort.
 - **Month nav ‹ / ›** → prev/next month (from `current_month` initially); rebuild
   context + repaint. Empty month → empty-state text (header/legend stay).
 - **Hover** a cell → floating tooltip (one reusable borderless `Toplevel`) near the
@@ -230,6 +248,10 @@ abnormal days → "Tidak ada hari kerja abnormal bulan ini".
   `pct_hadir = round(hk/work_days*100)` (and `0` when work_days 0), `ontime_days =
   summary['H']`, `telat_total = Σ TR/TB minutes`, `telat_days = TR+TB`, `dinas`,
   `sakit`. Plus existing context tests (grid coverage, HK, empty month).
+- **Sort / attention / today (NEW pure helpers):** `needs_attention` True when
+  `X>0` or `TB>0`, else False; `sort_employees` orders correctly per key
+  (kehadiran asc, telat desc, absen desc, nama tiebreak); `build_heatmap_context`
+  sets `today_day` to the day when injected `today` is in `year_month`, else `None`.
 - **`render_heatmap_print_html`** (NEW, replaces server route tests): returns HTML
   containing the month label + a known employee for `scope ∈ {full, matrix, lampiran}`;
   `matrix` omits the appendix heading, `lampiran` omits the matrix; `outlier='exc'`
@@ -260,7 +282,7 @@ abnormal days → "Tidak ada hari kerja abnormal bulan ini".
 | `src/db/schema.py` | `late_tolerance_min` default *(done)* |
 | `src/db/settings.py` | `read_late_tolerance` *(done)* |
 | `src/db/attendance.py` | `list_attendance_matrix` *(done)* |
-| `src/core/heatmap.py` | `cell_status` + STATUS_* *(done)*; **add per-employee `sorotan`** |
+| `src/core/heatmap.py` | `cell_status` + STATUS_* *(done)*; **add `sorotan`, `needs_attention`, `sort_employees`, `today_day`** |
 | `src/reports/heatmap_print.py` | **new** — `render_heatmap_print_html(conn, ym, *, scope, outlier) -> str` |
 | `src/reports/templates/heatmap_print.html.j2` | keep (print) |
 | `src/ui/screens/heatmap.py` | **rewrite** — in-app Canvas screen (§7) |
@@ -304,7 +326,13 @@ application*, not a browser.** v2 changes:
 - **Print kept** but server-free: `render_heatmap_print_html` → temp HTML →
   `open_html_in_browser` (the existing Cetak-Dashboard idiom). Print medium is still
   the browser (Ctrl-P / Save PDF) — only the *interactive* view moved in-app.
-- **Added Panel Sorotan** per employee (§5/§7): % Kehadiran + bar, tepat waktu, total
-  telat, dinas/sakit — fills the space between grid and ringkasan with real metrics.
+- **Added Panel Sorotan** per employee (§5/§7): % Kehadiran + bar, **HK/total
+  hari-kerja ratio**, tepat waktu, total telat, dinas/sakit — fills the space between
+  grid and ringkasan with real metrics.
+- **Added 3 in-app quick-wins** (user-selected): employee **sort** dropdown
+  (`sort_employees`: nama / kehadiran terendah / paling telat / paling absen),
+  **"Perlu perhatian" highlight** (`needs_attention` = X>0 or TB>0 → red accent +
+  badge), and a **"hari ini" marker** (`today_day` outline). A print %Hadir column
+  was offered but **deferred** — print stays HK-only.
 - Core data/colour logic, settings, query, taxonomy, and the print matrix/appendix
   design are **unchanged** from v1 (already implemented + green).
