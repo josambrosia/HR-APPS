@@ -108,16 +108,28 @@ GIT_SSH_COMMAND="C:/Windows/System32/OpenSSH/ssh.exe" git push origin vN
 tasklist | grep -i HR-Absensi || echo "not running"
 ```
 
-## Current state (as of last commit)
+## Current state (as of last commit) — HANDOFF for next session
 
-- Latest milestone: `v16.1.1` hotfix (commit `616751e`, LOCAL only — awaiting push authorization) — klik di luar search bar melepas fokus (Button-1 bind di toplevel, walk parent chain) + fix placeholder ghost (clear() shift focus ke toplevel, biar CTkEntry reactivate placeholder via FocusOut, hapus manual `_activate_placeholder`) + warna badge FIX di About changelog dari rose (`#F43F5E`) → amber (`#FBBF24`, teks gelap `#0A0A0A` kontras tinggi).
-- v16.1.0 (commit `fcf04a8`) = About scrollable changelog + fix Ctrl+F (`winfo_toplevel().bind_all`) + fix Enter submit di right panel + hapus resolution strip dari print. Framework rule #4 baru.
-- v16.0.2 hotfix (commit `eef2e5c`) = SearchBar relocate + placeholder visibility.
-- v16.0.1 hotfix (commit `10c967d`) = pack-order fix untuk + Resolve Massal button.
-- v16.0.0 bundle (commit `23c7bf1`) = UX polish bundle (cross-screen week, search/filter, shortcuts, About, print improvements).
-- Test baseline: **296 passing** (was 256 baseline; +40 net new di seluruh v16 family — beberapa test names di-rotate)
-- Latest installer artifact: `Installers/HR-Absensi-Setup-v16.1.1.exe` (33.4 MB) — canonical distributable
-- Backup installer: `Installers/HR-Absensi-Setup-v16.1.0.exe` (33.4 MB) — untuk rollback (v16.0.2 + v16.0.1 + v16.0.0 + older v15.x juga preserved)
-- Production `.exe` at `D:\Gawe\Project X\HR App\dist\HR-Absensi\` is v16.1.1 with `.bak` of v16.1.0 + `.bak.old` of v16.0.2 (full 2-level rotation)
+**Branch:** `claude/inspiring-dhawan-47161f` · **HEAD:** `720672c` · tree clean. `APP_VERSION = 18.0.0`.
 
-Subsequent work forks from `v16.1.1`. New features → new `vN+1` milestone following the 4-rule framework above (rule #4 wajib update APP_CHANGELOG).
+### What's done (LOCAL only — nothing pushed)
+- **v17.0.0** (commit `02d4bb4`) = Severe Lateness menu. Installer built (`Installers/HR-Absensi-Setup-v17.0.0.exe`). **NOT pushed — held.**
+- **v18.0.0** = **Heatmap Kehadiran**, rendered **IN-APP** (customtkinter + `tk.Canvas`). Pivoted from an earlier browser/loopback-server design (server removed). ~32 commits on top of v17. Features:
+  - In-app heatmap screen `src/ui/screens/heatmap.py`: per-employee grid + **Panel Sorotan** (% kehadiran + bar + HK/total ratio + tepat waktu + total telat + dinas/sakit) + Ringkasan; **sort** dropdown (nama / kehadiran terendah / paling telat / paling absen), **"Perlu perhatian"** red accent (X or TB), **"hari ini"** outline, hover tooltip + click→detail strip, **responsive multi-column reflow** by window width, Ctrl+F + click-outside-blur.
+  - Pure logic in `src/core/heatmap.py`: `cell_status`, `build_heatmap_context` (+ per-emp `sorotan`, `today_day`), `pct_band_color`, `needs_attention`, `sort_employees`.
+  - **Print** (server-free): `src/reports/heatmap_print.py::render_heatmap_print_html` → temp `.html` → `open_html_in_browser` (Cetak-Dashboard idiom). Appendix shows short `D · Dinas`, wide Alasan / narrow Masuk-Keluar-Telat, and **HR Officer name from Settings** in the header.
+  - New setting **Toleransi Telat (menit)** (default 12).
+  - Smoke fixes applied: multi-column layout, Cetak→browser (str-path `.as_uri` crash in `browser_launcher`), Dinas short label, appendix column widths, **HR Officer print header** (commit `720672c`).
+- **Test baseline: ~362 passing.** (`../../../.venv/Scripts/python.exe -m pytest -q`)
+- Specs/plans: `docs/superpowers/specs/2026-06-10-v18-heatmap-dashboard-design.md` (revised v2 in-app), `docs/superpowers/plans/2026-06-10-v18-heatmap-inapp.md`.
+
+### ⚠️ IMMEDIATE NEXT STEPS (do these in the CLI session)
+1. **Confirm full suite green.** Last run reached 93% with everything passing; the slow GUI tail (`test_settings_screen_severe_lateness`, `test_severe_lateness_screen`) is v17 code unaffected by the v18 print-only HR-officer change. Re-run if you want a clean 100%.
+2. **REBUILD the installer** — the current prod `.exe` + `Installers/HR-Absensi-Setup-v18.0.0.exe` were built **before** the HR-Officer-fix commit `720672c`, so they do **NOT** include it yet. Run `export PATH="/c/Program Files (x86)/Inno Setup 6:$PATH" && python -m tools.build_installer` → rotate prod `dist/HR-Absensi/` 2-level (never touch `data/`) → copy to `Installers/HR-Absensi-Setup-v18.0.0.exe`.
+3. **HOLD push.** BOTH `v17` and `v18` are unpushed and require **explicit user authorization** (Rule 1). When authorized: `git push origin HEAD:v18`, advance `latest` (`HEAD:latest`), and push/tag `v17` too; then update `memory/version_state.md`.
+
+### Notes
+- Latest installer `Installers/HR-Absensi-Setup-v18.0.0.exe` (in-app v18, but pre-HR-officer-fix → rebuild per step 2). Older v17/v16.x installers preserved for rollback.
+- Product screenshots were captured via a dummy dev DB (`seed_dummy.py` + `worktree/data/hr.db`) and then **removed** (tree clean). Re-seed only if more screenshots are needed; never point screenshots at production data.
+
+Subsequent work forks from `v18.0.0`.
