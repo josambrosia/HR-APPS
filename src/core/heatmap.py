@@ -96,7 +96,7 @@ def _prev_next_month(year_month):
     return f"{pm[0]:04d}-{pm[1]:02d}", f"{nm[0]:04d}-{nm[1]:02d}"
 
 
-def build_heatmap_context(conn, year_month, *, exclude_outliers):
+def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
     """Full render context for the heatmap templates: active employees × every
     date in `year_month` ('YYYY-MM'), each cell coloured via cell_status()."""
     y, m = int(year_month[:4]), int(year_month[5:7])
@@ -125,12 +125,15 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers):
         cells = {}
         summary = {k: 0 for k in _SUMMARY_KEYS}
         hk = 0
+        telat_total = 0
         for d in range(1, n_days + 1):
             tgl = f"{year_month}-{d:02d}"
             row = by_key.get((eid, tgl))
             status = cell_status(
                 row, tolerance=tol, severe=sev,
                 is_weekend=weekday_of[d] >= 5, is_holiday=tgl in holidays)
+            if status in ("sedang", "parah"):
+                telat_total += (row["terlambat_menit"] or 0)
             color = STATUS_COLORS[status]
             if row is not None and row["reason_category"]:
                 try:
@@ -154,9 +157,21 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers):
                 summary[_SUMMARY_OF[status]] += 1
             if status in HK_STATUSES:
                 hk += 1
+        sorotan = {
+            "hk": hk,
+            "work_days": eff_hk,
+            "pct_hadir": round(hk / eff_hk * 100) if eff_hk else 0,
+            "ontime_days": summary["H"],
+            "telat_total": telat_total,
+            "telat_days": summary["TR"] + summary["TB"],
+            "dinas": summary["D"],
+            "sakit": summary["S"],
+        }
+        sorotan["pct_color"] = pct_band_color(sorotan["pct_hadir"])
         out_emps.append({
             "employee_id": eid, "nama": e["nama"], "dept": e.get("dept") or "",
             "hk": hk, "summary": summary, "cells": cells,
+            "sorotan": sorotan, "needs_attention": needs_attention(summary),
         })
 
     # Week segments for the print matrix header (M1, M2, ...) + separators.
@@ -168,11 +183,14 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers):
     wsep_days = [seg["days"][0] for seg in print_weeks[1:]]
 
     prev_m, next_m = _prev_next_month(year_month)
+    today = today or date.today()
+    today_day = today.day if (today.year == y and today.month == m) else None
     legend = [{"code": STATUS_CODES[s], "color": STATUS_COLORS[s],
                "text_color": _text_color(STATUS_COLORS[s]),
                "label": STATUS_LABELS[s]} for s in _LEGEND_ORDER]
     return {
         "year_month": year_month,
+        "today_day": today_day,
         "month_label": f"{_INDO_MONTHS[m]} {y}",
         "prev_month": prev_m, "next_month": next_m,
         "days": list(range(1, n_days + 1)),
