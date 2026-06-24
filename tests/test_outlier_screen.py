@@ -161,3 +161,14 @@ def test_outlier_header_has_badge_no_searchbar(temp_db_path, monkeypatch, tk_roo
     assert hasattr(screen, "_search"), "screen._search must exist"
     assert isinstance(screen._search, SearchBar)
     screen.destroy()
+
+
+def test_outlier_uses_searchbar_shortcuts_helper(temp_db_path, monkeypatch, tk_root):
+    import src.ui.screens.outlier as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    screen = mod.OutlierScreen(tk_root)
+    tk_root.update_idletasks()
+    assert getattr(screen._search, "_click_bind_id", None) is not None
+    assert not hasattr(screen, "_on_click_outside_search")
+    screen.destroy()
