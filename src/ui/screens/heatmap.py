@@ -76,13 +76,7 @@ class HeatmapScreen(ctk.CTkFrame):
         self._build_canvas()
         self._load()
 
-        self.bind("<Control-f>", self._focus_search)
-        try:
-            self.winfo_toplevel().bind_all("<Control-f>", self._focus_search)
-        except Exception:
-            pass
-        self._click_bind_id = self.winfo_toplevel().bind(
-            "<Button-1>", self._on_click_outside_search, add="+")
+        self._search.install_shortcuts(self)
         self.bind("<Destroy>", self._on_destroy_cleanup)
 
     # ---------- build ----------
@@ -390,38 +384,8 @@ class HeatmapScreen(ctk.CTkFrame):
             f.write(html)
         open_html_in_browser(Path(path))
 
-    # ---------- shortcuts / cleanup ----------
-    def _focus_search(self, _e=None):
-        if hasattr(self, "_search") and self._search.winfo_exists():
-            self._search.focus()
-        return "break"
-
-    def _on_click_outside_search(self, event):
-        if not hasattr(self, "_search"):
-            return
-        t = event.widget
-        while t is not None:
-            if t is self._search:
-                return
-            try:
-                t = t.master
-            except Exception:
-                break
-        try:
-            self.focus_set()
-        except Exception:
-            pass
-
+    # ---------- cleanup ----------
     def _on_destroy_cleanup(self, _e=None):
-        try:
-            self.winfo_toplevel().unbind_all("<Control-f>")
-        except Exception:
-            pass
-        try:
-            if getattr(self, "_click_bind_id", None):
-                self.winfo_toplevel().unbind("<Button-1>", self._click_bind_id)
-        except Exception:
-            pass
         if self._tip is not None:
             try:
                 self._tip.destroy()

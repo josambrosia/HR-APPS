@@ -84,3 +84,14 @@ def test_click_detail_and_print(tmp_path, monkeypatch, tk_root):
     with open(captured["p"], encoding="utf-8") as f:
         assert "Mei 2026" in f.read()
     s.destroy()
+
+
+def test_heatmap_uses_searchbar_shortcuts_helper(temp_db_path, monkeypatch, tk_root):
+    import src.ui.screens.heatmap as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    screen = mod.HeatmapScreen(tk_root)
+    tk_root.update_idletasks()
+    assert getattr(screen._search, "_click_bind_id", None) is not None
+    assert not hasattr(screen, "_on_click_outside_search")
+    screen.destroy()
