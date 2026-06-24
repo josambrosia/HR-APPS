@@ -225,3 +225,55 @@ def test_issues_uses_searchbar_shortcuts_helper(temp_db_path, monkeypatch, tk_ro
     assert getattr(screen._search, "_click_bind_id", None) is not None
     assert not hasattr(screen, "_on_click_outside_search")
     screen.destroy()
+
+
+def test_issues_on_save_bumps_data_version(temp_db_path, monkeypatch, tk_root):
+    import src.ui.screens.issues as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        upsert_attendance(
+            conn, employee_id=a, tanggal="2026-04-07", hari="Selasa",
+            tipe="Hari Kerja", jadwal="08.00 - 16.00",
+            masuk="08.30", keluar="16:00", kerja_jam=None,
+            lembur_jam=None, terlambat_menit=30,
+            has_issue=1, imported_from="W1.xls")
+        set_setting(conn, "current_month", "2026-04")
+    screen = mod.IssuesScreen(tk_root)
+    tk_root.update_idletasks()
+    children = screen.open_tree.get_children()
+    screen.open_tree.selection_set(children[0])
+    screen._on_select_open(None)
+    tk_root.update_idletasks()
+    screen.cat_var.set(screen.cat_combo.cget("values")[0])   # any valid category
+    calls = []
+    monkeypatch.setattr(mod, "notify_data_changed", lambda: calls.append(1))
+    screen._on_save()
+    assert calls == [1]
+    screen.destroy()
+
+
+def test_issues_on_unresolve_bumps_data_version(temp_db_path, monkeypatch, tk_root):
+    import src.ui.screens.issues as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        upsert_attendance(
+            conn, employee_id=a, tanggal="2026-04-07", hari="Selasa",
+            tipe="Hari Kerja", jadwal="08.00 - 16.00",
+            masuk=None, keluar="16:00", kerja_jam=None,
+            lembur_jam=None, terlambat_menit=None,
+            has_issue=1, imported_from="W1.xls")
+        rid = conn.execute("SELECT id FROM attendance_records").fetchone()["id"]
+        set_setting(conn, "current_month", "2026-04")
+    screen = mod.IssuesScreen(tk_root)
+    tk_root.update_idletasks()
+    screen.selected_id = rid
+    monkeypatch.setattr(mod.messagebox, "askyesno", lambda *a, **k: True)
+    calls = []
+    monkeypatch.setattr(mod, "notify_data_changed", lambda: calls.append(1))
+    screen._on_unresolve()
+    assert calls == [1]
+    screen.destroy()
