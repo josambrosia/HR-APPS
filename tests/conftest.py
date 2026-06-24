@@ -97,3 +97,13 @@ def reset_period_state():
     period_state.reset()
     yield
     period_state.reset()
+
+
+@pytest.fixture(autouse=True)
+def reset_data_version():
+    """Reset the cross-screen data-version singleton between every test so
+    bump-counting tests don't bleed state into each other."""
+    from src.core.session_state import data_version
+    data_version.reset()
+    yield
+    data_version.reset()

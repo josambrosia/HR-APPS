@@ -31,3 +31,37 @@ def test_empty_set_is_ignored():
 def test_module_singleton_exists():
     """The module-level `period_state` is the shared instance used by screens."""
     assert isinstance(period_state, SessionPeriodState)
+
+
+from src.core.session_state import (
+    SessionDataVersion, data_version, notify_data_changed,
+)
+
+
+def test_data_version_starts_at_zero():
+    v = SessionDataVersion()
+    assert v.get() == 0
+
+
+def test_data_version_bump_increments():
+    v = SessionDataVersion()
+    v.bump()
+    v.bump()
+    assert v.get() == 2
+
+
+def test_data_version_reset_zeroes():
+    v = SessionDataVersion()
+    v.bump()
+    v.reset()
+    assert v.get() == 0
+
+
+def test_notify_data_changed_bumps_singleton():
+    before = data_version.get()
+    notify_data_changed()
+    assert data_version.get() == before + 1
+
+
+def test_data_version_module_singleton_type():
+    assert isinstance(data_version, SessionDataVersion)
