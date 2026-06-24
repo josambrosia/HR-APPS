@@ -16,7 +16,7 @@ from src.core.insights import (
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.reports.html_renderer import render_dashboard_html
 from src.ui.components.week_nav import WeekNavBar
-from src.core.session_state import period_state
+from src.core.session_state import period_state, data_version
 from src.ui.theme import (
     FONT_FAMILY, FONT_MONO,
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
@@ -60,6 +60,8 @@ class DashboardScreen(ctk.CTkFrame):
         # constructed (i.e., user navigates away and back), so writes in
         # other screens won't show stale data.
         self._query_cache: dict = {}
+        # Version the cache was built at; cleared when issue data changes.
+        self._cache_version: int = data_version.get()
 
         # Refs to widgets that get TEXT updated on period change
         self._kpi_labels: dict = {}        # name -> CTkLabel for value
@@ -422,6 +424,11 @@ class DashboardScreen(ctk.CTkFrame):
 
     def _query(self, start, end):
         """Memoized data fetch. Returns a dict of pre-computed result lists."""
+        # Drop the whole cache if issue data changed since it was built.
+        current_version = data_version.get()
+        if current_version != self._cache_version:
+            self._query_cache.clear()
+            self._cache_version = current_version
         key = (start, end)
         if key in self._query_cache:
             return self._query_cache[key]
