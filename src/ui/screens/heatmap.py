@@ -77,7 +77,7 @@ class HeatmapScreen(ctk.CTkFrame):
         self._load()
 
         self._search.install_shortcuts(self)
-        self.bind("<Destroy>", self._on_destroy_cleanup)
+        self.bind("<Destroy>", self._on_destroy_cleanup, add="+")
 
     # ---------- build ----------
     def _build_header(self):

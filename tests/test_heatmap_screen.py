@@ -95,3 +95,18 @@ def test_heatmap_uses_searchbar_shortcuts_helper(temp_db_path, monkeypatch, tk_r
     assert getattr(screen._search, "_click_bind_id", None) is not None
     assert not hasattr(screen, "_on_click_outside_search")
     screen.destroy()
+
+
+def test_heatmap_destroy_cleans_up_search_bindings(temp_db_path, monkeypatch, tk_root):
+    """Heatmap's own <Destroy> (tooltip) binding must NOT clobber the
+    SearchBar's <Destroy> cleanup — both run, so search bindings don't leak."""
+    import src.ui.screens.heatmap as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    screen = mod.HeatmapScreen(tk_root)
+    tk_root.update_idletasks()
+    search = screen._search
+    assert search._click_bind_id is not None
+    screen.destroy()
+    tk_root.update_idletasks()
+    assert search._click_bind_id is None

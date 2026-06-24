@@ -126,7 +126,7 @@ class SearchBar(ctk.CTkFrame):
             pass
         self._click_bind_id = self._top.bind(
             "<Button-1>", self._on_click_outside, add="+")
-        host.bind("<Destroy>", self._on_host_destroy)
+        host.bind("<Destroy>", self._on_host_destroy, add="+")
 
     def _focus_shortcut(self, _e=None):
         if self.winfo_exists():
