@@ -7,6 +7,7 @@ import customtkinter as ctk
 
 from src.config import DB_PATH
 from src.db.connection import get_connection
+from src.core.session_state import notify_data_changed
 from src.db.employees import upsert_employee, get_employee_by_no_staff
 from src.db.attendance import upsert_attendance, list_recent_imports, count_overlap
 from src.db.holidays import restamp_holidays
@@ -572,6 +573,7 @@ class ImportScreen(ctk.CTkFrame):
             # dates in the holidays table (see Hari Libur design spec).
             restamp_holidays(conn)
 
+        notify_data_changed()
         row_count = len(self._pending_rows)
         month_display = _format_month_id(mode_month) if mode_month else "-"
 

@@ -193,3 +193,25 @@ def test_batch_resolve_dialog_btn_row_in_footer_grid_row(
     assert int(dlg._btn_row.grid_info()["row"]) == (
         mod.BatchResolveDialog.ROW_FOOTER)
     dlg.destroy()
+
+
+def test_batch_submit_bumps_data_version(temp_db_path, monkeypatch, tk_root):
+    import src.ui.components.batch_resolve_dialog as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        _issue(conn, a, "2026-04-07", "Selasa")
+        conn.commit()
+        ids = [r["id"] for r in conn.execute(
+            "SELECT id FROM attendance_records").fetchall()]
+    dlg = mod.BatchResolveDialog(
+        tk_root, period_start="2026-04-01", period_end="2026-04-30",
+        on_done=lambda: None)
+    tk_root.update_idletasks()
+    monkeypatch.setattr(dlg, "_checked_ids", lambda: ids)
+    dlg._cat_var.set("Cuti")                       # valid, no-detail category
+    calls = []
+    monkeypatch.setattr(mod, "notify_data_changed", lambda: calls.append(1))
+    dlg._on_submit()
+    assert calls == [1]

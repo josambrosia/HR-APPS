@@ -11,6 +11,7 @@ from tkinter import messagebox
 
 from src.config import DB_PATH
 from src.db.connection import get_connection
+from src.core.session_state import notify_data_changed
 from src.db.attendance import set_reason, list_issues_for_period
 from src.core.reason_mapper import REASON_LABELS, REASON_NEEDS_DETAIL
 from src.ui.theme import (
@@ -342,6 +343,7 @@ class BatchResolveDialog(ctk.CTkToplevel):
                   if cat in REASON_NEEDS_DETAIL else None) or None
         with get_connection(DB_PATH) as conn:
             apply_batch_resolve(conn, ids, cat, detail)
+        notify_data_changed()
         try:
             self.grab_release()
         except Exception:
