@@ -108,3 +108,69 @@ class SearchBar(ctk.CTkFrame):
 
     def focus(self) -> None:
         self._entry.focus_set()
+
+    def install_shortcuts(self, host):
+        """Wire Ctrl+F (focus this search) and click-outside-to-blur for the
+        given host screen, with auto-cleanup on host <Destroy>.
+
+        Centralizes what used to be a per-screen copy-pasted block. The blur
+        decision is DEFERRED until after Tk's native click->focus handling so
+        it can never steal focus from an input the user just clicked (the
+        Resolve-form typing bug)."""
+        self._host = host
+        self._top = host.winfo_toplevel()
+        host.bind("<Control-f>", self._focus_shortcut)
+        try:
+            self._top.bind_all("<Control-f>", self._focus_shortcut)
+        except Exception:
+            pass
+        self._click_bind_id = self._top.bind(
+            "<Button-1>", self._on_click_outside, add="+")
+        host.bind("<Destroy>", self._on_host_destroy)
+
+    def _focus_shortcut(self, _e=None):
+        if self.winfo_exists():
+            self.focus()
+        return "break"
+
+    def _on_click_outside(self, event):
+        # Click inside the search bar? Leave it entirely alone.
+        w = event.widget
+        while w is not None:
+            if w is self:
+                return
+            w = getattr(w, "master", None)
+        # Outside: defer the decision so Tk's native click->focus runs first.
+        try:
+            self.after_idle(self._release_if_orphaned)
+        except Exception:
+            pass
+
+    def _release_if_orphaned(self):
+        try:
+            focused = self.focus_get()
+        except Exception:
+            return
+        w = focused
+        while w is not None:
+            if w is self:
+                # Focus is STILL inside the search -> inert click -> blur to host.
+                try:
+                    self._host.focus_set()
+                except Exception:
+                    pass
+                return
+            w = getattr(w, "master", None)
+        # Focus already moved to another real widget -> leave it untouched.
+
+    def _on_host_destroy(self, _e=None):
+        try:
+            self._top.unbind_all("<Control-f>")
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_click_bind_id", None):
+                self._top.unbind("<Button-1>", self._click_bind_id)
+                self._click_bind_id = None
+        except Exception:
+            pass

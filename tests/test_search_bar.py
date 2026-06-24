@@ -43,3 +43,47 @@ def test_search_bar_set_count_updates_label(tk_root):
     assert "12" in bar._counter_label.cget("text")
     assert "47" in bar._counter_label.cget("text")
     bar.destroy()
+
+
+import customtkinter as ctk
+
+
+def test_install_shortcuts_blurs_when_focus_stays_in_search(tk_root, monkeypatch):
+    """Inert click outside search (focus still in search) -> blur to host."""
+    host = ctk.CTkFrame(tk_root)
+    bar = SearchBar(host, on_change=lambda _q: None)
+    bar.install_shortcuts(host)
+    tk_root.update_idletasks()
+    monkeypatch.setattr(bar, "focus_get", lambda: bar)   # focus still in the search
+    blurred = []
+    monkeypatch.setattr(host, "focus_set", lambda: blurred.append(True))
+    bar._release_if_orphaned()
+    assert blurred == [True]
+    host.destroy()
+
+
+def test_install_shortcuts_leaves_focus_on_other_input(tk_root, monkeypatch):
+    """Click landed on another input (focus moved out) -> do NOT steal it."""
+    host = ctk.CTkFrame(tk_root)
+    other = ctk.CTkEntry(host)
+    bar = SearchBar(host, on_change=lambda _q: None)
+    bar.install_shortcuts(host)
+    tk_root.update_idletasks()
+    monkeypatch.setattr(bar, "focus_get", lambda: other)   # focus on a different widget
+    blurred = []
+    monkeypatch.setattr(host, "focus_set", lambda: blurred.append(True))
+    bar._release_if_orphaned()
+    assert blurred == []
+    host.destroy()
+
+
+def test_install_shortcuts_installs_and_cleans_up(tk_root):
+    host = ctk.CTkFrame(tk_root)
+    bar = SearchBar(host, on_change=lambda _q: None)
+    bar.install_shortcuts(host)
+    tk_root.update_idletasks()
+    assert bar._click_bind_id is not None
+    assert host.bind("<Control-f>") != ""
+    bar._on_host_destroy()
+    assert bar._click_bind_id is None
+    host.destroy()
