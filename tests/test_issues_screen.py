@@ -212,3 +212,16 @@ def test_issues_header_has_resolve_massal_no_searchbar(temp_db_path, monkeypatch
     assert _contains_search(tables_frame), \
         "SearchBar must be a descendant of the tables area (row 2)"
     screen.destroy()
+
+
+def test_issues_uses_searchbar_shortcuts_helper(temp_db_path, monkeypatch, tk_root):
+    """The screen delegates shortcuts to SearchBar.install_shortcuts and no
+    longer carries its own click-outside handler (the focus-theft bug)."""
+    import src.ui.screens.issues as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    screen = mod.IssuesScreen(tk_root)
+    tk_root.update_idletasks()
+    assert getattr(screen._search, "_click_bind_id", None) is not None
+    assert not hasattr(screen, "_on_click_outside_search")
+    screen.destroy()
