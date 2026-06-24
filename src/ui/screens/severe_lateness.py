@@ -10,7 +10,7 @@ from src.db.attendance import (
     set_reason, unresolve_issue,
     list_severe_lateness_for_period, count_severe_lateness_for_period,
 )
-from src.core.session_state import period_state
+from src.core.session_state import period_state, notify_data_changed
 from src.core.reason_mapper import REASON_LABELS, REASON_NEEDS_DETAIL, render_alasan_ijin
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.ui.components.kpi_card import KPICard
@@ -384,6 +384,7 @@ class SevereLatenessScreen(ctk.CTkFrame):
         with get_connection(DB_PATH) as conn:
             set_reason(conn, attendance_id=self.selected_id,
                        category=cat, detail=detail)
+        notify_data_changed()
         self._reload()
         self._build_panel_empty()
         self.selected_id = None
@@ -401,6 +402,7 @@ class SevereLatenessScreen(ctk.CTkFrame):
             return
         with get_connection(DB_PATH) as conn:
             unresolve_issue(conn, attendance_id=self.selected_id)
+        notify_data_changed()
         self._reload()
         self._build_panel_empty()
         self.selected_id = None

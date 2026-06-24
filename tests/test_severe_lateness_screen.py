@@ -84,3 +84,41 @@ def test_severe_uses_searchbar_shortcuts_helper(temp_db_path, monkeypatch, tk_ro
     assert getattr(screen._search, "_click_bind_id", None) is not None
     assert not hasattr(screen, "_on_click_outside_search")
     screen.destroy()
+
+
+def test_severe_on_save_bumps_data_version(temp_db_path, monkeypatch, tk_root):
+    import src.ui.screens.severe_lateness as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        _seed(conn)
+    screen = mod.SevereLatenessScreen(tk_root)
+    tk_root.update_idletasks()
+    children = screen.open_tree.get_children()
+    screen.open_tree.selection_set(children[0])
+    screen._on_select_open(None)
+    tk_root.update_idletasks()
+    screen.cat_var.set(screen.cat_combo.cget("values")[0])
+    calls = []
+    monkeypatch.setattr(mod, "notify_data_changed", lambda: calls.append(1))
+    screen._on_save()
+    assert calls == [1]
+    screen.destroy()
+
+
+def test_severe_on_unresolve_bumps_data_version(temp_db_path, monkeypatch, tk_root):
+    import src.ui.screens.severe_lateness as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        _seed(conn)
+        rid = conn.execute("SELECT id FROM attendance_records").fetchone()["id"]
+    screen = mod.SevereLatenessScreen(tk_root)
+    tk_root.update_idletasks()
+    screen.selected_id = rid
+    monkeypatch.setattr(mod.messagebox, "askyesno", lambda *a, **k: True)
+    calls = []
+    monkeypatch.setattr(mod, "notify_data_changed", lambda: calls.append(1))
+    screen._on_unresolve()
+    assert calls == [1]
+    screen.destroy()
