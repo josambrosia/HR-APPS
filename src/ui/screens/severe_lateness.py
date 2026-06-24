@@ -52,65 +52,10 @@ class SevereLatenessScreen(ctk.CTkFrame):
         self._build_tables_and_panel()
         self._reload()
 
-        # Bind Ctrl+F app-wide while this screen is mounted. Tk's per-widget
-        # bind only fires when the widget itself has focus — we want the
-        # shortcut to work whether focus is in the treeview, an entry, or
-        # anywhere else inside this screen. We register on the underlying
-        # toplevel (CTkFrame blocks bind_all directly) and keep the
-        # per-widget bind as a fallback / structural marker. unbind on
-        # destroy so the global binding doesn't leak when the user
-        # navigates away.
-        self.bind("<Control-f>", self._focus_search)
-        try:
-            self.winfo_toplevel().bind_all("<Control-f>", self._focus_search)
-        except Exception:
-            pass
-        # Click anywhere outside the search bar releases its focus. This
-        # both lets the user escape "search mode" naturally and gives the
-        # CTkEntry's placeholder a chance to re-activate (it only fires on
-        # FocusOut). The bind uses add="+" so it doesn't replace any other
-        # Button-1 handlers Tk may have registered.
-        top = self.winfo_toplevel()
-        self._click_bind_id = top.bind(
-            "<Button-1>", self._on_click_outside_search, add="+")
-        self.bind("<Destroy>", self._on_destroy_cleanup)
-
-    def _focus_search(self, _e=None):
-        if hasattr(self, "_search") and self._search.winfo_exists():
-            self._search.focus()
-        return "break"
-
-    def _on_click_outside_search(self, event):
-        """Release search-bar focus when user clicks anywhere outside it."""
-        if not hasattr(self, "_search"):
-            return
-        target = event.widget
-        # Walk up parent chain; if any ancestor is the SearchBar, we're inside it.
-        while target is not None:
-            if target is self._search:
-                return
-            try:
-                target = target.master
-            except Exception:
-                break
-        # Click was outside the search bar — drop focus.
-        try:
-            self.focus_set()
-        except Exception:
-            pass
-
-    def _on_destroy_cleanup(self, _e=None):
-        try:
-            self.winfo_toplevel().unbind_all("<Control-f>")
-        except Exception:
-            pass
-        # Also unbind the click-outside handler so it doesn't leak when
-        # the user navigates away from this screen.
-        try:
-            if getattr(self, "_click_bind_id", None):
-                self.winfo_toplevel().unbind("<Button-1>", self._click_bind_id)
-        except Exception:
-            pass
+        # Search shortcuts (Ctrl+F focus + click-outside blur) live in the
+        # SearchBar component so the corrected focus logic is shared, not
+        # copy-pasted across screens.
+        self._search.install_shortcuts(self)
 
     def _setup_treeview_style(self):
         style = ttk.Style()
