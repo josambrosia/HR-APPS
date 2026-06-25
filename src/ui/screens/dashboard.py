@@ -1,3 +1,4 @@
+import datetime
 import tempfile
 from pathlib import Path
 
@@ -24,7 +25,7 @@ from src.ui.theme import (
     COLOR_BORDER,
     COLOR_ACCENT, COLOR_ACCENT_HOVER,
     COLOR_SECONDARY,
-    COLOR_INFO, COLOR_SUCCESS, COLOR_WARN,
+    COLOR_INFO, COLOR_SUCCESS, COLOR_WARN, COLOR_DANGER,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED, COLOR_TEXT_DISABLED,
     FONT_DISPLAY, FONT_SUBHEAD,
     FONT_BODY_BOLD, FONT_SMALL, FONT_LABEL,
@@ -66,6 +67,7 @@ class DashboardScreen(ctk.CTkFrame):
 
         # Refs to widgets that get TEXT updated on period change
         self._kpi_labels: dict = {}        # name -> CTkLabel for value
+        self._kpi_deltas: dict = {}        # name -> CTkLabel for delta sublabel
         self._kpi_label_period: ctk.CTkLabel | None = None
         self._panel_titles: dict = {}      # panel key -> CTkLabel for title
         self._panel_subtitles: dict = {}   # panel key -> CTkLabel for subtitle (optional)
@@ -139,14 +141,20 @@ class DashboardScreen(ctk.CTkFrame):
             ctk.CTkLabel(
                 card, text=label_text.upper(),
                 font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
-            ).pack(anchor="w", padx=SPACE_LG, pady=(SPACE_MD, 0))
+            ).pack(anchor="w", padx=SPACE_LG, pady=(SPACE_SM, 0))
             value_lbl = ctk.CTkLabel(
                 card, text="—",
                 font=(FONT_MONO, 24, "bold") if mono else (FONT_FAMILY, 17, "bold"),
                 text_color=color,
             )
-            value_lbl.pack(anchor="w", padx=SPACE_LG, pady=(0, SPACE_MD))
+            value_lbl.pack(anchor="w", padx=SPACE_LG, pady=(0, SPACE_SM))
             self._kpi_labels[name] = value_lbl
+            delta_lbl = ctk.CTkLabel(
+                card, text="",
+                font=FONT_SMALL, text_color=COLOR_TEXT_MUTED,
+            )
+            delta_lbl.pack(anchor="w", padx=SPACE_LG, pady=(0, SPACE_SM))
+            self._kpi_deltas[name] = delta_lbl
             return card
 
         _kpi(kpi_frame, "Periode", "periode", COLOR_INFO, mono=False).grid(
@@ -340,6 +348,49 @@ class DashboardScreen(ctk.CTkFrame):
         start, end = full_month_range(self._current_month)
         return start, end, f"Bulanan ({self._current_month})"
 
+    def _previous_range(self):
+        """Return (prev_start, prev_end) for the period immediately before the current one.
+
+        Monthly: previous calendar month, full range.
+        Weekly:  shift back by the same number of days as the current range.
+        """
+        start, end, _ = self._period_range()
+        s = datetime.date.fromisoformat(start)
+        e = datetime.date.fromisoformat(end)
+        if self.nav.active == "semua":
+            try:
+                year = int(self._current_month[:4])
+                month = int(self._current_month[5:7])
+            except (ValueError, IndexError):
+                # Malformed/missing month — fall back to a 30-day shift
+                prev_e = s - datetime.timedelta(days=1)
+                prev_s = prev_e - datetime.timedelta(days=29)
+                return prev_s.isoformat(), prev_e.isoformat()
+            if month == 1:
+                prev_ym = f"{year - 1}-12"
+            else:
+                prev_ym = f"{year}-{month - 1:02d}"
+            return full_month_range(prev_ym)
+        else:
+            delta_days = (e - s).days + 1
+            prev_e = s - datetime.timedelta(days=1)
+            prev_s = prev_e - datetime.timedelta(days=delta_days - 1)
+            return prev_s.isoformat(), prev_e.isoformat()
+
+    def _set_delta(self, name: str, curr: int, prev: int, period_word: str) -> None:
+        """Update the delta sublabel for a KPI card. Lower-is-better for both metrics."""
+        if name not in self._kpi_deltas:
+            return
+        lbl = self._kpi_deltas[name]
+        diff = curr - prev
+        arrow = "▼" if diff < 0 else ("▲" if diff > 0 else "→")
+        color = COLOR_SUCCESS if diff < 0 else (COLOR_DANGER if diff > 0 else COLOR_TEXT_MUTED)
+        if name == "total_terlambat":
+            text = f"{arrow} {abs(diff)} mnt vs {period_word}"
+        else:
+            text = f"{arrow} {abs(diff)} vs {period_word}"
+        lbl.configure(text=text, text_color=color)
+
     def _dynamic_coaching_threshold(self, start_iso, end_iso):
         """Compute coaching threshold for the period.
 
@@ -434,6 +485,24 @@ class DashboardScreen(ctk.CTkFrame):
         data = self._query(start, end)
         total_late = sum(r["total_terlambat"] for r in data["ranking"])
         threshold = data["threshold"]
+
+        # Previous-period deltas for Total Terlambat + Coaching Flag sublabels
+        prev_start, prev_end = self._previous_range()
+        prev_data = self._query(prev_start, prev_end)
+        prev_total = sum(r["total_terlambat"] for r in prev_data["ranking"])
+        prev_coaching = len(prev_data["coaching"])
+        period_word = "bln lalu" if self.nav.active == "semua" else "mng lalu"
+
+        prev_empty = (not prev_data["ranking"] and prev_coaching == 0 and prev_total == 0)
+        if prev_empty:
+            for nm in ("total_terlambat", "coaching_count"):
+                if nm in self._kpi_deltas:
+                    self._kpi_deltas[nm].configure(
+                        text=f"— vs {period_word}", text_color=COLOR_TEXT_MUTED,
+                    )
+        else:
+            self._set_delta("total_terlambat", total_late, prev_total, period_word)
+            self._set_delta("coaching_count", len(data["coaching"]), prev_coaching, period_word)
 
         # KPI updates (just text — labels are reused)
         self._kpi_labels["periode"].configure(text=label)

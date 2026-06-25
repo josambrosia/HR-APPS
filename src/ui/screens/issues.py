@@ -23,11 +23,11 @@ from src.ui.theme import (
     COLOR_BORDER,
     COLOR_ACCENT, COLOR_ACCENT_HOVER,
     COLOR_INFO, COLOR_SUCCESS, COLOR_WARN,
-    COLOR_TEXT, COLOR_TEXT_MUTED,
+    COLOR_TEXT, COLOR_TEXT_MUTED, COLOR_TEXT_DISABLED,
     COLOR_ROW_TINT_OPEN, COLOR_ROW_TINT_RESOLVED,
     FONT_DISPLAY,
     FONT_BODY, FONT_BODY_BOLD, FONT_SMALL, FONT_LABEL,
-    SPACE_XS, SPACE_MD, SPACE_LG,
+    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
     RADIUS_MD,
 )
 
@@ -45,6 +45,7 @@ class IssuesScreen(ctk.CTkFrame):
         self.selected_id = None
         self._row_cache = {}
         self._search_query = ""
+        self._last_counts = None
 
         self._setup_treeview_style()
         self._build_header()
@@ -99,6 +100,7 @@ class IssuesScreen(ctk.CTkFrame):
         self._stats_cards = []
 
     def _render_stats(self, counts):
+        self._last_counts = counts
         for c in self._stats_cards:
             c.destroy()
         self._stats_cards = []
@@ -206,10 +208,24 @@ class IssuesScreen(ctk.CTkFrame):
     def _build_panel_empty(self):
         for w in self.right.winfo_children():
             w.destroy()
-        ctk.CTkLabel(self.right,
-                     text="Pilih issue di kiri untuk input alasan",
-                     font=FONT_BODY, text_color=COLOR_TEXT_MUTED
-                     ).pack(pady=80, padx=SPACE_LG)
+        ctk.CTkLabel(
+            self.right,
+            text="✓",
+            font=(FONT_FAMILY, 32),
+            text_color=COLOR_TEXT_DISABLED,
+        ).pack(pady=(48, SPACE_SM))
+        ctk.CTkLabel(
+            self.right,
+            text="Pilih issue di kiri untuk input alasan",
+            font=FONT_BODY, text_color=COLOR_TEXT_MUTED,
+        ).pack(padx=SPACE_LG)
+        if self._last_counts is not None:
+            c = self._last_counts
+            ctk.CTkLabel(
+                self.right,
+                text=f"Open {c['open']} · Resolved {c['resolved']} · Total {c['total']}",
+                font=FONT_SMALL, text_color=COLOR_TEXT_MUTED,
+            ).pack(pady=(SPACE_SM, 0), padx=SPACE_LG)
 
     def _build_panel_for(self, row_data):
         for w in self.right.winfo_children():
