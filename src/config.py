@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "19.0.0"
-APP_BUILD_DATE = "2026-06-25"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "20.0.0"
+APP_BUILD_DATE = "2026-06-26"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,29 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "20.0.0",
+        "date": "2026-06-26",
+        "changes": [
+            ("change", "Penyegaran tampilan menyeluruh (design system v20). Warna "
+                       "status dirombak agar konsisten: magenta kini khusus "
+                       "brand/aksi, sedangkan keterlambatan memakai gradasi "
+                       "'heat' (amber → oranye → merah) — Heatmap & Dashboard "
+                       "jadi jauh lebih mudah dibaca."),
+            ("feat", "Strip pola kehadiran bulanan per karyawan di tabel Ranking "
+                     "Lengkap (Dashboard): titik berwarna sekilas memperlihatkan "
+                     "pola hadir/telat/izin tiap orang, senada dengan Heatmap."),
+            ("feat", "Ikon sidebar monokrom yang konsisten (Segoe Fluent) "
+                     "menggantikan emoji; menu aktif disorot magenta."),
+            ("feat", "Judul layar memakai huruf khas 'Space Grotesk' (otomatis "
+                     "kembali ke Segoe UI bila font tak tersedia)."),
+            ("feat", "Kartu KPI Dashboard menampilkan perbandingan dengan periode "
+                     "sebelumnya (▲/▼ vs bulan/minggu lalu)."),
+            ("change", "Tabel lebih rapi: baris lebih tinggi, angka rata kanan, "
+                       "striping halus, dan tooltip untuk kolom Alasan yang "
+                       "panjang."),
+        ],
+    },
     {
         "version": "19.0.0",
         "date": "2026-06-25",

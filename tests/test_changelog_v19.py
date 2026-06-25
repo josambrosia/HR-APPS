@@ -1,20 +1,11 @@
 from src import config
 
 
-def test_version_is_v19():
-    assert config.APP_VERSION == "19.0.0"
-
-
-def test_build_date_is_v19():
-    assert config.APP_BUILD_DATE == "2026-06-25"
-
-
-def test_changelog_top_is_v19():
-    top = config.APP_CHANGELOG[0]
-    assert top["version"] == "19.0.0"
-    assert top["date"] == "2026-06-25"
-    kinds = [k for k, _ in top["changes"]]
-    assert "fix" in kinds
-    # Both bug fixes documented in user-facing terms.
-    assert any("Detail" in d for _, d in top["changes"])
-    assert any("Dashboard" in d for _, d in top["changes"])
+def test_changelog_retains_v19_entry():
+    """v19 entry must remain in the changelog history (newer versions prepend,
+    they don't drop older entries)."""
+    entry = next(
+        (e for e in config.APP_CHANGELOG if e["version"] == "19.0.0"), None)
+    assert entry is not None, "v19.0.0 changelog entry must be preserved"
+    assert any("Detail" in d for _, d in entry["changes"])
+    assert any("Dashboard" in d for _, d in entry["changes"])
