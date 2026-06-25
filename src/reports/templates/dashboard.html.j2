@@ -6,7 +6,7 @@
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   @page{size:A4;margin:0}
-  body{font-family:'Segoe UI','Inter',sans-serif;background:#fff;color:#171717;font-size:11px;line-height:1.45}
+  body{font-family:'Segoe UI','Inter',sans-serif;background:#fff;color:#171717;font-size:11px;line-height:1.45;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .doc{padding:14mm}
 
   /* Header */
@@ -24,12 +24,13 @@
   .b-kpi .k.cyan::before{background:#22d3ee}
   .b-kpi .k.violet::before{background:#a855f7}
   .b-kpi .k.emerald::before{background:#10b981}
+  .b-kpi .k.amber::before{background:#f97316}
   .b-kpi .k .l{font-size:9.5px;color:#737373;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:600}
   .b-kpi .k .n{font-family:Consolas,monospace;font-size:28px;color:#171717;font-weight:700;line-height:1}
   .b-kpi .k .n .u{font-size:14px;color:#737373;font-weight:500;margin-left:3px}
   .b-kpi .k .delta{font-size:10px;color:#525252;margin-top:4px}
   .b-kpi .k .delta.delta-good{color:#10b981}
-  .b-kpi .k .delta.delta-bad{color:#ec4899}
+  .b-kpi .k .delta.delta-bad{color:#dc2626}
   .b-kpi .k .delta.delta-neutral{color:#737373}
 
   /* Sections */
@@ -43,14 +44,15 @@
   .b-table thead{display:table-header-group}
   .b-table tr{break-inside:avoid;page-break-inside:avoid}
   .b-table th{text-align:left;font-size:9.5px;color:#737373;text-transform:uppercase;letter-spacing:.8px;padding:7px 6px;background:#fafafa;border-bottom:1px solid #ec4899}
-  .b-table td{padding:7px 6px;border-bottom:1px solid #f5f5f5}
-  .b-table .num{font-family:Consolas,monospace;text-align:right;color:#ec4899;font-weight:600}
+  .b-table td{padding:6px 6px;border-bottom:1px solid #f5f5f5}
+  .b-table .num{font-family:Consolas,monospace;text-align:right;color:#171717;font-weight:600}
   .b-table .cyan{color:#22d3ee;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
   .b-table .rank{font-family:Consolas,monospace;color:#737373;width:30px}
 
   /* Pills */
-  .b-pill{display:inline-block;background:#fdf2f8;color:#ec4899;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:600;margin:2px}
+  .b-pill{display:inline-block;background:#fff7ed;color:#ea580c;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:600;margin:2px}
   .b-pill.violet{background:#f5f3ff;color:#7c3aed}
+  .b-pill.emerald{background:#ecfdf5;color:#059669}
 
   /* Pola Jam Masuk */
   .b-jam{background:#fafafa;border-radius:8px;padding:14px 16px}
@@ -59,15 +61,16 @@
   .b-bar-row{display:grid;grid-template-columns:100px 1fr 50px;gap:10px;align-items:center;font-size:10.5px;padding:3px 0}
   .b-bar-row .lbl{font-family:Consolas;color:#525252;font-size:10px}
   .b-bar-row .lbl.early,.b-bar-row .lbl.ontime{color:#10b981}
-  .b-bar-row .lbl.mod{color:#a855f7}
-  .b-bar-row .lbl.severe,.b-bar-row .lbl.chronic{color:#ec4899}
+  .b-bar-row .lbl.mild{color:#d97706}
+  .b-bar-row .lbl.mod{color:#ea580c}
+  .b-bar-row .lbl.severe,.b-bar-row .lbl.chronic{color:#dc2626}
   .b-bar-track{height:14px;background:#fff;border:1px solid #e5e5e5;border-radius:7px;overflow:hidden}
   .b-bar-fill{height:100%;border-radius:7px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:9.5px;font-weight:600;white-space:nowrap;overflow:hidden}
   .b-bar-fill.early,.b-bar-fill.ontime{background:linear-gradient(90deg,#10b981,#34d399)}
   .b-bar-fill.mild{background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#171717}
-  .b-bar-fill.mod{background:linear-gradient(90deg,#a855f7,#c084fc)}
-  .b-bar-fill.severe{background:linear-gradient(90deg,#ec4899,#f472b6)}
-  .b-bar-fill.chronic{background:linear-gradient(90deg,#be123c,#e11d48)}
+  .b-bar-fill.mod{background:linear-gradient(90deg,#f97316,#fb923c)}
+  .b-bar-fill.severe{background:linear-gradient(90deg,#ef4444,#f87171)}
+  .b-bar-fill.chronic{background:linear-gradient(90deg,#b91c1c,#dc2626)}
   .b-bar-row .v{font-family:Consolas;font-weight:700;text-align:right;color:#171717}
   .b-jam-divider{border-top:1px dashed #e5e5e5;margin:8px 0;text-align:center;font-size:9px;color:#a3a3a3;text-transform:uppercase;letter-spacing:1px;padding-top:6px}
 
@@ -88,13 +91,13 @@
   .page-table tfoot{display:table-footer-group}
 
   /* Page 2 header */
-  .b-rank-head{padding-bottom:10px;border-bottom:2px solid #ec4899;margin-bottom:14px;position:relative}
+  .b-rank-head{padding-bottom:8px;border-bottom:2px solid #ec4899;margin-bottom:10px;position:relative}
   .b-rank-head::after{content:"";position:absolute;left:0;bottom:-5px;width:40px;height:8px;background:#22d3ee}
   .b-rank-head h2{font-size:18px;color:#171717}
   .b-rank-head .sub{font-size:10px;color:#737373;text-transform:uppercase;letter-spacing:1.5px;margin-top:6px;font-family:Consolas}
 
   /* Sign-off */
-  .b-signoff{margin-top:28px;display:flex;justify-content:flex-end;break-inside:avoid}
+  .b-signoff{margin-top:16px;display:flex;justify-content:flex-end;break-inside:avoid;page-break-inside:avoid}
   .b-signoff .so{text-align:center;font-size:10px;min-width:200px}
   .b-signoff .so .role{color:#525252}
   .b-signoff .so .gap{height:46px}
@@ -106,9 +109,16 @@
 
   /* Outlier transparency line (4e) */
   .outlier-note{font-size:10px;color:#7c3aed;background:#f5f3ff;border-left:3px solid #a855f7;padding:6px 10px;margin-bottom:10px;border-radius:0 4px 4px 0}
+
+  /* Screen-only print reminder (hidden on paper) — keeps the browser's
+     file:// path & timestamp out of the "confidential" PDF. */
+  .print-hint{max-width:180mm;margin:8px auto 0;padding:8px 12px;background:#fef9c3;border:1px solid #fde047;border-radius:6px;font-size:11px;color:#713f12;font-family:'Segoe UI',sans-serif}
+  @media print{.print-hint{display:none}}
 </style>
 </head>
 <body>
+
+<div class="print-hint">Sebelum simpan PDF: di dialog cetak browser, buka <b>More settings / Setelan lainnya</b> lalu matikan <b>&ldquo;Headers and footers&rdquo;</b> supaya URL &amp; tanggal tidak ikut tercetak.</div>
 
 <table class="page-table">
 <tbody><tr><td>
@@ -132,7 +142,7 @@
   <div class="b-kpi">
     <div class="k"><div class="l">Total Terlambat</div><div class="n">{{ kpi.total_terlambat }}</div><div class="delta delta-{{ kpi_deltas.total_terlambat.color_class }}">{% if kpi_deltas.total_terlambat.delta is none %}—{% else %}{{ kpi_deltas.total_terlambat.arrow }} {{ kpi_deltas.total_terlambat.delta|abs }} dari {{ kpi_deltas.total_terlambat.period_word }}{% endif %}</div></div>
     <div class="k cyan"><div class="l">Rata-rata / Kejadian</div><div class="n">{{ '%.0f' % kpi.avg_min }}<span class="u">min</span></div><div class="delta delta-{{ kpi_deltas.avg_min.color_class }}">{% if kpi_deltas.avg_min.delta is none %}—{% else %}{{ kpi_deltas.avg_min.arrow }} {{ kpi_deltas.avg_min.delta|abs }} min dari {{ kpi_deltas.avg_min.period_word }}{% endif %}</div></div>
-    <div class="k violet"><div class="l">Coaching</div><div class="n">{{ kpi.coaching_count }}</div><div class="delta delta-{{ kpi_deltas.coaching.color_class }}">{% if kpi_deltas.coaching.delta is none %}—{% else %}{{ kpi_deltas.coaching.arrow }} {{ kpi_deltas.coaching.delta|abs }} dari {{ kpi_deltas.coaching.period_word }}{% endif %}</div></div>
+    <div class="k amber"><div class="l">Coaching</div><div class="n">{{ kpi.coaching_count }}</div><div class="delta delta-{{ kpi_deltas.coaching.color_class }}">{% if kpi_deltas.coaching.delta is none %}—{% else %}{{ kpi_deltas.coaching.arrow }} {{ kpi_deltas.coaching.delta|abs }} dari {{ kpi_deltas.coaching.period_word }}{% endif %}</div></div>
     <div class="k emerald"><div class="l">Teladan</div><div class="n">{{ kpi.teladan_count }}</div><div class="delta delta-{{ kpi_deltas.teladan.color_class }}">{% if kpi_deltas.teladan.delta is none %}—{% else %}{{ kpi_deltas.teladan.arrow }} {{ kpi_deltas.teladan.delta|abs }} dari {{ kpi_deltas.teladan.period_word }}{% endif %}</div></div>
   </div>
   {% endif %}
@@ -160,7 +170,7 @@
     <div class="b-section">
       <h2>Karyawan Teladan</h2>
       {% if teladan %}
-        {% for r in teladan %}<span class="b-pill violet">{{ r.nama }} &middot; {{ r.dept }}</span>{% endfor %}
+        {% for r in teladan %}<span class="b-pill emerald">{{ r.nama }} &middot; {{ r.dept }}</span>{% endfor %}
         <div style="font-size:10px;color:#737373;margin-top:8px">Hadir penuh tanpa terlambat</div>
       {% else %}<div class="empty-state">Belum ada teladan periode ini.</div>{% endif %}
     </div>
@@ -194,7 +204,7 @@
           {% if b.band == '08:00' %}<div class="b-jam-divider">— ambang tepat waktu —</div>{% endif %}
           <div class="b-bar-row">
             <span class="lbl {{ b.severity }}">{{ b.band }}</span>
-            <div class="b-bar-track"><div class="b-bar-fill {{ b.severity }}" style="width:{% if jam_max > 0 %}{{ (b.count * 100 / jam_max)|round(0)|int }}{% else %}0{% endif %}%">{% if b.count > 0 %}{{ b.count }}{% endif %}</div></div>
+            <div class="b-bar-track"><div class="b-bar-fill {{ b.severity }}" style="width:{% if jam_max > 0 %}{{ (b.count * 100 / jam_max)|round(0)|int }}{% else %}0{% endif %}%"></div></div>
             <span class="v">{{ b.count }}</span>
           </div>
         {% endfor %}
@@ -228,12 +238,12 @@
           <td class="cyan">{{ r.dept }}</td>
           <td class="num" {% if is_teladan %}style="color:#10b981"{% endif %}>{{ r.total_terlambat }}</td>
           <td class="num" {% if is_teladan %}style="color:#10b981"{% endif %}>{{ r.hari_telat }}</td>
-          <td class="num" {% if r.absent_count >= 1 and not is_teladan %}style="color:#a855f7"{% elif is_teladan %}style="color:#10b981"{% endif %}>{{ r.absent_count }}</td>
+          <td class="num" {% if r.absent_count >= 1 and not is_teladan %}style="color:#dc2626"{% elif is_teladan %}style="color:#10b981"{% endif %}>{{ r.absent_count }}</td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
-  <div style="font-size:10px;color:#737373;margin-top:8px">Highlight emerald = karyawan teladan &middot; Highlight violet pada kolom absen = perlu perhatian khusus (&ge;1 hari tidak hadir).</div>
+  <div style="font-size:10px;color:#737373;margin-top:8px">Highlight emerald = karyawan teladan &middot; Angka merah pada kolom absen = perlu perhatian khusus (&ge;1 hari tidak hadir).</div>
   {% else %}<div class="empty-state">Tidak ada data karyawan di periode ini.</div>{% endif %}
 
   {# === SIGN-OFF === #}

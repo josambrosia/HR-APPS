@@ -1,21 +1,12 @@
 from src import config
 
 
-def test_version_is_v20():
-    assert config.APP_VERSION == "20.0.0"
-
-
-def test_build_date_is_v20():
-    assert config.APP_BUILD_DATE == "2026-06-26"
-
-
-def test_changelog_top_is_v20():
-    top = config.APP_CHANGELOG[0]
-    assert top["version"] == "20.0.0"
-    assert top["date"] == "2026-06-26"
-    kinds = [k for k, _ in top["changes"]]
-    assert "feat" in kinds and "change" in kinds
-    # design-refresh themes documented in user-facing terms
-    blob = " ".join(d for _, d in top["changes"])
-    assert "Heatmap" in blob or "heat" in blob
+def test_changelog_retains_v20_entry():
+    """v20.0.0 entry must remain in the changelog history (newer versions prepend,
+    they don't drop older entries)."""
+    entry = next(
+        (e for e in config.APP_CHANGELOG if e["version"] == "20.0.0"), None)
+    assert entry is not None, "v20.0.0 changelog entry must be preserved"
+    blob = " ".join(d for _, d in entry["changes"])
     assert "Space Grotesk" in blob
+    assert "Heatmap" in blob or "heat" in blob

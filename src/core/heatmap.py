@@ -20,6 +20,10 @@ STATUS_COLORS = {
     "lupa": "#94A3B8", "mangkir": "#EF4444", "na": "#737373",
     "libur": "#404040", "nodata": "#525252",
 }
+# HK (hari kerja dihadiri) is an aggregate, not a status — give it a colour that
+# no status uses and that isn't the brand magenta: a confident "working-day total"
+# blue. Black text fails the luminance test on it, so cells get near-white ink.
+HK_COLOR = "#2563EB"
 STATUS_CODES = {
     "hadir": "H", "dinas": "D", "sedang": "TR", "parah": "TB", "sakit": "S",
     "cuti": "C", "lupa": "LA", "mangkir": "X", "na": "NA", "libur": "·",
@@ -201,8 +205,12 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
         "is_empty": not rows,
         "legend": legend,
         "summary_keys": _SUMMARY_KEYS,
-        "summary_meta": [{"code": k, "color": STATUS_COLORS[_SUMMARY_STATUS[k]]}
+        "summary_meta": [{"code": k,
+                          "color": STATUS_COLORS[_SUMMARY_STATUS[k]],
+                          "text_color": _text_color(STATUS_COLORS[_SUMMARY_STATUS[k]])}
                          for k in _SUMMARY_KEYS],
+        "hk_color": HK_COLOR,
+        "hk_text_color": _text_color(HK_COLOR),
         "print_weeks": print_weeks,
         "wsep_days": wsep_days,
         "employees": out_emps,

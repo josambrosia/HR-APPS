@@ -9,6 +9,7 @@
   body{margin:0;background:#e9e9ee;color:#111;font-family:"Segoe UI",Arial,sans-serif}
   .toolbar{max-width:277mm;margin:10px auto 0;text-align:right}
   .btn{background:#DB2777;color:#fff;border:0;border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer}
+  .toolbar .hint{font-size:11px;color:#555;margin-right:12px;vertical-align:middle}
   .sheet{background:#fff;width:277mm;min-height:190mm;margin:16px auto;padding:10mm;box-shadow:0 4px 20px rgba(0,0,0,.25)}
   .bar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:6px}
   .bar h1{font-size:16px;margin:0}
@@ -28,8 +29,9 @@
   table.mx .wsep{border-left:1.6px solid #9aa0aa}
   table.mx tbody tr:nth-child(even) td.nm,table.mx tbody tr:nth-child(even) td.sm{background:#f5f5f9}
   table.mx td.cell{font-weight:700}
-  table.mx th.smh{background:#222;color:#fff;font-size:7px}
+  table.mx th.smh{font-size:7px;font-weight:700}
   table.mx td.sm{font-weight:700;color:#111} table.mx td.sm.hk{font-weight:700}
+  table.mx td.sm.z{font-weight:400;color:#c9c9c9}  /* zero counts recede; non-zero pops */
   .hknote{font-size:9px;color:#444;margin-top:7px;line-height:1.4}
   .legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:10px 0 4px;font-size:9px}
   .legend .it{display:flex;align-items:center;gap:5px}
@@ -44,13 +46,18 @@
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   table.det tr.grp td{border-top:1.6px solid #333}
   table.det tr.alt td{background:#f6f6fa}
+  .signoff{margin-top:18px;display:flex;justify-content:flex-end;break-inside:avoid;page-break-inside:avoid}
+  .signoff .so{text-align:center;font-size:10px;min-width:220px}
+  .signoff .so .role{color:#555}
+  .signoff .so .gap{height:46px}
+  .signoff .so .name{font-weight:700;color:#111;border-top:1px solid #111;padding-top:4px}
   .foot{margin-top:14px;font-size:9px;color:#555;display:flex;justify-content:space-between}
   .note{font-size:10px;color:#555;margin-top:6px}
   @media print{ body{background:#fff} .sheet{box-shadow:none;margin:0;width:auto} .toolbar{display:none} }
 </style>
 </head>
 <body>
-<div class="toolbar"><button class="btn" onclick="window.print()">🖨️ Cetak / Simpan PDF</button></div>
+<div class="toolbar"><span class="hint">Tip: di dialog cetak, matikan <b>Headers and footers</b> agar URL &amp; tanggal tidak ikut tercetak.</span><button class="btn" onclick="window.print()">🖨️ Cetak / Simpan PDF</button></div>
 <div class="sheet">
   <div class="bar">
     <h1>LAPORAN HEATMAP KEHADIRAN — {{ month_label }}</h1>
@@ -65,16 +72,16 @@
   <table class="mx">
     <colgroup><col class="nm">{% for d in days %}<col class="d">{% endfor %}<col class="sep"><col class="hkc">{% for k in summary_keys %}<col class="sm">{% endfor %}</colgroup>
     <thead>
-      <tr><th class="nm"></th>{% for seg in print_weeks %}<th class="wk {{ 'wsep' if not loop.first }}" colspan="{{ seg.days|length }}">{{ seg.label }}</th>{% endfor %}<th></th><th class="smh"></th>{% for k in summary_keys %}<th class="smh"></th>{% endfor %}</tr>
-      <tr><th class="nm">Nama</th>{% for d in days %}<th class="{{ 'we' if weekday_of[d] >= 5 }} {{ 'wsep' if d in wsep_days }}">{{ d }}</th>{% endfor %}<th></th><th class="smh">HK</th>{% for k in summary_keys %}<th class="smh">{{ k }}</th>{% endfor %}</tr>
-      <tr><th class="nm" style="font-size:7px;color:#999">(hari)</th>{% for d in days %}<th class="{{ 'we' if weekday_of[d] >= 5 }} {{ 'wsep' if d in wsep_days }}" style="font-weight:400;color:#999">{{ weekday_labels[weekday_of[d]] }}</th>{% endfor %}<th></th><th class="smh"></th>{% for k in summary_keys %}<th class="smh"></th>{% endfor %}</tr>
+      <tr><th class="nm"></th>{% for seg in print_weeks %}<th class="wk {{ 'wsep' if not loop.first }}" colspan="{{ seg.days|length }}">{{ seg.label }}</th>{% endfor %}<th></th><th class="smh" style="background:{{ hk_color }}"></th>{% for sm in summary_meta %}<th class="smh" style="background:{{ sm.color }}"></th>{% endfor %}</tr>
+      <tr><th class="nm">Nama</th>{% for d in days %}<th class="{{ 'we' if weekday_of[d] >= 5 }} {{ 'wsep' if d in wsep_days }}">{{ d }}</th>{% endfor %}<th></th><th class="smh" style="background:{{ hk_color }};color:{{ hk_text_color }}">HK</th>{% for sm in summary_meta %}<th class="smh" style="background:{{ sm.color }};color:{{ sm.text_color }}">{{ sm.code }}</th>{% endfor %}</tr>
+      <tr><th class="nm" style="font-size:7px;color:#999">(hari)</th>{% for d in days %}<th class="{{ 'we' if weekday_of[d] >= 5 }} {{ 'wsep' if d in wsep_days }}" style="font-weight:400;color:#999">{{ weekday_labels[weekday_of[d]] }}</th>{% endfor %}<th></th><th class="smh" style="background:{{ hk_color }}"></th>{% for sm in summary_meta %}<th class="smh" style="background:{{ sm.color }}"></th>{% endfor %}</tr>
     </thead>
     <tbody>
     {% for e in employees %}
       <tr>
         <td class="nm">{{ e.nama }}<div class="dept">{{ e.dept }}</div></td>
         {% for d in days %}{% set c = e.cells[d] %}<td class="cell {{ 'wsep' if d in wsep_days }}" style="background:{{ c.color }};color:{{ c.text_color }}">{{ c.code }}</td>{% endfor %}
-        <td></td><td class="sm hk">{{ e.hk }}</td>{% for k in summary_keys %}<td class="sm">{{ e.summary[k] }}</td>{% endfor %}
+        <td></td><td class="sm hk {{ 'z' if e.hk == 0 }}">{{ e.hk }}</td>{% for k in summary_keys %}<td class="sm {{ 'z' if e.summary[k] == 0 }}">{{ e.summary[k] }}</td>{% endfor %}
       </tr>
     {% endfor %}
     </tbody>
@@ -114,6 +121,11 @@
   {% if not ns.any %}<div class="note">Tidak ada hari kerja abnormal bulan ini.</div>{% endif %}
   {% endif %}
 
+  <div class="signoff"><div class="so">
+    <div class="role">HR Officer in Charge</div>
+    <div class="gap"></div>
+    <div class="name">{{ hr_officer_name if hr_officer_name else "____________" }}</div>
+  </div></div>
   <div class="foot"><span>HR Absensi · Heatmap</span><span>{{ month_label }}</span></div>
   {% endif %}
 </div>

@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "20.0.0"
+APP_VERSION = "20.0.1"
 APP_BUILD_DATE = "2026-06-26"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
@@ -17,6 +17,31 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "20.0.1",
+        "date": "2026-06-26",
+        "changes": [
+            ("fix", "Cetak Dashboard: angka pada tabel dan indikator naik/turun "
+                    "tidak lagi memakai warna brand (magenta). Histogram 'Pola Jam "
+                    "Masuk' kini bergradasi 'heat' hijau → kuning → oranye → merah "
+                    "(warna ungu/pink dihapus) sehingga tingkat keterlambatan lebih "
+                    "mudah dibaca sekilas."),
+            ("fix", "Cetak Dashboard: warna jadi konsisten — karyawan teladan hijau, "
+                    "kandidat coaching oranye, jumlah tidak hadir merah. Blok tanda "
+                    "tangan tidak lagi terdorong ke halaman kosong, dan warna "
+                    "dipastikan ikut tercetak walau opsi 'Background graphics' lupa "
+                    "dicentang."),
+            ("feat", "Cetak Heatmap: judul kolom ringkasan (HK, H, D, TR, TB, S, C, "
+                     "LA, X) kini berwarna sesuai penandanya masing-masing (HK "
+                     "biru) dan senada dengan warna sel di grid; angka 0 diredupkan "
+                     "agar angka yang penting lebih menonjol."),
+            ("feat", "Cetak Heatmap: ditambahkan blok tanda tangan 'HR Officer in "
+                     "Charge' di akhir laporan, konsisten dengan Cetak Dashboard."),
+            ("change", "Cetak Dashboard & Heatmap: ada pengingat di layar untuk "
+                       "mematikan 'Headers and footers' di dialog cetak browser, "
+                       "agar URL & tanggal lokal tidak ikut tercetak pada PDF."),
+        ],
+    },
     {
         "version": "20.0.0",
         "date": "2026-06-26",
