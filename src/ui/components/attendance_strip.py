@@ -6,7 +6,7 @@ from src.core.heatmap import STATUS_COLORS
 _SCALE = 3  # render at 3x then downscale for crisp edges
 
 
-def render_strip(statuses, *, cell=7, gap=2, pad=2):
+def render_strip(statuses, *, cell=6, gap=1, pad=2):
     """statuses: ordered list of status keys (workdays only, weekends excluded).
     Returns a PIL RGBA Image: a horizontal row of rounded dots, one per status,
     each filled with STATUS_COLORS[status] (unknown keys -> transparent)."""

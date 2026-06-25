@@ -258,7 +258,7 @@ class DashboardScreen(ctk.CTkFrame):
             rank_box, columns=cols, show="tree headings",
             style="Ranking.Treeview", selectmode="none",
         )
-        self.rank_tree.column("#0", width=170, stretch=False, anchor="w")
+        self.rank_tree.column("#0", width=178, minwidth=178, stretch=False, anchor="w")
         self.rank_tree.heading("#0", text="POLA BULAN")
         _numeric_cols = {"terlambat", "telat", "tidak_hadir"}
         for c in cols:
