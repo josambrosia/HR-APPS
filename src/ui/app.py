@@ -11,6 +11,7 @@ from src.ui.theme import (
     FONT_MONO_SMALL,
     RADIUS_MD,
 )
+from src.ui.icons import glyph, icon_font
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -238,8 +239,12 @@ class HRApp(ctk.CTk):
         content = ctk.CTkFrame(frame, fg_color="transparent")
         content.pack(side="left", fill="both", expand=True, padx=SPACE_LG)
 
+        # Prefer a monochrome Segoe Fluent Icons glyph; fall back to the emoji
+        # passed in nav_groups if the icon font / glyph is unavailable.
+        _g = glyph(screen_key)
         icon_lbl = ctk.CTkLabel(
-            content, text=icon, font=FONT_BODY,
+            content, text=(_g or icon),
+            font=((icon_font(), 16) if _g else FONT_BODY),
             text_color=COLOR_TEXT_DIM, anchor="w", width=22,
         )
         icon_lbl.pack(side="left")
@@ -294,6 +299,7 @@ class HRApp(ctk.CTk):
             if not new._left_bar.winfo_ismapped():
                 new._left_bar.pack(side="left", fill="y", pady=SPACE_XS, before=new._content)
             new._text_lbl.configure(text_color=COLOR_TEXT, font=FONT_BODY_BOLD)
+            new._icon_lbl.configure(text_color=COLOR_ACCENT)
             return
 
         prev = self._nav_items.get(self._active_nav_key)
@@ -301,6 +307,7 @@ class HRApp(ctk.CTk):
             prev.configure(fg_color="transparent")
             prev._left_bar.pack_forget()
             prev._text_lbl.configure(text_color="#C0C0C0", font=FONT_BODY)
+            prev._icon_lbl.configure(text_color=COLOR_TEXT_DIM)
 
         new = self._nav_items.get(screen_key)
         if new is not None:
@@ -309,6 +316,7 @@ class HRApp(ctk.CTk):
             # (without this, pack manager appends bar to end of slave list)
             new._left_bar.pack(side="left", fill="y", pady=SPACE_XS, before=new._content)
             new._text_lbl.configure(text_color=COLOR_TEXT, font=FONT_BODY_BOLD)
+            new._icon_lbl.configure(text_color=COLOR_ACCENT)
             self._active_nav_key = screen_key
 
     def _load_sidebar_icon(self, parent):
