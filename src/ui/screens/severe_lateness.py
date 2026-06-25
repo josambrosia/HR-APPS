@@ -15,6 +15,7 @@ from src.core.reason_mapper import REASON_LABELS, REASON_NEEDS_DETAIL, render_al
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.ui.components.kpi_card import KPICard
 from src.ui.components.search_bar import SearchBar
+from src.ui.components.tree_style import style_treeview, CellTooltip
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.theme import (
     FONT_FAMILY,
@@ -58,48 +59,8 @@ class SevereLatenessScreen(ctk.CTkFrame):
         self._search.install_shortcuts(self)
 
     def _setup_treeview_style(self):
-        style = ttk.Style()
-        try:
-            style.theme_use("clam")
-        except Exception:
-            pass
-        # OPEN table — subtle rose-tinted row bg (via tag, see _reload).
-        style.configure(
-            "Open.Treeview",
-            background=COLOR_SURFACE, fieldbackground=COLOR_SURFACE,
-            foreground=COLOR_TEXT, rowheight=24, borderwidth=0,
-            font=FONT_SMALL,
-        )
-        style.configure(
-            "Open.Treeview.Heading",
-            background=COLOR_SURFACE_HIGH, foreground=COLOR_TEXT_MUTED,
-            relief="flat", font=(FONT_FAMILY, 9, "bold"),
-        )
-        # Phase 4a: drop lavender selection workaround (was commit 3af2277).
-        # New semantic palette makes COLOR_SURFACE_HIGH a clean neutral hover
-        # that doesn't conflict with any row tag or status color.
-        style.map(
-            "Open.Treeview",
-            background=[("selected", COLOR_SURFACE_HIGH)],
-            foreground=[("selected", COLOR_TEXT)],
-        )
-        # RESOLVED table — subtle emerald-tinted row bg (via tag, see _reload).
-        style.configure(
-            "Resolved.Treeview",
-            background=COLOR_SURFACE, fieldbackground=COLOR_SURFACE,
-            foreground=COLOR_TEXT, rowheight=24, borderwidth=0,
-            font=FONT_SMALL,
-        )
-        style.configure(
-            "Resolved.Treeview.Heading",
-            background=COLOR_SURFACE_HIGH, foreground=COLOR_TEXT_MUTED,
-            relief="flat", font=(FONT_FAMILY, 9, "bold"),
-        )
-        style.map(
-            "Resolved.Treeview",
-            background=[("selected", COLOR_SURFACE_HIGH)],
-            foreground=[("selected", COLOR_TEXT)],
-        )
+        style_treeview("Open.Treeview")
+        style_treeview("Resolved.Treeview")
 
     def _build_header(self):
         header = ctk.CTkFrame(self, fg_color="transparent")
@@ -215,6 +176,7 @@ class SevereLatenessScreen(ctk.CTkFrame):
         self.resolved_tree.tag_configure("resolved_row", background=COLOR_ROW_TINT_RESOLVED)
         self.resolved_tree.bind("<<TreeviewSelect>>", self._on_select_resolved)
         self.resolved_tree.bind("<Return>", self._on_select_resolved)
+        CellTooltip(self.resolved_tree, "alasan")
 
         right = ctk.CTkFrame(
             self, fg_color=COLOR_SURFACE,
@@ -234,13 +196,15 @@ class SevereLatenessScreen(ctk.CTkFrame):
             style=style_name, height=8, selectmode="browse",
         )
         widths = {"nama": 130, "dept": 100, "tanggal": 90, "hari": 70,
-                  "masuk": 60, "keluar": 60, "terlambat": 80, "alasan": 200}
+                  "masuk": 60, "keluar": 60, "terlambat": 80, "alasan": 260}
         labels = {"nama": "Nama", "dept": "Dept", "tanggal": "Tanggal",
                   "hari": "Hari", "masuk": "Masuk", "keluar": "Keluar",
                   "terlambat": "Telat (mnt)", "alasan": "Alasan"}
+        _right_cols = {"masuk", "keluar", "terlambat"}
         for c in cols:
             tree.heading(c, text=labels[c])
-            tree.column(c, width=widths[c], anchor="w")
+            tree.column(c, width=widths[c],
+                        anchor="e" if c in _right_cols else "w")
         return tree
 
     def _build_panel_empty(self):

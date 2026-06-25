@@ -16,6 +16,7 @@ from src.core.insights import (
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.reports.html_renderer import render_dashboard_html
 from src.ui.components.week_nav import WeekNavBar
+from src.ui.components.tree_style import style_treeview, apply_zebra_tags
 from src.core.session_state import period_state, data_version
 from src.ui.theme import (
     FONT_FAMILY, FONT_MONO,
@@ -80,32 +81,7 @@ class DashboardScreen(ctk.CTkFrame):
         self._update_data()
 
     def _setup_treeview_style(self):
-        style = ttk.Style()
-        try:
-            style.theme_use("clam")
-        except Exception:
-            pass
-        style.configure(
-            "Ranking.Treeview",
-            background=COLOR_SURFACE,
-            fieldbackground=COLOR_SURFACE,
-            foreground=COLOR_TEXT,
-            rowheight=24,
-            borderwidth=0,
-            font=FONT_SMALL,
-        )
-        style.configure(
-            "Ranking.Treeview.Heading",
-            background=COLOR_SURFACE_HIGH,
-            foreground=COLOR_TEXT_MUTED,
-            relief="flat",
-            font=(FONT_FAMILY, 9, "bold"),
-        )
-        style.map(
-            "Ranking.Treeview",
-            background=[("selected", COLOR_SURFACE_HIGH)],
-            foreground=[("selected", COLOR_TEXT)],
-        )
+        style_treeview("Ranking.Treeview")
 
     # ──────────────────────────────────────────────────────────── Header
 
@@ -271,9 +247,12 @@ class DashboardScreen(ctk.CTkFrame):
             rank_box, columns=cols, show="headings",
             style="Ranking.Treeview", selectmode="none",
         )
+        _numeric_cols = {"terlambat", "telat", "tidak_hadir"}
         for c in cols:
             self.rank_tree.heading(c, text=labels[c])
-            self.rank_tree.column(c, width=widths[c], anchor="w")
+            self.rank_tree.column(c, width=widths[c],
+                                  anchor="e" if c in _numeric_cols else "w")
+        apply_zebra_tags(self.rank_tree)
         self.rank_tree.pack(fill="both", expand=True, padx=12, pady=(4, 8))
 
     def _make_pool_row(self, panel_key: str) -> dict:
@@ -511,12 +490,12 @@ class DashboardScreen(ctk.CTkFrame):
 
         # ── Ranking Lengkap (right) — Treeview ──
         self.rank_tree.delete(*self.rank_tree.get_children())
-        for r in data["ranking"]:
+        for i, r in enumerate(data["ranking"]):
             self.rank_tree.insert("", "end", values=(
                 r["nama"], r["dept"] or "-",
                 f"{r['total_terlambat']} mnt",
                 r["hari_telat"], r["tidak_hadir"],
-            ))
+            ), tags=("evenrow",) if i % 2 == 0 else ("oddrow",))
 
     # ─────────────────────────────────────────────────────────── Print
 
