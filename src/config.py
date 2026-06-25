@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "18.0.0"
-APP_BUILD_DATE = "2026-06-10"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "19.0.0"
+APP_BUILD_DATE = "2026-06-25"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,20 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "19.0.0",
+        "date": "2026-06-25",
+        "changes": [
+            ("fix", "Field 'Detail' pada panel Resolve (menu Issues & Severe "
+                    "Lateness) sekarang bisa diketik dengan normal — sebelumnya "
+                    "fokus keyboard tercuri setiap kali field diklik sehingga "
+                    "ketikan tidak masuk / kursor hilang."),
+            ("fix", "Dashboard kini langsung mencerminkan perubahan data: setiap "
+                    "issue yang di-resolve, dibatalkan, di-resolve massal, atau "
+                    "saat data fingerprint baru diimpor, angka & panel langsung "
+                    "diperbarui — tanpa perlu menutup & membuka ulang aplikasi."),
+        ],
+    },
     {
         "version": "18.0.0",
         "date": "2026-06-10",
