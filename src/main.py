@@ -15,6 +15,11 @@ SPLASH_MIN_MS = 2000  # minimum splash display duration
 def main():
     init_db(DB_PATH)
 
+    # Load the bundled display typeface (Space Grotesk) and repoint the theme's
+    # display tokens at it BEFORE any screen is built. Falls back to Segoe UI.
+    from src.ui.fonts import apply_display_font
+    apply_display_font()
+
     # Construct main app first (it must be the tk root). Hide it so the
     # splash is the only thing visible during startup.
     app = HRApp()

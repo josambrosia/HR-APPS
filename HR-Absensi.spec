@@ -16,6 +16,10 @@ a = Analysis(
         ('assets/brand/animation-02-typing-04E.svg', 'assets/brand'),
         ('assets/brand/animation-02-typing-04E.gif', 'assets/brand'),
         ('assets/brand/icon-04E.ico', 'assets/brand'),
+        # Display typeface (Space Grotesk) — loaded at runtime via src.ui.fonts
+        ('assets/fonts/SpaceGrotesk-Bold.ttf', 'assets/fonts'),
+        ('assets/fonts/SpaceGrotesk-Medium.ttf', 'assets/fonts'),
+        ('assets/fonts/SpaceGrotesk-SemiBold.ttf', 'assets/fonts'),
     ],
     hiddenimports=['customtkinter', 'PIL'],
     hookspath=[],

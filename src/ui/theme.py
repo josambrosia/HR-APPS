@@ -58,11 +58,15 @@ SPACE_XXL = 32
 # === FONT FAMILIES ===
 FONT_FAMILY = "Segoe UI"
 FONT_MONO   = "Consolas"
+# Display family — upgraded to "Space Grotesk" at startup by
+# src.ui.fonts.apply_display_font() (which also rebuilds the display tuples
+# below). Falls back to FONT_FAMILY when the bundled font can't be loaded.
+FONT_DISPLAY_FAMILY = FONT_FAMILY
 
 # === FONT TUPLES (drop into CTkLabel(font=...)) ===
-FONT_KPI         = (FONT_FAMILY, 28, "bold")
-FONT_DISPLAY     = (FONT_FAMILY, 24, "bold")
-FONT_HEADING     = (FONT_FAMILY, 18, "bold")
+FONT_KPI         = (FONT_DISPLAY_FAMILY, 28, "bold")
+FONT_DISPLAY     = (FONT_DISPLAY_FAMILY, 24, "bold")
+FONT_HEADING     = (FONT_DISPLAY_FAMILY, 18, "bold")
 FONT_SUBHEAD     = (FONT_FAMILY, 14, "bold")
 FONT_BODY        = (FONT_FAMILY, 12)
 FONT_BODY_BOLD   = (FONT_FAMILY, 12, "bold")
