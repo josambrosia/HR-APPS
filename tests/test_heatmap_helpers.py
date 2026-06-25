@@ -7,8 +7,8 @@ def test_pct_band_color():
     assert pct_band_color(90) == "#10B981"
     assert pct_band_color(89) == "#FBBF24"
     assert pct_band_color(75) == "#FBBF24"
-    assert pct_band_color(74) == "#EC4899"
-    assert pct_band_color(0) == "#EC4899"
+    assert pct_band_color(74) == "#F97316"
+    assert pct_band_color(0) == "#F97316"
 
 
 def test_needs_attention():

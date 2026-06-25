@@ -15,10 +15,10 @@ from src.db.outlier import excluded_employee_ids
 
 # status_key -> hex / code / human label
 STATUS_COLORS = {
-    "hadir": "#10B981", "dinas": "#047857", "sedang": "#EC4899",
-    "parah": "#BE185D", "sakit": "#22D3EE", "cuti": "#A855F7",
-    "lupa": "#EAB308", "mangkir": "#DC2626", "na": "#DC2626",
-    "libur": "#FFFFFF", "nodata": "#9CA3AF",
+    "hadir": "#10B981", "dinas": "#0D9488", "sedang": "#FBBF24",
+    "parah": "#F97316", "sakit": "#22D3EE", "cuti": "#A855F7",
+    "lupa": "#94A3B8", "mangkir": "#EF4444", "na": "#737373",
+    "libur": "#404040", "nodata": "#525252",
 }
 STATUS_CODES = {
     "hadir": "H", "dinas": "D", "sedang": "TR", "parah": "TB", "sakit": "S",
@@ -210,12 +210,12 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
 
 
 def pct_band_color(pct):
-    """Colour band for the % Kehadiran bar/number (>=90 green, 75-89 amber, <75 rose)."""
+    """Colour band for the % Kehadiran bar/number (>=90 green, 75-89 amber, <75 orange)."""
     if pct >= 90:
         return "#10B981"
     if pct >= 75:
         return "#FBBF24"
-    return "#EC4899"
+    return "#F97316"
 
 
 def needs_attention(summary):

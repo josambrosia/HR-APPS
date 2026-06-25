@@ -45,7 +45,7 @@ def test_sorotan_metrics():
     assert s["telat_total"] == 95
     assert s["telat_days"] == 2
     assert s["pct_hadir"] == round(3 / ctx["eff_hari_kerja"] * 100)
-    assert s["pct_color"] in ("#10B981", "#FBBF24", "#EC4899")
+    assert s["pct_color"] in ("#10B981", "#FBBF24", "#F97316")
     assert e["needs_attention"] is True
 
 

@@ -35,16 +35,17 @@ COLOR_SECONDARY_HOVER  = "#C084FC"
 COLOR_SECONDARY_DEEP   = "#9333EA"
 
 # === SEMANTIC (dev-tool palette) ===
-COLOR_INFO          = "#22D3EE"   # Cyan — Periode, neutral data, info toast
-COLOR_SUCCESS       = "#10B981"   # Emerald — Teladan VALUE, Sudah, success
-COLOR_WARN          = "#F43F5E"   # Rose — late data, Belum, warning
-COLOR_ERROR         = "#DC2626"   # Red (dark) — errors, destructive
+COLOR_INFO          = "#22D3EE"   # Cyan — Periode, neutral data, sakit, info toast
+COLOR_SUCCESS       = "#10B981"   # Emerald — hadir / Teladan VALUE, Sudah, success
+COLOR_WARN          = "#FBBF24"   # Amber — late-light, open, Belum, caution
+COLOR_DANGER        = "#F97316"   # Orange — late-heavy (between warn and error)
+COLOR_ERROR         = "#EF4444"   # Red — absen tanpa alasan, errors, destructive
 
 # === ROW TINTS (4% saturation over COLOR_SURFACE for subtle differentiation) ===
-COLOR_ROW_TINT_OPEN     = "#1A1518"  # subtle rose tint — Issues OPEN rows
+COLOR_ROW_TINT_OPEN     = "#1F1B12"  # subtle amber tint — Issues OPEN rows (needs attention)
 COLOR_ROW_TINT_RESOLVED = "#13181B"  # subtle emerald tint — Issues RESOLVED rows
 COLOR_ROW_TINT_SUDAH    = "#1B2820"  # subtle emerald tint — Coaching SUDAH rows
-COLOR_ROW_TINT_BELUM    = "#281A20"  # subtle rose tint — Coaching BELUM rows
+COLOR_ROW_TINT_BELUM    = "#1F1B12"  # subtle amber tint — Coaching BELUM rows (needs attention)
 
 # === SPACING SCALE (8pt grid) ===
 SPACE_XS  = 4
