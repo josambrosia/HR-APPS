@@ -16,6 +16,8 @@ from src.core.insights import (
 )
 from src.core.week_utils import weeks_in_month, full_month_range
 from src.reports.html_renderer import render_dashboard_html
+from PIL import ImageTk
+from src.ui.components.attendance_strip import render_strip, month_status_map
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.components.tree_style import style_treeview, apply_zebra_tags
 from src.core.session_state import period_state, data_version
@@ -75,6 +77,7 @@ class DashboardScreen(ctk.CTkFrame):
         self._panel_boxes: dict = {}       # panel key -> outer CTkFrame (for grid/grid_remove)
         self._panel_rows: dict[str, list[dict]] = {}   # panel_key -> [{"frame", "left", "right"}, ...]
         self._panel_empty: dict[str, ctk.CTkLabel] = {}  # panel_key -> empty-state label
+        self._strip_imgs: list = []  # strong refs — prevents Tk GC of ranking row images
         self._setup_treeview_style()
         self._build_header()
         self.body = ctk.CTkFrame(self, fg_color="transparent")
@@ -252,9 +255,11 @@ class DashboardScreen(ctk.CTkFrame):
                   "telat": "Telat", "tidak_hadir": "Tdk Hadir"}
 
         self.rank_tree = ttk.Treeview(
-            rank_box, columns=cols, show="headings",
+            rank_box, columns=cols, show="tree headings",
             style="Ranking.Treeview", selectmode="none",
         )
+        self.rank_tree.column("#0", width=170, stretch=False, anchor="w")
+        self.rank_tree.heading("#0", text="POLA BULAN")
         _numeric_cols = {"terlambat", "telat", "tidak_hadir"}
         for c in cols:
             self.rank_tree.heading(c, text=labels[c])
@@ -559,8 +564,17 @@ class DashboardScreen(ctk.CTkFrame):
 
         # ── Ranking Lengkap (right) — Treeview ──
         self.rank_tree.delete(*self.rank_tree.get_children())
+        self._strip_imgs.clear()
+        try:
+            with get_connection(DB_PATH) as conn:
+                smap = month_status_map(conn, self._current_month)
+        except Exception:
+            smap = {}
         for i, r in enumerate(data["ranking"]):
-            self.rank_tree.insert("", "end", values=(
+            statuses = smap.get(r["id"], [])
+            photo = ImageTk.PhotoImage(render_strip(statuses)) if statuses else None
+            self._strip_imgs.append(photo)
+            self.rank_tree.insert("", "end", image=photo, values=(
                 r["nama"], r["dept"] or "-",
                 f"{r['total_terlambat']} mnt",
                 r["hari_telat"], r["tidak_hadir"],
