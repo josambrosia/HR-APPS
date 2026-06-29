@@ -29,6 +29,8 @@
   table.mx .wsep{border-left:1.6px solid #9aa0aa}
   table.mx tbody tr:nth-child(even) td.nm,table.mx tbody tr:nth-child(even) td.sm{background:#f5f5f9}
   table.mx td.cell{font-weight:700}
+  table.mx td.cell.hollow{background:#fff;border:1px dashed #c4c4cc;color:#b5b5bd}
+  .legend .sw.hollow{background:#fff;border:1px dashed #c4c4cc;color:#b5b5bd}
   table.mx th.smh{font-size:7px;font-weight:700}
   table.mx td.sm{font-weight:700;color:#111} table.mx td.sm.hk{font-weight:700}
   table.mx td.sm.z{font-weight:400;color:#c9c9c9}  /* zero counts recede; non-zero pops */
@@ -80,7 +82,7 @@
     {% for e in employees %}
       <tr>
         <td class="nm">{{ e.nama }}<div class="dept">{{ e.dept }}</div></td>
-        {% for d in days %}{% set c = e.cells[d] %}<td class="cell {{ 'wsep' if d in wsep_days }}" style="background:{{ c.color }};color:{{ c.text_color }}">{{ c.code }}</td>{% endfor %}
+        {% for d in days %}{% set c = e.cells[d] %}{% if c.status == 'nodata' %}<td class="cell hollow {{ 'wsep' if d in wsep_days }}">{{ c.code }}</td>{% else %}<td class="cell {{ 'wsep' if d in wsep_days }}" style="background:{{ c.color }};color:{{ c.text_color }}">{{ c.code }}</td>{% endif %}{% endfor %}
         <td></td><td class="sm hk {{ 'z' if e.hk == 0 }}">{{ e.hk }}</td>{% for k in summary_keys %}<td class="sm {{ 'z' if e.summary[k] == 0 }}">{{ e.summary[k] }}</td>{% endfor %}
       </tr>
     {% endfor %}
@@ -90,7 +92,7 @@
     Kolom <b>HK</b> = jumlah hari kerja yang <b>dihadiri</b> (Hadir, Terlambat, Dinas, Lupa absen);
     Sakit / Cuti / Absen tidak dihitung. Sel <b>abu-abu</b> = hari kerja yang datanya belum tersedia.</div>
   <div class="legend">
-    {% for l in legend %}<div class="it"><span class="sw" style="background:{{ l.color }};color:{{ l.text_color }}">{{ l.code }}</span>{{ l.label }}</div>{% endfor %}
+    {% for l in legend %}<div class="it">{% if l.code == '–' %}<span class="sw hollow">{{ l.code }}</span>{% else %}<span class="sw" style="background:{{ l.color }};color:{{ l.text_color }}">{{ l.code }}</span>{% endif %}{{ l.label }}</div>{% endfor %}
   </div>
   {% endif %}
 

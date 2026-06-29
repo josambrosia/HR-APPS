@@ -123,9 +123,17 @@ class HeatmapScreen(ctk.CTkFrame):
         for item in (self._ctx["legend"] if self._ctx else []):
             chip = ctk.CTkFrame(self._legend, fg_color="transparent")
             chip.pack(side="left", padx=(0, SPACE_MD))
-            ctk.CTkLabel(chip, text=item["code"], width=22, height=16,
-                         fg_color=item["color"], text_color=item["text_color"],
-                         font=(FONT_FAMILY, 10, "bold"), corner_radius=4).pack(side="left", padx=(0, 4))
+            sw_kwargs = dict(width=22, height=16, font=(FONT_FAMILY, 10, "bold"),
+                             corner_radius=4)
+            if item["code"] == "–":   # nodata: hollow swatch
+                ctk.CTkLabel(chip, text=item["code"], text_color=COLOR_TEXT_MUTED,
+                             fg_color=COLOR_SURFACE, border_width=1,
+                             border_color=item["color"], **sw_kwargs
+                             ).pack(side="left", padx=(0, 4))
+            else:
+                ctk.CTkLabel(chip, text=item["code"], fg_color=item["color"],
+                             text_color=item["text_color"], **sw_kwargs
+                             ).pack(side="left", padx=(0, 4))
             ctk.CTkLabel(chip, text=item["label"], font=FONT_SMALL,
                          text_color=COLOR_TEXT_DIM).pack(side="left")
 
@@ -284,10 +292,22 @@ class HeatmapScreen(ctk.CTkFrame):
                     continue
                 cell = e["cells"][day]
                 cx = gx + _WD_W + w * (_CELL_W + _CELL_GAP)
-                rid = c.create_rectangle(cx, ry, cx + _CELL_W, ry + _CELL_H,
-                                         fill=cell["color"], outline="", tags=("cell", "cellrect"))
-                tid = c.create_text(cx + 4, ry + 2, anchor="nw", fill=cell["text_color"],
-                                    font=(FONT_FAMILY, 10, "bold"), text=str(day), tags=("cell",))
+                if cell["status"] == "nodata":
+                    rid = c.create_rectangle(cx, ry, cx + _CELL_W, ry + _CELL_H,
+                                             fill=COLOR_SURFACE, outline=cell["color"],
+                                             tags=("cell", "cellrect"))
+                    tid = c.create_text(cx + 4, ry + 2, anchor="nw",
+                                        fill=COLOR_TEXT_MUTED,
+                                        font=(FONT_FAMILY, 10, "bold"),
+                                        text=str(day), tags=("cell",))
+                else:
+                    rid = c.create_rectangle(cx, ry, cx + _CELL_W, ry + _CELL_H,
+                                             fill=cell["color"], outline="",
+                                             tags=("cell", "cellrect"))
+                    tid = c.create_text(cx + 4, ry + 2, anchor="nw",
+                                        fill=cell["text_color"],
+                                        font=(FONT_FAMILY, 10, "bold"),
+                                        text=str(day), tags=("cell",))
                 self._cell_by_item[rid] = cell
                 self._cell_by_item[tid] = cell
                 if today_day and day == today_day:

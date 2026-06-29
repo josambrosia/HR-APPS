@@ -18,7 +18,7 @@ STATUS_COLORS = {
     "hadir": "#10B981", "dinas": "#0D9488", "sedang": "#FBBF24",
     "parah": "#F97316", "sakit": "#22D3EE", "cuti": "#A855F7",
     "lupa": "#94A3B8", "mangkir": "#EF4444", "na": "#737373",
-    "libur": "#404040", "nodata": "#525252",
+    "libur": "#39414F", "nodata": "#3A3F4A",
 }
 # HK (hari kerja dihadiri) is an aggregate, not a status — give it a colour that
 # no status uses and that isn't the brand magenta: a confident "working-day total"
