@@ -262,10 +262,10 @@ class HeatmapScreen(ctk.CTkFrame):
         card_right = x + card_w
         gx = x + _CARD_PAD + _NAME_W + _COL_GAP   # grid after name, left side
         grid_right = gx + grid_w
-        # Ringkasan hugs the right edge; Kehadiran sits centred in the gap between
-        # the grid and Ringkasan, so the slack reads as two balanced gaps, not one.
-        rx = card_right - _CARD_PAD - _SUM_W
-        sx = grid_right + _COL_GAP + max(0, (rx - _COL_GAP - (grid_right + _COL_GAP) - _SPOT_W) // 2)
+        # Kehadiran + Ringkasan grouped right after the grid (left side), so the
+        # top-right corner stays clear for the Cetak button (no overlap).
+        sx = grid_right + _COL_GAP
+        rx = sx + _SPOT_W + _COL_GAP
         grid_h = _HEAD_H + 7 * (_CELL_H + _CELL_GAP)
         card_h = grid_h + 2 * _CARD_PAD
         self._round_rect(x, y, card_right, y + card_h, RADIUS_MD,
