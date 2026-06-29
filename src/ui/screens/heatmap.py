@@ -35,8 +35,8 @@ _CARD_GAP = 10
 _CARD_PAD = 12
 _NAME_W = 116
 _WD_W = 22
-_CELL_W = 30
-_CELL_H = 22
+_CELL_W = 34
+_CELL_H = 24
 _CELL_GAP = 3
 _HEAD_H = 16
 _COL_GAP = 16
@@ -67,6 +67,7 @@ class HeatmapScreen(ctk.CTkFrame):
         self._visible_employees = []
         self._tip = None
         self._ncols = None
+        self._last_w = None
 
         self._build_header()
         self._build_toolbar()
@@ -125,11 +126,15 @@ class HeatmapScreen(ctk.CTkFrame):
             chip.pack(side="left", padx=(0, SPACE_MD))
             sw_kwargs = dict(width=22, height=16, font=(FONT_FAMILY, 10, "bold"),
                              corner_radius=4)
-            if item["code"] == "–":   # nodata: hollow swatch
-                ctk.CTkLabel(chip, text=item["code"], text_color=COLOR_TEXT_MUTED,
-                             fg_color=COLOR_SURFACE, border_width=1,
-                             border_color=item["color"], **sw_kwargs
-                             ).pack(side="left", padx=(0, 4))
+            if item["code"] == "–":   # nodata: hollow swatch (CTkFrame border)
+                swatch = ctk.CTkFrame(chip, width=22, height=16, corner_radius=4,
+                                      fg_color=COLOR_SURFACE, border_width=1,
+                                      border_color=item["color"])
+                swatch.pack(side="left", padx=(0, 4))
+                swatch.pack_propagate(False)
+                ctk.CTkLabel(swatch, text=item["code"], text_color=COLOR_TEXT_MUTED,
+                             font=(FONT_FAMILY, 10, "bold"), fg_color="transparent"
+                             ).pack(expand=True, fill="both")
             else:
                 ctk.CTkLabel(chip, text=item["code"], fg_color=item["color"],
                              text_color=item["text_color"], **sw_kwargs
@@ -205,13 +210,11 @@ class HeatmapScreen(ctk.CTkFrame):
                 + _SPOT_W + _COL_GAP + _SUM_W + _CARD_PAD)
 
     def _on_canvas_configure(self, event):
-        # Re-flow into more/fewer columns only when the column count actually
-        # changes (avoids a repaint on every pixel of a window drag).
         if not self._ctx or self._ctx.get("is_empty"):
             return
-        card_w = self._card_width(len(self._ctx["weeks"]))
-        ncols = max(1, int((event.width - _PAD) // (card_w + _CARD_GAP)))
-        if ncols != self._ncols:
+        w = event.width
+        if self._last_w is None or abs(w - self._last_w) > 8:
+            self._last_w = w
             self._repaint()
 
     def _repaint(self):
@@ -235,33 +238,30 @@ class HeatmapScreen(ctk.CTkFrame):
             c.configure(scrollregion=(0, 0, 0, 80))
             return
         ctx = self._ctx
-        card_w = self._card_width(len(ctx["weeks"]))
+        avail = max(self._canvas.winfo_width(), 320)
+        card_w = avail - 2 * _PAD          # one card fills the row
         card_h = _HEAD_H + 7 * (_CELL_H + _CELL_GAP) + 2 * _CARD_PAD
-        avail = max(c.winfo_width(), card_w + 2 * _PAD)
-        ncols = max(1, int((avail - _PAD) // (card_w + _CARD_GAP)))
+        ncols = 1
         self._ncols = ncols
         for i, e in enumerate(emps):
-            col, r = i % ncols, i // ncols
-            self._paint_card(e, _PAD + col * (card_w + _CARD_GAP),
-                             _PAD + r * (card_h + _CARD_GAP))
-        nrows = (len(emps) + ncols - 1) // ncols
-        c.configure(scrollregion=(0, 0, 0, _PAD + nrows * (card_h + _CARD_GAP)))
+            self._paint_card(e, _PAD, _PAD + i * (card_h + _CARD_GAP), card_w)
+        c.configure(scrollregion=(0, 0, 0, _PAD + len(emps) * (card_h + _CARD_GAP)))
 
     def _round_rect(self, x0, y0, x1, y1, r, **kw):
         pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1,
                x1 - r, y1, x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
         return self._canvas.create_polygon(pts, smooth=True, **kw)
 
-    def _paint_card(self, e, x, y):
+    def _paint_card(self, e, x, y, card_w):
         c = self._canvas
         ctx = self._ctx
-        weeks = ctx["weeks"]
-        nweeks = len(weeks)
+        weeks = ctx["weeks"]; nweeks = len(weeks)
         grid_w = _WD_W + nweeks * (_CELL_W + _CELL_GAP)
-        gx = x + _CARD_PAD + _NAME_W + _COL_GAP
-        sx = gx + grid_w + _COL_GAP + 8
-        rx = sx + _SPOT_W + _COL_GAP
-        card_right = rx + _SUM_W + _CARD_PAD
+        card_right = x + card_w
+        # Kehadiran + Ringkasan anchored to the right edge
+        rx = card_right - _CARD_PAD - _SUM_W
+        sx = rx - _COL_GAP - _SPOT_W
+        gx = x + _CARD_PAD + _NAME_W + _COL_GAP   # grid after name, left side
         grid_h = _HEAD_H + 7 * (_CELL_H + _CELL_GAP)
         card_h = grid_h + 2 * _CARD_PAD
         self._round_rect(x, y, card_right, y + card_h, RADIUS_MD,
