@@ -259,8 +259,8 @@ REASON_CATEGORIES = (
 
 # Reason categories shown in the Severe Lateness resolve panel — a subset of
 # REASON_CATEGORIES relevant when BOTH punches are present (so lupa_absen_* and
-# libur are excluded). terlambat_kerja is in COACHING_EXCLUDED (justified late →
-# dropped from coaching); terlambat_lain is not (stays counted, just annotated).
+# libur are excluded). Both terlambat_kerja and terlambat_lain are in
+# COACHING_EXCLUDED (justified late → lateness counted as 0, dropped from coaching).
 SEVERE_LATENESS_CATEGORIES = (
     "tugas_lapangan",
     "tugas_paparan",
@@ -271,8 +271,9 @@ SEVERE_LATENESS_CATEGORIES = (
     "na",
 )
 
-# Reason category values that mark a row's lateness as work-justified —
-# rows with one of these categories are EXCLUDED from the weekly
-# terlambat_menit sum used for coaching_flag (see design spec section 6).
-# Lateness-justified reasons (work duty OR other excused lateness).
+# Lateness-justified reasons: their lateness is treated as 0 (zeroed in the
+# terlambat_menit sums) AND they are excluded from coaching. Work-duty
+# (tugas_lapangan / tugas_paparan / terlambat_kerja) OR other excused lateness
+# (terlambat_lain). Consumed by insights.terlambat_ranking,
+# insights.karyawan_teladan, db/coaching.py, reason_mapper.effective_attendance.
 COACHING_EXCLUDED = ("tugas_lapangan", "tugas_paparan", "terlambat_kerja", "terlambat_lain")
