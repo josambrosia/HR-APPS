@@ -48,7 +48,7 @@ def terlambat_ranking(
                SUM(CASE WHEN ar.tipe = 'Hari Kerja'
                           AND ar.masuk IS NULL AND ar.keluar IS NULL
                           AND (ar.reason_category IS NULL
-                               OR ar.reason_category != 'lupa_absen_datang')
+                               OR ar.reason_category NOT IN ('lupa_absen_datang', 'terlambat_kerja', 'terlambat_lain'))
                         THEN 1 ELSE 0 END) AS tidak_hadir,
                SUM(CASE WHEN ar.has_issue = 1 THEN 1 ELSE 0 END) AS issue_count
           FROM attendance_records ar
