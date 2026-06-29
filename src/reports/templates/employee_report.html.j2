@@ -2,67 +2,155 @@
 <html lang="id"><head><meta charset="utf-8"/>
 <title>Laporan Kehadiran — {{ emp.nama }} — {{ month_label }}</title>
 <style>
-  @page{ size:A4 portrait; margin:12mm; }
+{{ font_face_css | safe }}
+  :root{
+    --ink:#16161A; --mute:#6B7280; --faint:#9AA0AA; --line:#E9E9EE; --tint:#FAFAFB;
+    --brand:#DB2777; --cyan:#0E7490;
+    --disp:"Space Grotesk","Segoe UI",sans-serif;
+    --body:"Segoe UI",Arial,sans-serif;
+    --mono:"Consolas","SF Mono",monospace;
+  }
+  @page{ size:A4 portrait; margin:14mm 14mm 12mm; }
   *{box-sizing:border-box}
-  body{margin:0;background:#fff;color:#111;font-family:"Segoe UI",Arial,sans-serif;font-size:11px}
-  .bar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:6px}
-  .bar h1{font-size:16px;margin:0}
-  .bar .meta{font-size:11px;color:#444;text-align:right;line-height:1.5}
-  .stats{display:flex;flex-wrap:wrap;gap:8px 22px;margin:12px 0}
-  .stats .s{font-size:11px}
-  .stats .s b{font-size:15px;display:block}
-  h2.sec{font-size:12px;margin:14px 0 4px;border-bottom:1px solid #999;padding-bottom:3px}
-  table.det{width:100%;border-collapse:collapse;font-size:9px}
-  table.det th,table.det td{border:.5px solid #ccc;padding:3px 6px;text-align:left}
-  table.det thead th{background:#222;color:#fff}
-  table.det td.c{text-align:center}
-  .signoff{margin-top:18px;display:flex;justify-content:flex-end}
-  .signoff .so{text-align:center;font-size:10px;min-width:220px}
-  .signoff .so .gap{height:46px}
-  .signoff .so .name{font-weight:700;border-top:1px solid #111;padding-top:4px}
-  .foot{margin-top:14px;font-size:9px;color:#555}
-  .mx{border-collapse:collapse;table-layout:fixed;margin-top:6px}
-  .mx td,.mx th{border:.5px solid #dcdce2;text-align:center;width:18px;height:16px;font-size:8px;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .mx td.hollow{background:#fff;border:1px dashed #c4c4cc;color:#b5b5bd}
-</style></head><body>
-  <div class="bar">
-    <h1>LAPORAN KEHADIRAN — {{ emp.nama }}</h1>
-    <div class="meta">Josaphat Tech Solution · HR Absensi<br>
-      {{ emp.dept }}{% if no_staff %} · NIP {{ no_staff }}{% endif %} · {{ month_label }}</div>
-  </div>
-  {% set s = emp.sorotan %}
-  <div class="stats">
-    <div class="s">Kehadiran<b>{{ s.pct_hadir }}%</b></div>
-    <div class="s">Hari kerja dihadiri<b>{{ s.hk }}/{{ s.work_days }}</b></div>
-    <div class="s">Tepat waktu<b>{{ s.ontime_days }} hari</b></div>
-    <div class="s">Telat<b>{{ s.telat_total }} mnt · {{ s.telat_days }} hari</b></div>
-    <div class="s">Dinas<b>{{ s.dinas }}</b></div>
-    <div class="s">Sakit<b>{{ s.sakit }}</b></div>
-  </div>
-  <h2 class="sec">Pola Bulan</h2>
-  <table class="mx">
-    <tr><th></th>{% for w in range(weeks|length) %}<th>M{{ w + 1 }}</th>{% endfor %}</tr>
-    {% for wd in range(7) %}
-    <tr><td style="font-weight:400;color:#999">{{ weekday_labels[wd] }}</td>
-      {% for w in range(weeks|length) %}{% set day = weeks[w][wd] %}{% if day == 0 %}<td></td>{% elif emp.cells[day].status == 'nodata' %}<td class="hollow">{{ emp.cells[day].code }}</td>{% else %}<td style="background:{{ emp.cells[day].color }};color:{{ emp.cells[day].text_color }}">{{ emp.cells[day].code }}</td>{% endif %}{% endfor %}
-    </tr>{% endfor %}
-  </table>
+  body{margin:0;color:var(--ink);font-family:var(--body);font-size:10.5px;line-height:1.5;
+       -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rule{height:3px;background:var(--brand);border-radius:2px}
 
-  <h2 class="sec">Lampiran — Rincian Harian</h2>
+  /* Masthead */
+  .mast{padding-top:11px}
+  .eyebrow{display:flex;justify-content:space-between;align-items:baseline;
+           font-family:var(--mono);font-size:8.5px;letter-spacing:1.6px;color:var(--mute);
+           text-transform:uppercase}
+  .mast h1{font-family:var(--disp);font-weight:700;font-size:30px;line-height:1.05;
+           letter-spacing:-.5px;margin:7px 0 2px}
+  .mast .who{font-size:11px;color:var(--mute)}
+  .mast .who .dept{color:var(--cyan);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+  .mast .who .nip{font-family:var(--mono);color:var(--faint)}
+
+  /* Hero stat band */
+  .hero{display:flex;align-items:stretch;gap:20px;margin:16px 0 4px;padding:14px 0;
+        border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .hero .pct{min-width:150px}
+  .hero .pct .big{font-family:var(--disp);font-weight:700;font-size:52px;line-height:.9;letter-spacing:-1px}
+  .hero .pct .lbl{font-family:var(--mono);font-size:8.5px;letter-spacing:2px;color:var(--mute);
+                  text-transform:uppercase;margin-top:4px}
+  .hero .pct .track{height:5px;border-radius:3px;background:var(--line);margin-top:8px;overflow:hidden}
+  .hero .pct .fill{height:100%;border-radius:3px}
+  .hero .grid{flex:1;display:grid;grid-template-columns:repeat(6,1fr);gap:2px 0;align-self:center}
+  .hero .grid .c{padding:2px 14px;border-left:1px solid var(--line)}
+  .hero .grid .c .n{font-family:var(--disp);font-weight:700;font-size:19px;line-height:1.1}
+  .hero .grid .c .n .u{font-family:var(--mono);font-size:11px;color:var(--mute);font-weight:400}
+  .hero .grid .c .k{font-family:var(--mono);font-size:8px;letter-spacing:1.2px;color:var(--mute);
+                    text-transform:uppercase;margin-top:1px}
+
+  /* Section eyebrow */
+  h2.sec{font-family:var(--mono);font-size:9px;letter-spacing:2.4px;text-transform:uppercase;
+         color:var(--ink);margin:20px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--line);
+         display:flex;justify-content:space-between;align-items:baseline}
+  h2.sec::before{content:"";display:inline-block;width:14px;height:2px;background:var(--brand);
+                 margin-right:8px;vertical-align:middle}
+  h2.sec .hint{color:var(--faint);letter-spacing:.6px;text-transform:none;font-size:8.5px}
+
+  /* Pola Bulan grid */
+  .grid-wrap{display:flex;gap:24px;align-items:flex-start}
+  table.mx{border-collapse:separate;border-spacing:3px;table-layout:fixed}
+  table.mx td,table.mx th{width:26px;height:22px;text-align:center;font-family:var(--mono);
+       font-size:9px;font-weight:700;border-radius:4px}
+  table.mx th{font-weight:600;color:var(--faint);background:transparent;font-size:8px;letter-spacing:.5px}
+  table.mx td.wd{font-family:var(--mono);color:var(--faint);text-align:right;width:24px;font-weight:600;
+       background:transparent}
+  table.mx td.hollow{background:#fff;border:1px dashed #CBD0D8;color:#C2C7CF}
+  table.mx td.empty{background:transparent}
+  .legend{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:5px 14px;font-size:9px;padding-top:18px}
+  .legend .it{display:flex;align-items:center;gap:7px;color:var(--mute)}
+  .legend .sw{width:18px;height:15px;border-radius:4px;flex:0 0 auto;text-align:center;
+       font-family:var(--mono);font-size:7.5px;font-weight:700;line-height:15px}
+  .legend .sw.hollow{background:#fff;border:1px dashed #CBD0D8;color:#C2C7CF}
+
+  /* Daily ledger */
+  table.det{width:100%;border-collapse:collapse;font-size:9.5px}
+  table.det thead th{font-family:var(--mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;
+       color:var(--mute);text-align:left;padding:6px 8px;border-bottom:1.5px solid var(--brand);font-weight:600}
+  table.det tbody td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  table.det tbody tr:nth-child(even){background:var(--tint)}
+  table.det tr{break-inside:avoid;page-break-inside:avoid}
+  table.det thead{display:table-header-group}
+  table.det .mono{font-family:var(--mono)}
+  table.det .tgl{font-family:var(--mono);color:var(--mute);width:58px}
+  table.det .num{font-family:var(--mono);text-align:right;width:46px}
+  table.det .pill{display:inline-block;border-radius:20px;padding:1.5px 9px;font-family:var(--mono);
+       font-size:8.5px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+
+  /* Sign-off + footer */
+  .signoff{margin-top:26px;display:flex;justify-content:flex-end;break-inside:avoid}
+  .signoff .so{text-align:center;font-size:10px;min-width:230px}
+  .signoff .so .role{color:var(--mute);font-family:var(--mono);font-size:8.5px;letter-spacing:1px;
+       text-transform:uppercase}
+  .signoff .so .gap{height:48px}
+  .signoff .so .name{font-weight:700;border-top:1px solid var(--ink);padding-top:5px}
+  .foot{margin-top:14px;padding-top:8px;border-top:1px solid var(--line);
+        display:flex;justify-content:space-between;font-family:var(--mono);font-size:8px;
+        letter-spacing:.8px;color:var(--faint);text-transform:uppercase}
+</style></head><body>
+  <div class="rule"></div>
+  <div class="mast">
+    <div class="eyebrow"><span>Josaphat Tech Solution — Laporan Kehadiran</span><span>{{ month_label }}</span></div>
+    <h1>{{ emp.nama }}</h1>
+    <div class="who"><span class="dept">{{ emp.dept or "—" }}</span>{% if no_staff %} &nbsp;·&nbsp; <span class="nip">NIP {{ no_staff }}</span>{% endif %}</div>
+  </div>
+
+  {% set s = emp.sorotan %}
+  <div class="hero">
+    <div class="pct">
+      <div class="big" style="color:{{ s.pct_color }}">{{ s.pct_hadir }}<span style="font-size:24px">%</span></div>
+      <div class="lbl">Kehadiran</div>
+      <div class="track"><div class="fill" style="width:{{ s.pct_hadir if s.pct_hadir <= 100 else 100 }}%;background:{{ s.pct_color }}"></div></div>
+    </div>
+    <div class="grid">
+      <div class="c"><div class="n">{{ s.hk }}<span class="u">/{{ s.work_days }}</span></div><div class="k">Hari Hadir</div></div>
+      <div class="c"><div class="n">{{ s.ontime_days }}</div><div class="k">Tepat Waktu</div></div>
+      <div class="c"><div class="n">{{ s.telat_total }}<span class="u">m</span></div><div class="k">Total Telat</div></div>
+      <div class="c"><div class="n">{{ s.telat_days }}</div><div class="k">Hari Telat</div></div>
+      <div class="c"><div class="n">{{ s.dinas }}</div><div class="k">Dinas</div></div>
+      <div class="c"><div class="n">{{ s.sakit }}</div><div class="k">Sakit</div></div>
+    </div>
+  </div>
+
+  <h2 class="sec">Pola Bulan <span class="hint">setiap kotak = satu hari · warna = status</span></h2>
+  <div class="grid-wrap">
+    <table class="mx">
+      <tr><th></th>{% for w in range(weeks|length) %}<th>M{{ w + 1 }}</th>{% endfor %}</tr>
+      {% for wd in range(7) %}
+      <tr><td class="wd">{{ weekday_labels[wd] }}</td>
+        {% for w in range(weeks|length) %}{% set day = weeks[w][wd] %}{% if day == 0 %}<td class="empty"></td>{% elif emp.cells[day].status == 'nodata' %}<td class="hollow">{{ emp.cells[day].code }}</td>{% else %}<td style="background:{{ emp.cells[day].color }};color:{{ emp.cells[day].text_color }}">{{ emp.cells[day].code }}</td>{% endif %}{% endfor %}
+      </tr>{% endfor %}
+    </table>
+    <div class="legend">
+      {% for l in legend %}<div class="it">{% if l.code == '–' %}<span class="sw hollow">{{ l.code }}</span>{% else %}<span class="sw" style="background:{{ l.color }};color:{{ l.text_color }}">{{ l.code }}</span>{% endif %}<span>{{ l.label }}</span></div>{% endfor %}
+    </div>
+  </div>
+
+  <h2 class="sec">Rincian Harian <span class="hint">hari kerja selain hadir-normal & libur</span></h2>
   <table class="det">
-    <thead><tr><th>Tgl</th><th>Hari</th><th>Status</th><th>Masuk</th><th>Keluar</th><th>Telat</th><th>Alasan</th></tr></thead>
+    <thead><tr><th>Tgl</th><th>Hari</th><th>Status</th><th class="num">Masuk</th><th class="num">Keluar</th><th class="num">Telat</th><th>Alasan</th></tr></thead>
     <tbody>
-    {% for d in days %}{% set c = emp.cells[d] %}{% if c.status not in ('libur', 'nodata') %}
-      <tr><td class="c">{{ d }}</td><td>{{ weekday_labels[weekday_of[d]] }}</td>
-        <td>{{ c.code }} · {{ "Dinas" if c.status == "dinas" else c.label }}</td>
-        <td class="c">{{ c.masuk }}</td><td class="c">{{ c.keluar }}</td>
-        <td class="c">{{ c.telat }}</td><td>{{ c.alasan }}</td></tr>
+    {% set ns = namespace(any=false) %}
+    {% for d in days %}{% set c = emp.cells[d] %}{% if c.status not in ('hadir', 'libur', 'nodata') %}{% set ns.any = true %}
+      <tr>
+        <td class="tgl">{{ "%02d"|format(d) }} {{ month_label[:3] }}</td>
+        <td>{{ weekday_labels[weekday_of[d]] }}</td>
+        <td><span class="pill" style="background:{{ c.color }};color:{{ c.text_color }}">{{ c.code }} · {{ "Dinas" if c.status == "dinas" else c.label }}</span></td>
+        <td class="num">{{ c.masuk }}</td><td class="num">{{ c.keluar }}</td>
+        <td class="num">{{ c.telat }}</td><td>{{ c.alasan }}</td>
+      </tr>
     {% endif %}{% endfor %}
+    {% if not ns.any %}<tr><td colspan="7" style="color:var(--mute);padding:10px 8px">Tidak ada hari kerja abnormal — hadir penuh & tepat waktu.</td></tr>{% endif %}
     </tbody>
   </table>
+
   <div class="signoff"><div class="so">
-    <div>HR Officer in Charge</div><div class="gap"></div>
+    <div class="role">HR Officer in Charge</div><div class="gap"></div>
     <div class="name">{{ hr_officer_name if hr_officer_name else "____________" }}</div>
   </div></div>
-  <div class="foot">HR Absensi · Laporan per-pegawai · {{ month_label }}</div>
+  <div class="foot"><span>Josaphat Tech Solution · From Concept to Code</span><span>Confidential · {{ month_label }}</span></div>
 </body></html>

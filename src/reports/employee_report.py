@@ -7,6 +7,7 @@ from datetime import date
 from src.db.settings import get_setting
 from src.core.heatmap import build_heatmap_context
 from src.reports.html_renderer import _build_env
+from src.reports.report_fonts import display_font_face_css
 
 
 def render_employee_report_html(conn, year_month, employee_id):
@@ -28,6 +29,7 @@ def render_employee_report_html(conn, year_month, employee_id):
     env = _build_env()
     return env.get_template("employee_report.html.j2").render(
         emp=emp,
+        font_face_css=display_font_face_css(),
         no_staff=no_staff,
         month_label=ctx["month_label"],
         days=ctx["days"],

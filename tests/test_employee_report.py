@@ -38,5 +38,5 @@ def test_report_has_grid_and_perday_row():
     with get_connection(p) as conn:
         html = render_employee_report_html(conn, "2026-05", e)
     assert 'class="mx"' in html                 # mini-heatmap grid
-    assert "Lampiran — Rincian Harian" in html  # per-day table heading
+    assert "Rincian Harian" in html             # per-day table heading
     assert "08:30" in html                      # the seeded punch appears
