@@ -20,6 +20,7 @@ from src.db.connection import get_connection
 from src.db.settings import get_setting
 from src.core.heatmap import build_heatmap_context, sort_employees
 from src.reports.heatmap_print import render_heatmap_print_html
+from src.reports.employee_report import render_employee_report_html
 from src.ui.browser_launcher import open_html_in_browser
 from src.ui.components.search_bar import SearchBar
 from src.ui.components.heatmap_print_dialog import HeatmapPrintDialog
@@ -165,6 +166,7 @@ class HeatmapScreen(ctk.CTkFrame):
         self._canvas.tag_bind("cell", "<Motion>", self._on_cell_motion)
         self._canvas.tag_bind("cell", "<Leave>", lambda e: self._hide_tip())
         self._canvas.tag_bind("cell", "<Button-1>", self._on_cell_click)
+        self._canvas.tag_bind("cetak", "<Button-1>", self._on_cetak_click)
         self._canvas.bind("<Configure>", self._on_canvas_configure)
 
     # ---------- data / nav ----------
@@ -277,6 +279,17 @@ class HeatmapScreen(ctk.CTkFrame):
         if e.get("needs_attention"):
             c.create_text(nx, ny + 40, anchor="nw", fill=COLOR_ERROR,
                           font=(FONT_FAMILY, 10, "bold"), text="● Perlu perhatian")
+        bx1 = card_right - _CARD_PAD
+        bx0 = bx1 - 78
+        by0 = y + 8
+        by1 = by0 + 20
+        bid = self._round_rect(bx0, by0, bx1, by1, 6,
+                               fill=COLOR_SURFACE_HIGH, outline=COLOR_BORDER)
+        tid = c.create_text((bx0 + bx1) / 2, (by0 + by1) / 2, fill=COLOR_TEXT,
+                            font=(FONT_FAMILY, 10, "bold"), text="🖨 Cetak")
+        for it in (bid, tid):
+            c.addtag_withtag("cetak", it)
+            self._cell_by_item[it] = {"_cetak_emp": e["employee_id"]}
         gy = y + _CARD_PAD
         for w in range(nweeks):
             cx = gx + _WD_W + w * (_CELL_W + _CELL_GAP)
@@ -402,6 +415,21 @@ class HeatmapScreen(ctk.CTkFrame):
         with get_connection(DB_PATH) as conn:
             html = render_heatmap_print_html(conn, self._month, scope=scope, outlier=outlier)
         fd, path = tempfile.mkstemp(suffix=".html", prefix="heatmap_")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(html)
+        open_html_in_browser(Path(path))
+
+    def _on_cetak_click(self, _event):
+        item = self._canvas.find_withtag("current")
+        info = self._cell_by_item.get(item[0]) if item else None
+        if info and "_cetak_emp" in info:
+            self._print_employee(info["_cetak_emp"])
+        return "break"
+
+    def _print_employee(self, employee_id):
+        with get_connection(DB_PATH) as conn:
+            html = render_employee_report_html(conn, self._month, employee_id)
+        fd, path = tempfile.mkstemp(suffix=".html", prefix="emp_report_")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(html)
         open_html_in_browser(Path(path))
