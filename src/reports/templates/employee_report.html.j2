@@ -21,8 +21,11 @@
   .eyebrow{display:flex;justify-content:space-between;align-items:baseline;
            font-family:var(--mono);font-size:8.5px;letter-spacing:1.6px;color:var(--mute);
            text-transform:uppercase}
+  .mast .kicker{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.2px;
+                color:var(--brand);margin:9px 0 1px}
+  .mast .kicker b{color:var(--ink);font-weight:700}
   .mast h1{font-family:var(--disp);font-weight:700;font-size:30px;line-height:1.05;
-           letter-spacing:-.5px;margin:7px 0 2px}
+           letter-spacing:-.5px;margin:1px 0 2px}
   .mast .who{font-size:11px;color:var(--mute)}
   .mast .who .dept{color:var(--cyan);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
   .mast .who .nip{font-family:var(--mono);color:var(--faint)}
@@ -94,7 +97,8 @@
 </style></head><body>
   <div class="rule"></div>
   <div class="mast">
-    <div class="eyebrow"><span>Josaphat Tech Solution — Laporan Kehadiran</span><span>{{ month_label }}</span></div>
+    <div class="eyebrow"><span>Josaphat Tech Solution · HR Absensi</span><span>Confidential</span></div>
+    <div class="kicker">Report Kehadiran &middot; <b>{{ month_label }}</b></div>
     <h1>{{ emp.nama }}</h1>
     <div class="who"><span class="dept">{{ emp.dept or "—" }}</span>{% if no_staff %} &nbsp;·&nbsp; <span class="nip">NIP {{ no_staff }}</span>{% endif %}</div>
   </div>
@@ -152,5 +156,5 @@
     <div class="role">HR Officer in Charge</div><div class="gap"></div>
     <div class="name">{{ hr_officer_name if hr_officer_name else "____________" }}</div>
   </div></div>
-  <div class="foot"><span>Josaphat Tech Solution · From Concept to Code</span><span>Confidential · {{ month_label }}</span></div>
+  <div class="foot"><span>Josaphat Tech Solution · From Concept to Code</span><span>Confidential · <b>{{ month_label }}</b></span></div>
 </body></html>
