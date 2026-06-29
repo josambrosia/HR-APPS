@@ -236,8 +236,10 @@ DEFAULT_LATE_TOLERANCE_MIN = 12
 # Heatmap colour grouping — reasons shown GREEN ("Dinas") on the attendance
 # heatmap. Deliberately BROADER than COACHING_EXCLUDED (adds tugas_belajar):
 # this is a presentation choice and does NOT change coaching/dashboard logic.
+# Matches legend "Dinas (…/terlambat dengan alasan)".
 HEATMAP_DINAS_REASONS = (
     "tugas_lapangan", "tugas_paparan", "tugas_belajar", "terlambat_kerja",
+    "terlambat_lain",
 )
 
 # Reason categories (canonical IDs used in DB and UI)
@@ -272,4 +274,5 @@ SEVERE_LATENESS_CATEGORIES = (
 # Reason category values that mark a row's lateness as work-justified —
 # rows with one of these categories are EXCLUDED from the weekly
 # terlambat_menit sum used for coaching_flag (see design spec section 6).
-COACHING_EXCLUDED = ("tugas_lapangan", "tugas_paparan", "terlambat_kerja")
+# Lateness-justified reasons (work duty OR other excused lateness).
+COACHING_EXCLUDED = ("tugas_lapangan", "tugas_paparan", "terlambat_kerja", "terlambat_lain")
