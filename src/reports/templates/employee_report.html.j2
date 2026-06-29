@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"/>
+<title>Laporan Kehadiran — {{ emp.nama }} — {{ month_label }}</title>
+<style>
+  @page{ size:A4 portrait; margin:12mm; }
+  *{box-sizing:border-box}
+  body{margin:0;background:#fff;color:#111;font-family:"Segoe UI",Arial,sans-serif;font-size:11px}
+  .bar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:6px}
+  .bar h1{font-size:16px;margin:0}
+  .bar .meta{font-size:11px;color:#444;text-align:right;line-height:1.5}
+  .stats{display:flex;flex-wrap:wrap;gap:8px 22px;margin:12px 0}
+  .stats .s{font-size:11px}
+  .stats .s b{font-size:15px;display:block}
+  h2.sec{font-size:12px;margin:14px 0 4px;border-bottom:1px solid #999;padding-bottom:3px}
+  table.det{width:100%;border-collapse:collapse;font-size:9px}
+  table.det th,table.det td{border:.5px solid #ccc;padding:3px 6px;text-align:left}
+  table.det thead th{background:#222;color:#fff}
+  table.det td.c{text-align:center}
+  .signoff{margin-top:18px;display:flex;justify-content:flex-end}
+  .signoff .so{text-align:center;font-size:10px;min-width:220px}
+  .signoff .so .gap{height:46px}
+  .signoff .so .name{font-weight:700;border-top:1px solid #111;padding-top:4px}
+  .foot{margin-top:14px;font-size:9px;color:#555}
+  .mx{border-collapse:collapse;table-layout:fixed;margin-top:6px}
+  .mx td,.mx th{border:.5px solid #dcdce2;text-align:center;width:18px;height:16px;font-size:8px;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .mx td.hollow{background:#fff;border:1px dashed #c4c4cc;color:#b5b5bd}
+</style></head><body>
+  <div class="bar">
+    <h1>LAPORAN KEHADIRAN — {{ emp.nama }}</h1>
+    <div class="meta">Josaphat Tech Solution · HR Absensi<br>
+      {{ emp.dept }}{% if no_staff %} · NIP {{ no_staff }}{% endif %} · {{ month_label }}</div>
+  </div>
+  {% set s = emp.sorotan %}
+  <div class="stats">
+    <div class="s">Kehadiran<b>{{ s.pct_hadir }}%</b></div>
+    <div class="s">Hari kerja dihadiri<b>{{ s.hk }}/{{ s.work_days }}</b></div>
+    <div class="s">Tepat waktu<b>{{ s.ontime_days }} hari</b></div>
+    <div class="s">Telat<b>{{ s.telat_total }} mnt · {{ s.telat_days }} hari</b></div>
+    <div class="s">Dinas<b>{{ s.dinas }}</b></div>
+    <div class="s">Sakit<b>{{ s.sakit }}</b></div>
+  </div>
+  {# mini-heatmap + per-day table added in Task C2 #}
+  <div class="signoff"><div class="so">
+    <div>HR Officer in Charge</div><div class="gap"></div>
+    <div class="name">{{ hr_officer_name if hr_officer_name else "____________" }}</div>
+  </div></div>
+  <div class="foot">HR Absensi · Laporan per-pegawai · {{ month_label }}</div>
+</body></html>
