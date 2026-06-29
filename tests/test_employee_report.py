@@ -31,3 +31,12 @@ def test_report_has_identity_and_stats():
     assert "Mei 2026" in html
     assert "Budi Officer" in html          # HR officer sign-off
     assert "Kehadiran" in html             # stats block label
+
+
+def test_report_has_grid_and_perday_row():
+    p, e = _seed()
+    with get_connection(p) as conn:
+        html = render_employee_report_html(conn, "2026-05", e)
+    assert 'class="mx"' in html                 # mini-heatmap grid
+    assert "Lampiran — Rincian Harian" in html  # per-day table heading
+    assert "08:30" in html                      # the seeded punch appears

@@ -39,7 +39,27 @@
     <div class="s">Dinas<b>{{ s.dinas }}</b></div>
     <div class="s">Sakit<b>{{ s.sakit }}</b></div>
   </div>
-  {# mini-heatmap + per-day table added in Task C2 #}
+  <h2 class="sec">Pola Bulan</h2>
+  <table class="mx">
+    <tr><th></th>{% for w in range(weeks|length) %}<th>M{{ w + 1 }}</th>{% endfor %}</tr>
+    {% for wd in range(7) %}
+    <tr><td style="font-weight:400;color:#999">{{ weekday_labels[wd] }}</td>
+      {% for w in range(weeks|length) %}{% set day = weeks[w][wd] %}{% if day == 0 %}<td></td>{% elif emp.cells[day].status == 'nodata' %}<td class="hollow">{{ emp.cells[day].code }}</td>{% else %}<td style="background:{{ emp.cells[day].color }};color:{{ emp.cells[day].text_color }}">{{ emp.cells[day].code }}</td>{% endif %}{% endfor %}
+    </tr>{% endfor %}
+  </table>
+
+  <h2 class="sec">Lampiran — Rincian Harian</h2>
+  <table class="det">
+    <thead><tr><th>Tgl</th><th>Hari</th><th>Status</th><th>Masuk</th><th>Keluar</th><th>Telat</th><th>Alasan</th></tr></thead>
+    <tbody>
+    {% for d in days %}{% set c = emp.cells[d] %}{% if c.status not in ('libur', 'nodata') %}
+      <tr><td class="c">{{ d }}</td><td>{{ weekday_labels[weekday_of[d]] }}</td>
+        <td>{{ c.code }} · {{ "Dinas" if c.status == "dinas" else c.label }}</td>
+        <td class="c">{{ c.masuk }}</td><td class="c">{{ c.keluar }}</td>
+        <td class="c">{{ c.telat }}</td><td>{{ c.alasan }}</td></tr>
+    {% endif %}{% endfor %}
+    </tbody>
+  </table>
   <div class="signoff"><div class="so">
     <div>HR Officer in Charge</div><div class="gap"></div>
     <div class="name">{{ hr_officer_name if hr_officer_name else "____________" }}</div>
