@@ -33,10 +33,12 @@ def test_reason_overrides_lateness():
     assert cs(row(masuk=None, reason_category="lupa_absen_pulang")) == "lupa"
     assert cs(row(masuk=None, reason_category="na")) == "na"
 
-def test_terlambat_lain_falls_through():
-    # not a leave reason -> shown by lateness magnitude
-    assert cs(row(terlambat_menit=30, reason_category="terlambat_lain")) == "sedang"
-    assert cs(row(terlambat_menit=80, reason_category="terlambat_lain")) == "parah"
+def test_terlambat_lain_is_dinas():
+    # v21: "Terlambat dengan alasan" is justified -> Dinas, regardless of how
+    # late, and even with no punch (reason precedence runs before the masuk check).
+    assert cs(row(terlambat_menit=30, reason_category="terlambat_lain")) == "dinas"
+    assert cs(row(terlambat_menit=80, reason_category="terlambat_lain")) == "dinas"
+    assert cs(row(masuk=None, reason_category="terlambat_lain")) == "dinas"
 
 def test_absen_tanpa_alasan():
     assert cs(row(masuk=None, reason_category=None)) == "mangkir"
