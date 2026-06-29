@@ -39,7 +39,8 @@ STATUS_LABELS = {
 }
 # statuses that count toward HK (hari kerja dihadiri)
 HK_STATUSES = ("hadir", "sedang", "parah", "dinas", "lupa")
-# leave/justified reasons whose colour overrides lateness (terlambat_lain NOT here)
+# leave reasons whose colour overrides lateness (justified-late reasons are
+# caught above via HEATMAP_DINAS_REASONS, so they are intentionally NOT here)
 _LEAVE_REASON_STATUS = {
     "izin_sakit": "sakit", "cuti": "cuti",
     "lupa_absen_datang": "lupa", "lupa_absen_pulang": "lupa",
@@ -61,7 +62,7 @@ def cell_status(row, *, tolerance, severe, is_weekend, is_holiday):
         return "dinas"
     if reason in _LEAVE_REASON_STATUS:
         return _LEAVE_REASON_STATUS[reason]
-    # (terlambat_lain falls through to lateness tiers)
+    # (justified-late terlambat_kerja/terlambat_lain already returned "dinas" above)
     # 4. Present + lateness tiers
     if row["masuk"]:
         late = row["terlambat_menit"] or 0

@@ -35,7 +35,7 @@ _CARD_GAP = 10
 _CARD_PAD = 12
 _NAME_W = 116
 _WD_W = 22
-_CELL_W = 34
+_CELL_W = 40
 _CELL_H = 24
 _CELL_GAP = 3
 _HEAD_H = 16
@@ -239,7 +239,7 @@ class HeatmapScreen(ctk.CTkFrame):
             return
         ctx = self._ctx
         avail = max(self._canvas.winfo_width(), 320)
-        card_w = avail - 2 * _PAD          # one card fills the row
+        card_w = avail - 2 * _PAD - 20     # one card fills the row (right margin clears the scrollbar)
         card_h = _HEAD_H + 7 * (_CELL_H + _CELL_GAP) + 2 * _CARD_PAD
         ncols = 1
         self._ncols = ncols
@@ -258,10 +258,12 @@ class HeatmapScreen(ctk.CTkFrame):
         weeks = ctx["weeks"]; nweeks = len(weeks)
         grid_w = _WD_W + nweeks * (_CELL_W + _CELL_GAP)
         card_right = x + card_w
-        # Kehadiran + Ringkasan anchored to the right edge
-        rx = card_right - _CARD_PAD - _SUM_W
-        sx = rx - _COL_GAP - _SPOT_W
         gx = x + _CARD_PAD + _NAME_W + _COL_GAP   # grid after name, left side
+        grid_right = gx + grid_w
+        # Ringkasan hugs the right edge; Kehadiran sits centred in the gap between
+        # the grid and Ringkasan, so the slack reads as two balanced gaps, not one.
+        rx = card_right - _CARD_PAD - _SUM_W
+        sx = grid_right + _COL_GAP + max(0, (rx - _COL_GAP - (grid_right + _COL_GAP) - _SPOT_W) // 2)
         grid_h = _HEAD_H + 7 * (_CELL_H + _CELL_GAP)
         card_h = grid_h + 2 * _CARD_PAD
         self._round_rect(x, y, card_right, y + card_h, RADIUS_MD,
