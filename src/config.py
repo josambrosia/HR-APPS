@@ -21,14 +21,19 @@ APP_CHANGELOG = [
         "version": "21.1.0",
         "date": "2026-06-30",
         "changes": [
-            ("feat", "Heatmap: kartu pegawai kini menampilkan \"Pola "
-                     "Keterlambatan\" di ruang kanan yang dulu kosong — satu "
-                     "tanda per hari kerja (tinggi bar = menit telat, warna = "
-                     "tingkat, garis putus-putus = batas toleransi) sehingga "
-                     "terlihat kapan & seberapa parah keterlambatan sebulan."),
-            ("change", "Heatmap: tombol \"Cetak\" di tiap kartu pegawai kini "
-                       "punya efek hover (menyala magenta + kursor tangan) "
-                       "seperti tombol Cetak di Dashboard."),
+            ("feat", "Heatmap: panel \"Pola Keterlambatan\" baru mengisi ruang "
+                     "kosong di kartu pegawai — grafik garis gradasi keparahan "
+                     "(hijau→kuning→oranye→merah) dengan angka menit di tiap "
+                     "puncak, sorotan \"Puncak Keterlambatan\" (hari terparah), "
+                     "rata-rata telat per hari, dan tren paruh bulan. Arahkan "
+                     "kursor (hover) ke puncak untuk detail harian."),
+            ("change", "Heatmap: kartu pegawai dirapikan jadi panel berkotak "
+                       "(\"Bento\") agar tiap zona — kalender, Kehadiran, "
+                       "Ringkasan, dan grafik — terpisah jelas dan tak lagi "
+                       "terasa datar."),
+            ("change", "Heatmap: tombol \"Cetak\" kini selalu magenta dan pindah "
+                       "ke header grafik; saat di-hover kursor berubah jadi "
+                       "tangan, seperti tombol Cetak di Dashboard."),
             ("fix", "Laporan cetak per-pegawai kini rapi saat dibuka di browser "
                     "(sebelumnya melebar memenuhi layar) — ditampilkan sebagai "
                     "lembar A4 di tengah dengan margin; hasil cetak tidak "
