@@ -203,6 +203,8 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
         "weekday_labels": ["Sn", "Sl", "Rb", "Km", "Jm", "Sb", "Mg"],
         "weeks": weeks,
         "eff_hari_kerja": eff_hk,
+        "late_tolerance": tol,
+        "severe_threshold": sev,
         "is_empty": not rows,
         "legend": legend,
         "summary_keys": _SUMMARY_KEYS,

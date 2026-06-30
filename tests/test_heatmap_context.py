@@ -49,3 +49,13 @@ def test_context_empty_month(temp_db_path):
     with get_connection(temp_db_path) as conn:
         ctx = build_heatmap_context(conn, "2026-05", exclude_outliers=False)
     assert ctx["is_empty"] is True
+
+
+def test_context_exposes_tolerance_and_severe(temp_db_path):
+    """The in-app lateness lane (v21.1.0 'Pola Keterlambatan') needs the tolerance
+    and severe thresholds to place its dashed guide and scale its bars."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        ctx = build_heatmap_context(conn, "2026-05", exclude_outliers=False)
+    assert ctx["late_tolerance"] == 12          # schema default
+    assert isinstance(ctx["severe_threshold"], int) and ctx["severe_threshold"] > 0
