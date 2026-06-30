@@ -27,6 +27,9 @@ APP_CHANGELOG = [
                      "puncak, sorotan \"Puncak Keterlambatan\" (hari terparah), "
                      "rata-rata telat per hari, dan tren paruh bulan. Arahkan "
                      "kursor (hover) ke puncak untuk detail harian."),
+            ("feat", "Laporan cetak per-pegawai kini ikut menampilkan grafik "
+                     "\"Pola Keterlambatan\" di samping \"Pola Bulan\" — tanpa "
+                     "menambah panjang dokumen (tetap 1 halaman)."),
             ("change", "Heatmap: kartu pegawai dirapikan jadi panel berkotak "
                        "(\"Bento\") agar tiap zona — kalender, Kehadiran, "
                        "Ringkasan, dan grafik — terpisah jelas dan tak lagi "
