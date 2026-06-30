@@ -5,7 +5,7 @@ paths resolve in dev and the PyInstaller bundle."""
 from datetime import date
 
 from src.db.settings import get_setting
-from src.core.heatmap import build_heatmap_context
+from src.core.heatmap import build_heatmap_context, build_lateness_ridge
 from src.reports.html_renderer import _build_env
 from src.reports.report_fonts import display_font_face_css
 
@@ -26,6 +26,8 @@ def render_employee_report_html(conn, year_month, employee_id):
                        (employee_id,)).fetchone()
     if row and row[0]:
         no_staff = row[0]
+    ridge = build_lateness_ridge(emp.get("cells", {}), ctx["days"],
+                                 ctx["late_tolerance"], ctx["severe_threshold"])
     env = _build_env()
     return env.get_template("employee_report.html.j2").render(
         emp=emp,
@@ -38,5 +40,6 @@ def render_employee_report_html(conn, year_month, employee_id):
         weeks=ctx["weeks"],
         eff_hari_kerja=ctx["eff_hari_kerja"],
         legend=ctx["legend"],
+        ridge=ridge,
         hr_officer_name=get_setting(conn, "hr_officer_name", default=""),
     )

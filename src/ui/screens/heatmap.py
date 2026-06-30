@@ -18,7 +18,8 @@ import customtkinter as ctk
 from src.config import DB_PATH
 from src.db.connection import get_connection
 from src.db.settings import get_setting
-from src.core.heatmap import build_heatmap_context, sort_employees
+from src.core.heatmap import (
+    build_heatmap_context, sort_employees, severity_color, SEVERITY_COLORS)
 from src.reports.heatmap_print import render_heatmap_print_html
 from src.reports.employee_report import render_employee_report_html
 from src.ui.browser_launcher import open_html_in_browser
@@ -50,23 +51,7 @@ _BENTO_TILE = "#17181B"      # zone-tile fill
 _BENTO_TILE_BD = "#25262B"   # zone-tile border
 _TILE_PAD = 10               # padding inside a tile
 _TILE_GAP = 11               # gap between tiles
-_RIDGE_FILL = "#201E18"      # flat area fill under the lateness ridge
-# Severity ramp for the lateness ridge: on-time green → mild amber → orange → severe red.
-_SEV_GREEN = "#10B981"
-_SEV_AMBER = "#FBBF24"
-_SEV_ORANGE = "#FB923C"
-_SEV_RED = "#EF4444"
-
-
-def _sev_color(minutes, tolerance, severe):
-    """Colour a lateness value by how severe it is (drives the ridge contour)."""
-    if minutes <= tolerance:
-        return _SEV_GREEN
-    if minutes < severe * 0.5:
-        return _SEV_AMBER
-    if minutes < severe:
-        return _SEV_ORANGE
-    return _SEV_RED
+_RIDGE_FILL = "#201E18"      # flat area fill under the lateness ridge (severity_color in core)
 
 
 _SORT_OPTIONS = {
@@ -467,7 +452,7 @@ class HeatmapScreen(ctk.CTkFrame):
             cur = (day_x(d), y_of(late_min(d)), late_min(d))
             if prev is not None:
                 c.create_line(prev[0], prev[1], cur[0], cur[1],
-                              fill=_sev_color(max(prev[2], cur[2]), tol, sev), width=2)
+                              fill=severity_color(max(prev[2], cur[2]), tol, sev), width=2)
             prev = cur
         # dinas baseline ticks + late peaks (dot + minute label; hoverable via "cell")
         for d in days:
@@ -480,7 +465,7 @@ class HeatmapScreen(ctk.CTkFrame):
             elif st in ("sedang", "parah") and isinstance(cell["telat"], int):
                 m = cell["telat"]
                 py = y_of(m)
-                col = _sev_color(m, tol, sev)
+                col = severity_color(m, tol, sev)
                 did = c.create_oval(cx - 2.8, py - 2.8, cx + 2.8, py + 2.8,
                                     fill=col, outline="", tags=("cell",))
                 lid = c.create_text(cx, max(py - 6, top_y - 6), anchor="s", fill=col,
@@ -507,7 +492,7 @@ class HeatmapScreen(ctk.CTkFrame):
         c.create_text(tx, sy, anchor="nw", fill=COLOR_TEXT_MUTED,
                       font=(FONT_FAMILY, 8, "bold"), text="PUNCAK KETERLAMBATAN")
         if lt["worst_min"] > 0:
-            wc = _sev_color(lt["worst_min"], tol, sev)
+            wc = severity_color(lt["worst_min"], tol, sev)
             big = c.create_text(tx, sy + 12, anchor="nw", fill=wc,
                                 font=(FONT_FAMILY, 22, "bold"), text=str(lt["worst_min"]))
             bb = c.bbox(big)
@@ -528,8 +513,8 @@ class HeatmapScreen(ctk.CTkFrame):
         c.create_text(col1, sy + 13, anchor="nw", fill=COLOR_TEXT,
                       font=(FONT_FAMILY, 16, "bold"), text=f"{lt['avg_min']}m")
         # half-month trend
-        ttxt, tcol = {"up": ("↑ naik", _SEV_ORANGE),
-                      "down": ("↓ turun", _SEV_GREEN),
+        ttxt, tcol = {"up": ("↑ naik", SEVERITY_COLORS["mid"]),
+                      "down": ("↓ turun", SEVERITY_COLORS["ok"]),
                       "flat": ("→ tetap", COLOR_TEXT_DIM)}[lt["trend"]]
         c.create_text(col2, sy, anchor="nw", fill=COLOR_TEXT_MUTED,
                       font=(FONT_FAMILY, 8, "bold"), text="TREN ½ BULAN")

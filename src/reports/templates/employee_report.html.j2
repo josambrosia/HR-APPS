@@ -54,8 +54,8 @@
                  margin-right:8px;vertical-align:middle}
   h2.sec .hint{color:var(--faint);letter-spacing:.6px;text-transform:none;font-size:8.5px}
 
-  /* Pola Bulan grid */
-  .grid-wrap{display:flex;gap:24px;align-items:flex-start}
+  /* Pola Bulan grid + lateness ridge (right column) */
+  .grid-wrap{display:flex;gap:18px;align-items:flex-start}
   table.mx{border-collapse:separate;border-spacing:3px;table-layout:fixed}
   table.mx td,table.mx th{width:26px;height:22px;text-align:center;font-family:var(--mono);
        font-size:9px;font-weight:700;border-radius:4px}
@@ -64,10 +64,19 @@
        background:transparent}
   table.mx td.hollow{background:#fff;border:1px dashed #CBD0D8;color:#C2C7CF}
   table.mx td.empty{background:transparent}
-  .legend{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:5px 14px;font-size:9px;padding-top:18px}
-  .legend .it{display:flex;align-items:center;gap:7px;color:var(--mute)}
-  .legend .sw{width:18px;height:15px;border-radius:4px;flex:0 0 auto;text-align:center;
-       font-family:var(--mono);font-size:7.5px;font-weight:700;line-height:15px}
+  .rcol{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+  .ridge .rcap{font-family:var(--mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--mute)}
+  .ridge .rcap b{color:var(--faint);font-weight:400}
+  .rsvg{display:block;width:100%;height:74px;margin-top:3px}
+  .rsvg .rtol{stroke:#E4C58F;stroke-width:.8;stroke-dasharray:3 2}
+  .rsvg .rbase{stroke:var(--line);stroke-width:.8}
+  .rsvg .rfill{fill:#FCF1DD}
+  .rsvg .rlab{font-family:var(--mono);font-size:7px;font-weight:700;text-anchor:middle}
+  .rsvg .rax{font-family:var(--mono);font-size:6.5px;fill:var(--faint);text-anchor:middle}
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;font-size:8.5px}
+  .legend .it{display:flex;align-items:center;gap:6px;color:var(--mute)}
+  .legend .sw{width:16px;height:13px;border-radius:3px;flex:0 0 auto;text-align:center;
+       font-family:var(--mono);font-size:7px;font-weight:700;line-height:13px}
   .legend .sw.hollow{background:#fff;border:1px dashed #CBD0D8;color:#C2C7CF}
 
   /* Daily ledger */
@@ -139,8 +148,22 @@
         {% for w in range(weeks|length) %}{% set day = weeks[w][wd] %}{% if day == 0 %}<td class="empty"></td>{% elif emp.cells[day].status == 'nodata' %}<td class="hollow">{{ emp.cells[day].code }}</td>{% else %}<td style="background:{{ emp.cells[day].color }};color:{{ emp.cells[day].text_color }}">{{ emp.cells[day].code }}</td>{% endif %}{% endfor %}
       </tr>{% endfor %}
     </table>
-    <div class="legend">
-      {% for l in legend %}<div class="it">{% if l.code == '–' %}<span class="sw hollow">{{ l.code }}</span>{% else %}<span class="sw" style="background:{{ l.color }};color:{{ l.text_color }}">{{ l.code }}</span>{% endif %}<span>{{ l.label }}</span></div>{% endfor %}
+    <div class="rcol">
+      <div class="ridge">
+        <div class="rcap">Pola Keterlambatan <b>&middot; menit telat / hari</b></div>
+        <svg class="rsvg" viewBox="0 0 {{ ridge.w }} {{ ridge.h }}" preserveAspectRatio="none">
+          {% if ridge.tol_y %}<line x1="{{ ridge.left }}" y1="{{ ridge.tol_y }}" x2="{{ ridge.right }}" y2="{{ ridge.tol_y }}" class="rtol"/>{% endif %}
+          <line x1="{{ ridge.left }}" y1="{{ ridge.base_y }}" x2="{{ ridge.right }}" y2="{{ ridge.base_y }}" class="rbase"/>
+          <polygon points="{{ ridge.fill }}" class="rfill"/>
+          {% for s in ridge.segments %}<line x1="{{ s.x1 }}" y1="{{ s.y1 }}" x2="{{ s.x2 }}" y2="{{ s.y2 }}" stroke="{{ s.color }}" stroke-width="1.5" stroke-linecap="round"/>{% endfor %}
+          {% for p in ridge.dinas %}<circle cx="{{ p.x }}" cy="{{ ridge.base_y }}" r="1.8" fill="#0D9488"/>{% endfor %}
+          {% for p in ridge.peaks %}<circle cx="{{ p.x }}" cy="{{ p.y }}" r="2.1" fill="{{ p.color }}"/><text x="{{ p.x }}" y="{{ p.ly }}" class="rlab" fill="{{ p.color }}">{{ p.m }}</text>{% endfor %}
+          {% for a in ridge.axis %}<text x="{{ a.x }}" y="{{ ridge.h - 2 }}" class="rax">{{ a.d }}</text>{% endfor %}
+        </svg>
+      </div>
+      <div class="legend">
+        {% for l in legend %}<div class="it">{% if l.code == '–' %}<span class="sw hollow">{{ l.code }}</span>{% else %}<span class="sw" style="background:{{ l.color }};color:{{ l.text_color }}">{{ l.code }}</span>{% endif %}<span>{{ l.label }}</span></div>{% endfor %}
+      </div>
     </div>
   </div>
 

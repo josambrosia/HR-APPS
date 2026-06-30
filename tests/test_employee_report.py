@@ -42,6 +42,15 @@ def test_report_has_grid_and_perday_row():
     assert "08:30" in html                      # the seeded punch appears
 
 
+def test_report_has_lateness_ridge():
+    """The report embeds the lateness ridge beside Pola Bulan (v21.1.0)."""
+    p, e = _seed()
+    with get_connection(p) as conn:
+        html = render_employee_report_html(conn, "2026-05", e)
+    assert "Pola Keterlambatan" in html        # ridge caption
+    assert 'class="rsvg"' in html              # the server-rendered ridge SVG
+
+
 def test_report_has_onscreen_sheet_frame():
     """The browser preview frames the report as an A4 sheet (screen-only, so the
     printout is unaffected). Guards the v21.1.0 'rapi di layar' fix."""

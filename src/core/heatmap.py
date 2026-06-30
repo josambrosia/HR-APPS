@@ -249,6 +249,79 @@ def pct_band_color(pct):
     return "#F97316"
 
 
+# Severity ramp for the lateness ridge: on-time green → mild amber → orange → severe red.
+SEVERITY_COLORS = {"ok": "#10B981", "mild": "#FBBF24", "mid": "#FB923C", "severe": "#EF4444"}
+
+
+def severity_color(minutes, tolerance, severe):
+    """Colour a lateness value by how severe it is (drives the ridge contour). Shared
+    by the in-app heatmap and the printed report so the ramp can't drift apart."""
+    if minutes <= tolerance:
+        return SEVERITY_COLORS["ok"]
+    if minutes < severe * 0.5:
+        return SEVERITY_COLORS["mild"]
+    if minutes < severe:
+        return SEVERITY_COLORS["mid"]
+    return SEVERITY_COLORS["severe"]
+
+
+def build_lateness_ridge(cells, days, tolerance, severe, *,
+                         width=560, height=82, pad_top=12, pad_bottom=15, pad_x=8):
+    """Pre-compute SVG geometry for the per-day lateness ridge embedded in the
+    printed report: a flat fill polygon under a severity-coloured contour, peak
+    markers (late days) with their minutes, dinas baseline dots, the tolerance
+    line, and day-axis ticks — all in a fixed viewBox that scales to fit. Built
+    server-side (not JS) so it always prints."""
+    n = max(len(days), 1)
+    scale_max = max(severe * 1.33, 80.0)
+    base_y = height - pad_bottom
+    top_y = pad_top
+    usable = base_y - top_y
+    left = float(pad_x)
+    right = float(width - pad_x)
+    span = max(right - left, 1.0)
+
+    def late(d):
+        cell = cells.get(d)
+        if cell and cell.get("status") in ("sedang", "parah") and isinstance(cell.get("telat"), int):
+            return cell["telat"]
+        return 0
+
+    def y_of(m):
+        return base_y - min(m / scale_max, 1.0) * usable
+
+    coords = [(left + (i + 0.5) / n * span, y_of(late(d)), late(d))
+              for i, d in enumerate(days)]
+    fill = (f"{left:.1f},{base_y:.1f} "
+            + " ".join(f"{x:.1f},{y:.1f}" for x, y, _ in coords)
+            + f" {right:.1f},{base_y:.1f}")
+    segments = [{"x1": round(coords[i][0], 1), "y1": round(coords[i][1], 1),
+                 "x2": round(coords[i + 1][0], 1), "y2": round(coords[i + 1][1], 1),
+                 "color": severity_color(max(coords[i][2], coords[i + 1][2]), tolerance, severe)}
+                for i in range(len(coords) - 1)]
+    peaks, dinas = [], []
+    for i, d in enumerate(days):
+        cell = cells.get(d)
+        if not cell:
+            continue
+        x = left + (i + 0.5) / n * span
+        st = cell.get("status")
+        if st in ("sedang", "parah") and isinstance(cell.get("telat"), int):
+            m = cell["telat"]
+            y = y_of(m)
+            peaks.append({"x": round(x, 1), "y": round(y, 1), "m": m,
+                          "ly": round(max(y - 4, top_y - 1), 1),
+                          "color": severity_color(m, tolerance, severe)})
+        elif st == "dinas":
+            dinas.append({"x": round(x, 1)})
+    axis = [{"x": round(left + (d - 0.5) / n * span, 1), "d": d}
+            for d in sorted({1, 8, 15, 22, n}) if 1 <= d <= n]
+    return {"w": width, "h": height, "left": round(left, 1), "right": round(right, 1),
+            "base_y": round(base_y, 1), "fill": fill, "segments": segments,
+            "peaks": peaks, "dinas": dinas, "axis": axis,
+            "tol": tolerance, "tol_y": round(y_of(tolerance), 1) if tolerance > 0 else None}
+
+
 def needs_attention(summary):
     """True when the employee has an unexcused absence (X) or severe lateness (TB)."""
     return summary.get("X", 0) > 0 or summary.get("TB", 0) > 0
