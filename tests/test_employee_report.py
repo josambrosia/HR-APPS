@@ -40,3 +40,13 @@ def test_report_has_grid_and_perday_row():
     assert 'class="mx"' in html                 # mini-heatmap grid
     assert "Rincian Harian" in html             # per-day table heading
     assert "08:30" in html                      # the seeded punch appears
+
+
+def test_report_has_onscreen_sheet_frame():
+    """The browser preview frames the report as an A4 sheet (screen-only, so the
+    printout is unaffected). Guards the v21.1.0 'rapi di layar' fix."""
+    p, e = _seed()
+    with get_connection(p) as conn:
+        html = render_employee_report_html(conn, "2026-05", e)
+    assert "@media screen" in html              # framing is screen-only (no ink cost)
+    assert "210mm" in html                      # centred on an A4-width sheet

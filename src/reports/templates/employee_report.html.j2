@@ -94,6 +94,16 @@
   .foot{margin-top:14px;padding-top:8px;border-top:1px solid var(--line);
         display:flex;justify-content:space-between;font-family:var(--mono);font-size:8px;
         letter-spacing:.8px;color:var(--faint);text-transform:uppercase}
+
+  /* On-screen preview only. Frame the document as a sheet of A4 paper centred on
+     a neutral backdrop, with the same margins @page uses — so what you see in the
+     browser matches the printout. @media screen is never printed: no ink cost, and
+     the printed output stays byte-identical (real margins come from @page above). */
+  @media screen{
+    html{background:#E7E7EC}
+    body{max-width:210mm;margin:24px auto 48px;padding:14mm 14mm 12mm;background:#fff;
+         border-radius:3px;box-shadow:0 1px 2px rgba(18,18,28,.10),0 14px 40px rgba(18,18,28,.16)}
+  }
 </style></head><body>
   <div class="rule"></div>
   <div class="mast">
