@@ -131,6 +131,10 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
         summary = {k: 0 for k in _SUMMARY_KEYS}
         hk = 0
         telat_total = 0
+        worst_min = 0
+        worst_day = None
+        fh_late = sh_late = 0          # late minutes in the 1st / 2nd half of month
+        mid = n_days // 2
         for d in range(1, n_days + 1):
             tgl = f"{year_month}-{d:02d}"
             row = by_key.get((eid, tgl))
@@ -138,7 +142,14 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
                 row, tolerance=tol, severe=sev,
                 is_weekend=weekday_of[d] >= 5, is_holiday=tgl in holidays)
             if status in ("sedang", "parah"):
-                telat_total += (row["terlambat_menit"] or 0)
+                tm = row["terlambat_menit"] or 0
+                telat_total += tm
+                if tm > worst_min:
+                    worst_min, worst_day = tm, d
+                if d <= mid:
+                    fh_late += tm
+                else:
+                    sh_late += tm
             color = STATUS_COLORS[status]
             if row is not None and row["reason_category"]:
                 try:
@@ -173,10 +184,19 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
             "sakit": summary["S"],
         }
         sorotan["pct_color"] = pct_band_color(sorotan["pct_hadir"])
+        late_days = summary["TR"] + summary["TB"]
+        lateness = {
+            "worst_min": worst_min,
+            "worst_day": worst_day,
+            "avg_min": round(telat_total / late_days) if late_days else 0,
+            "trend": ("up" if sh_late > fh_late
+                      else "down" if sh_late < fh_late else "flat"),
+        }
         out_emps.append({
             "employee_id": eid, "nama": e["nama"], "dept": e.get("dept") or "",
             "hk": hk, "summary": summary, "cells": cells,
-            "sorotan": sorotan, "needs_attention": needs_attention(summary),
+            "sorotan": sorotan, "lateness": lateness,
+            "needs_attention": needs_attention(summary),
         })
 
     # Week segments for the print matrix header (M1, M2, ...) + separators.

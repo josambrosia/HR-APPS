@@ -51,6 +51,27 @@ def test_context_empty_month(temp_db_path):
     assert ctx["is_empty"] is True
 
 
+def test_context_lateness_insights(temp_db_path):
+    """The lateness panel's spotlight + stats need worst day, average per late
+    day, and the half-month trend (v21.1.0 'Pola Keterlambatan')."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="ANDI", dept="IT")
+        upsert_attendance(conn, employee_id=a, tanggal="2026-05-04", hari="Senin",
+                          tipe="Hari Kerja", jadwal="", masuk="09:40", keluar="16:30",
+                          kerja_jam=None, lembur_jam=None, terlambat_menit=100,
+                          has_issue=0, imported_from="W")
+        upsert_attendance(conn, employee_id=a, tanggal="2026-05-18", hari="Senin",
+                          tipe="Hari Kerja", jadwal="", masuk="08:30", keluar="16:30",
+                          kerja_jam=None, lembur_jam=None, terlambat_menit=30,
+                          has_issue=0, imported_from="W")
+        ctx = build_heatmap_context(conn, "2026-05", exclude_outliers=False)
+    lt = ctx["employees"][0]["lateness"]
+    assert lt["worst_min"] == 100 and lt["worst_day"] == 4   # worst day + minutes
+    assert lt["avg_min"] == 65                               # (100+30)/2
+    assert lt["trend"] == "down"                             # 2nd half (30) < 1st (100)
+
+
 def test_context_exposes_tolerance_and_severe(temp_db_path):
     """The in-app lateness lane (v21.1.0 'Pola Keterlambatan') needs the tolerance
     and severe thresholds to place its dashed guide and scale its bars."""

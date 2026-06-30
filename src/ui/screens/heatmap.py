@@ -40,9 +40,34 @@ _CELL_W = 40
 _CELL_H = 24
 _CELL_GAP = 3
 _HEAD_H = 16
-_COL_GAP = 16
 _SPOT_W = 178
 _SUM_W = 150
+
+# Bento panel tones — in-app heatmap only (tk.Canvas: solid fills, no gradient/blur).
+_BENTO_CARD = "#0F0F11"      # card surface, darker so the tiles read as raised
+_BENTO_CARD_BD = "#242428"   # card border
+_BENTO_TILE = "#17181B"      # zone-tile fill
+_BENTO_TILE_BD = "#25262B"   # zone-tile border
+_TILE_PAD = 10               # padding inside a tile
+_TILE_GAP = 11               # gap between tiles
+_RIDGE_FILL = "#201E18"      # flat area fill under the lateness ridge
+# Severity ramp for the lateness ridge: on-time green → mild amber → orange → severe red.
+_SEV_GREEN = "#10B981"
+_SEV_AMBER = "#FBBF24"
+_SEV_ORANGE = "#FB923C"
+_SEV_RED = "#EF4444"
+
+
+def _sev_color(minutes, tolerance, severe):
+    """Colour a lateness value by how severe it is (drives the ridge contour)."""
+    if minutes <= tolerance:
+        return _SEV_GREEN
+    if minutes < severe * 0.5:
+        return _SEV_AMBER
+    if minutes < severe:
+        return _SEV_ORANGE
+    return _SEV_RED
+
 
 _SORT_OPTIONS = {
     "Nama (A–Z)": "nama",
@@ -209,11 +234,6 @@ class HeatmapScreen(ctk.CTkFrame):
             emps = [e for e in emps if q in (e["nama"] + " " + e.get("dept", "")).lower()]
         return sort_employees(emps, self._sortkey)
 
-    def _card_width(self, nweeks):
-        grid_w = _WD_W + nweeks * (_CELL_W + _CELL_GAP)
-        return (_CARD_PAD + _NAME_W + _COL_GAP + grid_w + _COL_GAP + 8
-                + _SPOT_W + _COL_GAP + _SUM_W + _CARD_PAD)
-
     def _on_canvas_configure(self, event):
         if not self._ctx or self._ctx.get("is_empty"):
             return
@@ -246,7 +266,7 @@ class HeatmapScreen(ctk.CTkFrame):
         ctx = self._ctx
         avail = max(self._canvas.winfo_width(), 320)
         card_w = avail - 2 * _PAD - 20     # one card fills the row (right margin clears the scrollbar)
-        card_h = _HEAD_H + 7 * (_CELL_H + _CELL_GAP) + 2 * _CARD_PAD
+        card_h = _HEAD_H + 7 * (_CELL_H + _CELL_GAP) + 2 * _TILE_PAD + 2 * _CARD_PAD
         ncols = 1
         self._ncols = ncols
         for i, e in enumerate(emps):
@@ -259,44 +279,55 @@ class HeatmapScreen(ctk.CTkFrame):
         return self._canvas.create_polygon(pts, smooth=True, **kw)
 
     def _paint_card(self, e, x, y, card_w):
+        ctx = self._ctx
+        nweeks = len(ctx["weeks"])
+        grid_w = _WD_W + nweeks * (_CELL_W + _CELL_GAP)
+        card_right = x + card_w
+        tile_h = _HEAD_H + 7 * (_CELL_H + _CELL_GAP) + 2 * _TILE_PAD
+        card_h = tile_h + 2 * _CARD_PAD
+        ty0 = y + _CARD_PAD
+        ty1 = ty0 + tile_h
+        # card surface — tiles sit on top of it for a sense of depth
+        self._round_rect(x, y, card_right, y + card_h, RADIUS_MD,
+                         fill=_BENTO_CARD, outline=_BENTO_CARD_BD)
+        # name block (not tiled)
+        nx, ny = x + _CARD_PAD + 4, ty0 + 2
+        self._canvas.create_text(nx, ny, anchor="nw", fill=COLOR_TEXT,
+                                 font=FONT_BODY_BOLD, text=e["nama"])
+        if e.get("dept"):
+            self._canvas.create_text(nx, ny + 18, anchor="nw", fill=COLOR_TEXT_MUTED,
+                                     font=FONT_SMALL, text=e["dept"])
+        if e.get("needs_attention"):
+            self._canvas.create_text(nx, ny + 40, anchor="nw", fill=COLOR_ERROR,
+                                     font=(FONT_FAMILY, 10, "bold"), text="● Perlu perhatian")
+        # grid tile
+        gx0 = x + _CARD_PAD + _NAME_W + _TILE_GAP
+        gx1 = gx0 + grid_w + 2 * _TILE_PAD
+        self._round_rect(gx0, ty0, gx1, ty1, 9, fill=_BENTO_TILE, outline=_BENTO_TILE_BD)
+        self._paint_grid(gx0 + _TILE_PAD, ty0 + _TILE_PAD, e)
+        # Kehadiran tile
+        kx0 = gx1 + _TILE_GAP
+        kx1 = kx0 + _SPOT_W + 2 * _TILE_PAD
+        self._round_rect(kx0, ty0, kx1, ty1, 9, fill=_BENTO_TILE, outline=_BENTO_TILE_BD)
+        self._paint_sorotan(kx0 + _TILE_PAD, ty0 + _TILE_PAD, e["sorotan"])
+        # Ringkasan tile
+        rx0 = kx1 + _TILE_GAP
+        rx1 = rx0 + _SUM_W + 2 * _TILE_PAD
+        self._round_rect(rx0, ty0, rx1, ty1, 9, fill=_BENTO_TILE, outline=_BENTO_TILE_BD)
+        self._paint_summary(rx0 + _TILE_PAD, ty0 + _TILE_PAD, e)
+        # Pola Keterlambatan tile fills the rest; the Cetak button lives in its header
+        px0 = rx1 + _TILE_GAP
+        px1 = card_right - _CARD_PAD
+        if px1 - px0 >= 220:
+            self._round_rect(px0, ty0, px1, ty1, 9, fill=_BENTO_TILE, outline=_BENTO_TILE_BD)
+            self._paint_lateness(px0 + _TILE_PAD, ty0 + _TILE_PAD,
+                                 px1 - px0 - 2 * _TILE_PAD, tile_h - 2 * _TILE_PAD, e)
+        return y + card_h
+
+    def _paint_grid(self, gx, gy, e):
         c = self._canvas
         ctx = self._ctx
         weeks = ctx["weeks"]; nweeks = len(weeks)
-        grid_w = _WD_W + nweeks * (_CELL_W + _CELL_GAP)
-        card_right = x + card_w
-        gx = x + _CARD_PAD + _NAME_W + _COL_GAP   # grid after name, left side
-        grid_right = gx + grid_w
-        # Kehadiran + Ringkasan grouped right after the grid (left side), so the
-        # top-right corner stays clear for the Cetak button (no overlap).
-        sx = grid_right + _COL_GAP
-        rx = sx + _SPOT_W + _COL_GAP
-        grid_h = _HEAD_H + 7 * (_CELL_H + _CELL_GAP)
-        card_h = grid_h + 2 * _CARD_PAD
-        self._round_rect(x, y, card_right, y + card_h, RADIUS_MD,
-                         fill=COLOR_SURFACE, outline=COLOR_BORDER)
-        if e.get("needs_attention"):
-            c.create_rectangle(x, y + 6, x + 3, y + card_h - 6, fill=COLOR_ERROR, outline="")
-        nx, ny = x + _CARD_PAD, y + _CARD_PAD
-        c.create_text(nx, ny, anchor="nw", fill=COLOR_TEXT, font=FONT_BODY_BOLD, text=e["nama"])
-        if e.get("dept"):
-            c.create_text(nx, ny + 18, anchor="nw", fill=COLOR_TEXT_MUTED, font=FONT_SMALL, text=e["dept"])
-        if e.get("needs_attention"):
-            c.create_text(nx, ny + 40, anchor="nw", fill=COLOR_ERROR,
-                          font=(FONT_FAMILY, 10, "bold"), text="● Perlu perhatian")
-        bx1 = card_right - _CARD_PAD
-        bx0 = bx1 - 78
-        by0 = y + 8
-        by1 = by0 + 20
-        bid = self._round_rect(bx0, by0, bx1, by1, 6,
-                               fill=COLOR_SURFACE_HIGH, outline=COLOR_BORDER)
-        tid = c.create_text((bx0 + bx1) / 2, (by0 + by1) / 2, fill=COLOR_TEXT,
-                            font=(FONT_FAMILY, 10, "bold"), text="🖨 Cetak")
-        btn = {"_cetak_emp": e["employee_id"], "_rect": bid, "_text": tid,
-               "_bbox": (bx0, by0, bx1, by1)}
-        for it in (bid, tid):
-            c.addtag_withtag("cetak", it)
-            self._cell_by_item[it] = btn
-        gy = y + _CARD_PAD
         for w in range(nweeks):
             cx = gx + _WD_W + w * (_CELL_W + _CELL_GAP)
             c.create_text(cx + _CELL_W / 2, gy, anchor="n", fill=COLOR_TEXT_MUTED,
@@ -315,36 +346,23 @@ class HeatmapScreen(ctk.CTkFrame):
                 cx = gx + _WD_W + w * (_CELL_W + _CELL_GAP)
                 if cell["status"] == "nodata":
                     rid = c.create_rectangle(cx, ry, cx + _CELL_W, ry + _CELL_H,
-                                             fill=COLOR_SURFACE, outline=cell["color"],
+                                             fill=_BENTO_TILE, outline=cell["color"],
                                              tags=("cell", "cellrect"))
-                    tid = c.create_text(cx + 4, ry + 2, anchor="nw",
-                                        fill=COLOR_TEXT_MUTED,
-                                        font=(FONT_FAMILY, 10, "bold"),
-                                        text=str(day), tags=("cell",))
+                    tid = c.create_text(cx + 4, ry + 2, anchor="nw", fill=COLOR_TEXT_MUTED,
+                                        font=(FONT_FAMILY, 10, "bold"), text=str(day), tags=("cell",))
                 else:
                     rid = c.create_rectangle(cx, ry, cx + _CELL_W, ry + _CELL_H,
-                                             fill=cell["color"], outline="",
-                                             tags=("cell", "cellrect"))
-                    tid = c.create_text(cx + 4, ry + 2, anchor="nw",
-                                        fill=cell["text_color"],
-                                        font=(FONT_FAMILY, 10, "bold"),
-                                        text=str(day), tags=("cell",))
+                                             fill=cell["color"], outline="", tags=("cell", "cellrect"))
+                    tid = c.create_text(cx + 4, ry + 2, anchor="nw", fill=cell["text_color"],
+                                        font=(FONT_FAMILY, 10, "bold"), text=str(day), tags=("cell",))
                 self._cell_by_item[rid] = cell
                 self._cell_by_item[tid] = cell
                 if today_day and day == today_day:
                     c.create_rectangle(cx, ry, cx + _CELL_W, ry + _CELL_H,
                                        outline=COLOR_TEXT, width=2)
-        self._paint_sorotan(sx, y + _CARD_PAD, e["sorotan"])
-        self._paint_summary(rx, y + _CARD_PAD, e)
-        tx = rx + _SUM_W + _COL_GAP
-        lane_w = (card_right - _CARD_PAD) - tx
-        if lane_w >= 210:
-            self._paint_timeline(tx, y + _CARD_PAD, lane_w, grid_h, e)
-        return y + card_h
 
     def _paint_sorotan(self, sx, sy, s):
         c = self._canvas
-        c.create_line(sx - 10, sy, sx - 10, sy + 166, fill=COLOR_BORDER)
         c.create_text(sx, sy, anchor="nw", fill=COLOR_TEXT_DIM, font=FONT_SMALL, text="Kehadiran")
         c.create_text(sx + _SPOT_W - 12, sy - 4, anchor="ne", fill=s["pct_color"],
                       font=(FONT_FAMILY, 18, "bold"), text=f"{s['pct_hadir']}%")
@@ -366,7 +384,6 @@ class HeatmapScreen(ctk.CTkFrame):
 
     def _paint_summary(self, rx, sy, e):
         c = self._canvas
-        c.create_line(rx - 10, sy, rx - 10, sy + 166, fill=COLOR_BORDER)
         c.create_text(rx, sy, anchor="nw", fill=COLOR_TEXT_MUTED, font=FONT_SMALL,
                       text=f"Ringkasan — HK {e['hk']}")
         summ = e["summary"]
@@ -378,68 +395,146 @@ class HeatmapScreen(ctk.CTkFrame):
             c.create_text(ex + 16, ey, anchor="nw", fill=COLOR_TEXT_DIM, font=FONT_SMALL,
                           text=f"{m['code']} {summ[m['code']]}")
 
-    def _paint_timeline(self, tx, ty, tw, th, e):
-        """Per-day lateness lane that fills the card's right gutter. One mark per
-        day: on-time = baseline dot, dinas/justified = teal tick, late = a bar
-        whose height ∝ minutes late (capped); a dashed line marks the tolerance.
-        Turns the empty space into the one thing the colour grid can't show —
-        when and how badly someone runs late across the month."""
+    def _paint_lateness(self, tx, ty, tw, th, e):
+        """The 'Pola Keterlambatan' tile: a severity-gradient ridge of daily
+        lateness (a peak = a late day, height ∝ minutes, colour = how severe),
+        the month's worst day spotlighted with average & half-month trend below,
+        and the Cetak button in its header. Late peaks reuse the cell tooltip on
+        hover. tk.Canvas can't gradient-fill, so the area is a flat tint under a
+        severity-coloured contour line."""
         c = self._canvas
         ctx = self._ctx
-        n_days = len(ctx["days"])
+        cells = e["cells"]
+        days = ctx["days"]
+        n_days = len(days)
         tol = ctx.get("late_tolerance") or 0
         sev = ctx.get("severe_threshold") or 0
-        scale_max = max(float(sev), 60.0)
+        scale_max = max(sev * 1.33, 80.0)
 
-        # left separator (matches the other panels) + caption
-        c.create_line(tx - 10, ty, tx - 10, ty + 166, fill=COLOR_BORDER)
+        # header: caption (left) + Cetak button (right, always magenta)
         c.create_text(tx, ty, anchor="nw", fill=COLOR_TEXT_DIM, font=FONT_SMALL,
                       text="Pola Keterlambatan")
-        c.create_text(tx, ty + 15, anchor="nw", fill=COLOR_TEXT_MUTED,
-                      font=(FONT_FAMILY, 8), text="menit telat / hari")
+        bx1 = tx + tw
+        bx0 = bx1 - 74
+        by0, by1 = ty - 2, ty + 18
+        bid = self._round_rect(bx0, by0, bx1, by1, 6, fill=COLOR_ACCENT, outline=COLOR_ACCENT)
+        tid = c.create_text((bx0 + bx1) / 2, (by0 + by1) / 2, fill=COLOR_BG,
+                            font=(FONT_FAMILY, 10, "bold"), text="🖨 Cetak")
+        btn = {"_cetak_emp": e["employee_id"], "_bbox": (bx0, by0, bx1, by1)}
+        for it in (bid, tid):
+            c.addtag_withtag("cetak", it)
+            self._cell_by_item[it] = btn
 
-        base_y = ty + th - 16
-        top_y = ty + 36
-        usable = base_y - top_y
-        left = tx
-        right = tx + tw - 8
+        # chart geometry (between the header and the bottom stat strip)
+        fill_h = 64
+        div_y = ty + th - fill_h
+        chart_top = ty + 24
+        base_y = div_y - 20
+        top_y = chart_top + 8
+        usable = max(base_y - top_y, 12)
+        left, right = tx, tx + tw
         span = max(right - left, 1)
 
         def day_x(d):
             return left + (d - 0.5) / n_days * span
 
-        # tolerance guide (dashed) + label, then the baseline
+        def y_of(m):
+            return base_y - min(m / scale_max, 1.0) * usable
+
+        def late_min(d):
+            cell = cells[d]
+            if cell["status"] in ("sedang", "parah") and isinstance(cell["telat"], int):
+                return cell["telat"]
+            return 0
+
+        # tolerance guide + baseline
         if tol > 0:
-            tol_y = base_y - min(tol / scale_max, 1.0) * usable
-            c.create_line(left, tol_y, right, tol_y, fill="#5A4A2A", dash=(3, 3))
-            c.create_text(right, tol_y - 9, anchor="ne", fill=COLOR_TEXT_MUTED,
+            ytol = y_of(tol)
+            c.create_line(left, ytol, right, ytol, fill="#5A4A2A", dash=(3, 3))
+            c.create_text(left + 1, ytol - 2, anchor="sw", fill=COLOR_TEXT_MUTED,
                           font=(FONT_FAMILY, 8), text=f"toleransi {tol}m")
         c.create_line(left, base_y, right, base_y, fill=COLOR_BORDER)
 
-        bw = max(3.0, min(7.0, span / n_days - 3))
-        cells = e["cells"]
-        for d in range(1, n_days + 1):
+        # flat filled area (no gradients on tk.Canvas)
+        pts = [left, base_y]
+        for d in days:
+            pts += [day_x(d), y_of(late_min(d))]
+        pts += [right, base_y]
+        c.create_polygon(pts, fill=_RIDGE_FILL, outline="")
+        # severity-coloured contour, segment by segment
+        prev = None
+        for d in days:
+            cur = (day_x(d), y_of(late_min(d)), late_min(d))
+            if prev is not None:
+                c.create_line(prev[0], prev[1], cur[0], cur[1],
+                              fill=_sev_color(max(prev[2], cur[2]), tol, sev), width=2)
+            prev = cur
+        # dinas baseline ticks + late peaks (dot + minute label; hoverable via "cell")
+        for d in days:
             cell = cells[d]
             st = cell["status"]
-            col = cell["color"]
             cx = day_x(d)
-            if st in ("sedang", "parah"):
-                mins = cell["telat"] if isinstance(cell["telat"], int) else 0
-                h = max(3.0, min(mins / scale_max, 1.0) * usable)
-                c.create_rectangle(cx - bw / 2, base_y - h, cx + bw / 2, base_y,
-                                   fill=col, outline="")
-            elif st == "hadir":
+            if st == "dinas":
                 c.create_oval(cx - 2.4, base_y - 2.4, cx + 2.4, base_y + 2.4,
-                              fill=col, outline="")
-            elif st == "dinas":
-                c.create_rectangle(cx - 3, base_y - 4, cx + 3, base_y, fill=col, outline="")
-            elif st in ("sakit", "cuti", "lupa", "mangkir"):
-                c.create_rectangle(cx - 3, base_y - 3, cx + 3, base_y, fill=col, outline="")
-            # libur / nodata: nothing drawn
+                              fill=cell["color"], outline="")
+            elif st in ("sedang", "parah") and isinstance(cell["telat"], int):
+                m = cell["telat"]
+                py = y_of(m)
+                col = _sev_color(m, tol, sev)
+                did = c.create_oval(cx - 2.8, py - 2.8, cx + 2.8, py + 2.8,
+                                    fill=col, outline="", tags=("cell",))
+                lid = c.create_text(cx, max(py - 6, top_y - 6), anchor="s", fill=col,
+                                    font=(FONT_FAMILY, 8, "bold"), text=str(m), tags=("cell",))
+                self._cell_by_item[did] = cell
+                self._cell_by_item[lid] = cell
+        # day-of-month axis
         for d in sorted({1, 8, 15, 22, n_days}):
             if 1 <= d <= n_days:
                 c.create_text(day_x(d), base_y + 3, anchor="n", fill=COLOR_TEXT_MUTED,
                               font=(FONT_FAMILY, 8), text=str(d))
+
+        # ---- stat strip: spotlight (worst day) + average + half-month trend, as
+        #      three evenly-spaced columns so wide tiles don't strand the values ----
+        c.create_line(left, div_y, right, div_y, fill="#23242A")
+        lt = e["lateness"]
+        sy = div_y + 7
+        spot_w = int(tw * 0.40)
+        col1 = tx + spot_w
+        col2 = col1 + (tw - spot_w) // 2
+        c.create_line(col1 - 12, div_y + 6, col1 - 12, ty + th - 2, fill="#262730")
+        c.create_line(col2 - 12, div_y + 6, col2 - 12, ty + th - 2, fill="#262730")
+        # spotlight — Puncak Keterlambatan (worst day)
+        c.create_text(tx, sy, anchor="nw", fill=COLOR_TEXT_MUTED,
+                      font=(FONT_FAMILY, 8, "bold"), text="PUNCAK KETERLAMBATAN")
+        if lt["worst_min"] > 0:
+            wc = _sev_color(lt["worst_min"], tol, sev)
+            big = c.create_text(tx, sy + 12, anchor="nw", fill=wc,
+                                font=(FONT_FAMILY, 22, "bold"), text=str(lt["worst_min"]))
+            bb = c.bbox(big)
+            if bb:
+                c.create_text(bb[2] + 1, bb[3] - 4, anchor="sw", fill=COLOR_TEXT_MUTED,
+                              font=(FONT_FAMILY, 11), text="m")
+            mon3 = ctx["month_label"].split()[0][:3]
+            c.create_text(tx, sy + 41, anchor="nw", fill=COLOR_TEXT_DIM,
+                          font=(FONT_FAMILY, 9), text=f"{lt['worst_day']} {mon3}")
+        else:
+            c.create_text(tx, sy + 16, anchor="nw", fill=COLOR_TEXT_DIM,
+                          font=(FONT_FAMILY, 14, "bold"), text="—")
+            c.create_text(tx, sy + 41, anchor="nw", fill=COLOR_TEXT_MUTED,
+                          font=(FONT_FAMILY, 9), text="tidak ada")
+        # average per late day
+        c.create_text(col1, sy, anchor="nw", fill=COLOR_TEXT_MUTED,
+                      font=(FONT_FAMILY, 8, "bold"), text="RATA² / HARI TELAT")
+        c.create_text(col1, sy + 13, anchor="nw", fill=COLOR_TEXT,
+                      font=(FONT_FAMILY, 16, "bold"), text=f"{lt['avg_min']}m")
+        # half-month trend
+        ttxt, tcol = {"up": ("↑ naik", _SEV_ORANGE),
+                      "down": ("↓ turun", _SEV_GREEN),
+                      "flat": ("→ tetap", COLOR_TEXT_DIM)}[lt["trend"]]
+        c.create_text(col2, sy, anchor="nw", fill=COLOR_TEXT_MUTED,
+                      font=(FONT_FAMILY, 8, "bold"), text="TREN ½ BULAN")
+        c.create_text(col2, sy + 13, anchor="nw", fill=tcol,
+                      font=(FONT_FAMILY, 15, "bold"), text=ttxt)
 
     # ---------- hover / click ----------
     def _current_cell(self):
@@ -500,15 +595,13 @@ class HeatmapScreen(ctk.CTkFrame):
         return "break"
 
     def _on_cetak_enter(self, _event):
-        """Hover affordance: light the button magenta with inverted text + a hand
-        cursor, mirroring the dashboard's Cetak button (which is a real CTkButton)."""
+        """The button stays magenta; hover only swaps the cursor to a hand to
+        signal it's clickable (like the dashboard's Cetak button)."""
         item = self._canvas.find_withtag("current")
         info = self._cell_by_item.get(item[0]) if item else None
-        if not info or "_rect" not in info:
+        if not info or "_bbox" not in info:
             return
         self._cetak_hover = info
-        self._canvas.itemconfigure(info["_rect"], fill=COLOR_ACCENT, outline=COLOR_ACCENT)
-        self._canvas.itemconfigure(info["_text"], fill=COLOR_BG)
         self._canvas.configure(cursor="hand2")
 
     def _on_cetak_leave(self, event):
@@ -516,16 +609,11 @@ class HeatmapScreen(ctk.CTkFrame):
         if not info:
             return
         # The rect and its label are two items; moving between them fires Leave.
-        # Only un-hover when the pointer truly exits the button's bounding box.
+        # Only drop the hand cursor once the pointer truly exits the button box.
         cx, cy = self._canvas.canvasx(event.x), self._canvas.canvasy(event.y)
         x0, y0, x1, y1 = info["_bbox"]
         if x0 <= cx <= x1 and y0 <= cy <= y1:
             return
-        try:
-            self._canvas.itemconfigure(info["_rect"], fill=COLOR_SURFACE_HIGH, outline=COLOR_BORDER)
-            self._canvas.itemconfigure(info["_text"], fill=COLOR_TEXT)
-        except tk.TclError:
-            pass
         self._canvas.configure(cursor="")
         self._cetak_hover = None
 
