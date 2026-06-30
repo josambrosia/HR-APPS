@@ -1,21 +1,11 @@
 from src import config
 
 
-def test_version_is_v21_1():
-    assert config.APP_VERSION == "21.0.1"
-
-
-def test_build_date_is_v21_1():
-    assert config.APP_BUILD_DATE == "2026-06-30"
-
-
-def test_changelog_top_is_v21_1():
-    top = config.APP_CHANGELOG[0]
-    assert top["version"] == "21.0.1"
-    assert top["date"] == "2026-06-30"
-    kinds = [k for k, _ in top["changes"]]
-    # v21.0.1 = in-app Cetak-overlap fix + per-employee report redesign
-    assert "fix" in kinds and "change" in kinds
-    blob = " ".join(d for _, d in top["changes"])
+def test_changelog_retains_v21_0_1_entry():
+    """v21.0.1 entry must remain in history (newer versions prepend, not drop)."""
+    entry = next(
+        (e for e in config.APP_CHANGELOG if e["version"] == "21.0.1"), None)
+    assert entry is not None, "v21.0.1 changelog entry must be preserved"
+    blob = " ".join(d for _, d in entry["changes"])
     assert "Report Kehadiran" in blob
     assert "Cetak" in blob

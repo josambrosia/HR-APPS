@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "21.0.1"
+APP_VERSION = "21.1.0"
 APP_BUILD_DATE = "2026-06-30"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
@@ -17,6 +17,24 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "21.1.0",
+        "date": "2026-06-30",
+        "changes": [
+            ("feat", "Heatmap: kartu pegawai kini menampilkan \"Pola "
+                     "Keterlambatan\" di ruang kanan yang dulu kosong — satu "
+                     "tanda per hari kerja (tinggi bar = menit telat, warna = "
+                     "tingkat, garis putus-putus = batas toleransi) sehingga "
+                     "terlihat kapan & seberapa parah keterlambatan sebulan."),
+            ("change", "Heatmap: tombol \"Cetak\" di tiap kartu pegawai kini "
+                       "punya efek hover (menyala magenta + kursor tangan) "
+                       "seperti tombol Cetak di Dashboard."),
+            ("fix", "Laporan cetak per-pegawai kini rapi saat dibuka di browser "
+                    "(sebelumnya melebar memenuhi layar) — ditampilkan sebagai "
+                    "lembar A4 di tengah dengan margin; hasil cetak tidak "
+                    "berubah."),
+        ],
+    },
     {
         "version": "21.0.1",
         "date": "2026-06-30",
