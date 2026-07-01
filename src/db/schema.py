@@ -81,6 +81,13 @@ CREATE TABLE IF NOT EXISTS holidays (
     tanggal    TEXT NOT NULL PRIMARY KEY,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS wa_contacts (
+    employee_id  INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    year_month   TEXT    NOT NULL,
+    contacted_at TEXT    NOT NULL,
+    PRIMARY KEY (employee_id, year_month)
+);
 """
 
 DEFAULT_SETTINGS = {
