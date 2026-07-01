@@ -147,10 +147,11 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
         q = self._search_var.get().strip().lower()
         rows = [r for r in self._rows_cache if q in r["nama"].lower()]
         if not rows:
-            ctk.CTkLabel(self.list_frame, text=empty_msg, font=FONT_BODY,
+            msg = "(tak ada nama yang cocok)" if q and self._rows_cache else empty_msg
+            ctk.CTkLabel(self.list_frame, text=msg, font=FONT_BODY,
                          text_color=COLOR_TEXT_MUTED).pack(pady=20)
             return
-        rows.sort(key=lambda r: (r["id"] in self._contacted, r["nama"]))
+        rows.sort(key=lambda r: (r["id"] in self._contacted, r["nama"].lower()))
         for r in rows:
             self._list_row(r)
 
