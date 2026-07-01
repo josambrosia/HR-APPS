@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "21.1.0"
-APP_BUILD_DATE = "2026-06-30"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "21.2.0"
+APP_BUILD_DATE = "2026-07-02"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,23 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "21.2.0",
+        "date": "2026-07-02",
+        "changes": [
+            ("feat", "WhatsApp Assistant kini menyusun pesan siap kirim: ada "
+                     "preview WhatsApp langsung, dan tombol Kirim membuka WhatsApp "
+                     "dengan teks SUDAH terisi (tidak lagi membuka chat kosong)."),
+            ("feat", "Template pesan bertanda tangan HR (nama dari Settings) dengan "
+                     "pilihan nada Formal/Ramah dan catatan tambahan; teks bisa "
+                     "disunting langsung sebelum dikirim atau disalin."),
+            ("feat", "Tandai \"sudah dihubungi\" per pegawai untuk bulan aktif, plus "
+                     "indikator status nomor HP dan kotak pencarian di daftar pegawai."),
+            ("change", "Panel WhatsApp Assistant didesain ulang jadi \"compose\": "
+                       "identitas pegawai (avatar, dept, nomor), rincian issue, dan "
+                       "gelembung pesan ala WhatsApp."),
+        ],
+    },
     {
         "version": "21.1.0",
         "date": "2026-06-30",
