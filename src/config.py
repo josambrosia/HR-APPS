@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "21.2.0"
-APP_BUILD_DATE = "2026-07-02"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "22.0.0"
+APP_BUILD_DATE = "2026-07-03"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,33 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "22.0.0",
+        "date": "2026-07-03",
+        "changes": [
+            ("change", "Aplikasi tidak lagi membeku saat proses berat: Export, "
+                       "Generate, Preview, dan Import kini berjalan di latar "
+                       "belakang dengan indikator progres, dan tombol otomatis "
+                       "nonaktif selama proses — klik ganda tidak lagi memicu "
+                       "proses dobel."),
+            ("change", "Pindah antar menu kini instan: layar tidak dibangun "
+                       "ulang dari nol — kata pencarian, minggu terpilih, file "
+                       "yang sudah dipilih, dan isi tampilan tetap tersimpan "
+                       "saat kembali; data terbaru otomatis dimuat ulang."),
+            ("change", "Semua pop-up konfirmasi & error kini memakai dialog "
+                       "gelap yang konsisten dengan tema aplikasi (tidak ada "
+                       "lagi pop-up putih bawaan Windows); konfirmasi ringan "
+                       "seperti \"Tersalin\" tampil sebagai toast kecil."),
+            ("change", "Pencarian di Issues, Severe Lateness, Heatmap, dan "
+                       "WhatsApp Assistant lebih halus (hasil diperbarui "
+                       "setelah jeda ketik singkat), dan Heatmap tidak lagi "
+                       "tersendat saat ukuran jendela diubah."),
+            ("change", "Perapian internal besar: Issues & Severe Lateness kini "
+                       "berbagi satu fondasi kode, semua warna aksen memakai "
+                       "token tema terpusat, dan akses database dirapikan ke "
+                       "lapisan data — perilaku antar layar dijamin seragam."),
+        ],
+    },
     {
         "version": "21.2.0",
         "date": "2026-07-02",

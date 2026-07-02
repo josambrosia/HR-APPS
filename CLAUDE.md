@@ -108,28 +108,25 @@ GIT_SSH_COMMAND="C:/Windows/System32/OpenSSH/ssh.exe" git push origin vN
 tasklist | grep -i HR-Absensi || echo "not running"
 ```
 
-## Current state (as of last commit) — HANDOFF for next session
+## Current state (2026-07-03) — HANDOFF for next session
 
-**Branch:** `claude/inspiring-dhawan-47161f` · **HEAD:** `720672c` · tree clean. `APP_VERSION = 18.0.0`.
+**Branch:** `v22.0.0` (forked from local `v21.2.0`) · `APP_VERSION = 22.0.0`.
 
-### What's done (LOCAL only — nothing pushed)
-- **v17.0.0** (commit `02d4bb4`) = Severe Lateness menu. Installer built (`Installers/HR-Absensi-Setup-v17.0.0.exe`). **NOT pushed — held.**
-- **v18.0.0** = **Heatmap Kehadiran**, rendered **IN-APP** (customtkinter + `tk.Canvas`). Pivoted from an earlier browser/loopback-server design (server removed). ~32 commits on top of v17. Features:
-  - In-app heatmap screen `src/ui/screens/heatmap.py`: per-employee grid + **Panel Sorotan** (% kehadiran + bar + HK/total ratio + tepat waktu + total telat + dinas/sakit) + Ringkasan; **sort** dropdown (nama / kehadiran terendah / paling telat / paling absen), **"Perlu perhatian"** red accent (X or TB), **"hari ini"** outline, hover tooltip + click→detail strip, **responsive multi-column reflow** by window width, Ctrl+F + click-outside-blur.
-  - Pure logic in `src/core/heatmap.py`: `cell_status`, `build_heatmap_context` (+ per-emp `sorotan`, `today_day`), `pct_band_color`, `needs_attention`, `sort_employees`.
-  - **Print** (server-free): `src/reports/heatmap_print.py::render_heatmap_print_html` → temp `.html` → `open_html_in_browser` (Cetak-Dashboard idiom). Appendix shows short `D · Dinas`, wide Alasan / narrow Masuk-Keluar-Telat, and **HR Officer name from Settings** in the header.
-  - New setting **Toleransi Telat (menit)** (default 12).
-  - Smoke fixes applied: multi-column layout, Cetak→browser (str-path `.as_uri` crash in `browser_launcher`), Dinas short label, appendix column widths, **HR Officer print header** (commit `720672c`).
-- **Test baseline: 363 passing — confirmed green at HEAD `720672c`.** (`../../../.venv/Scripts/python.exe -m pytest -q`)
-- Specs/plans: `docs/superpowers/specs/2026-06-10-v18-heatmap-dashboard-design.md` (revised v2 in-app), `docs/superpowers/plans/2026-06-10-v18-heatmap-inapp.md`.
+### v22.0.0 = "Frontend Quality Pass" (P0+P1 dari audit frontend 2026-07-03)
+No new features — behavior/architecture hardening. Plan: `docs/superpowers/plans/2026-07-03-v22-frontend-quality-pass.md`. Highlights:
+- **Non-blocking UI**: Export/Generate/Preview/Import berjalan via `src/ui/tasks.py::run_bg` (worker thread + queue + `after` polling; worker buka koneksi SQLite sendiri) + `BusyGuard` anti klik-ganda.
+- **Screen caching**: `app.py._show` menyimpan instance layar (`grid_remove`/`grid`), memanggil kontrak `on_show()` pada tiap re-display (semua 12 layar punya `on_show` — selalu re-read data volatil, chrome tidak dibangun ulang). `WeekNavBar.sync()` untuk bar persisten.
+- **ResolveScreenBase** (`src/ui/screens/resolve_base.py`): `issues.py` (485→37 LOC) dan `severe_lateness.py` (476→70) kini subclass tipis.
+- **feedback.py + MessageDialog**: semua `tkinter.messagebox` diganti dialog gelap; sukses ringan → toast.
+- **Token & komponen**: tint semantik terpusat di `theme.py` (zero hex liar di semua screen kecuali palet lokal bernama `_WA_*`/`_BENTO_*` + `#0F0F0F` dropzone); komponen shared baru: ActiveMonthBanner, EmptyStateCard, FileChip, HistoryList; `core/week_utils.py` = resolve_period/week_range/parse_week_key/MONTH_NAMES_ID (dedup 4× resolver + 3× dict bulan).
+- **SearchBar debounce** (200ms di resolve/heatmap/whatsapp), heatmap resize throttle, SQL mentah keluar dari layar UI ke `src/db/`.
 
-### ⚠️ IMMEDIATE NEXT STEPS (do these in the CLI session)
-1. **Full suite already green — 363 passed at HEAD `720672c`.** No need to re-run unless you change code.
-2. **REBUILD the installer** ← *start here* — the current prod `.exe` + `Installers/HR-Absensi-Setup-v18.0.0.exe` were built **before** the HR-Officer-fix commit `720672c`, so they do **NOT** include it yet. Run `export PATH="/c/Program Files (x86)/Inno Setup 6:$PATH" && python -m tools.build_installer` → rotate prod `dist/HR-Absensi/` 2-level (never touch `data/`) → copy to `Installers/HR-Absensi-Setup-v18.0.0.exe`.
-3. **HOLD push.** BOTH `v17` and `v18` are unpushed and require **explicit user authorization** (Rule 1). When authorized: `git push origin HEAD:v18`, advance `latest` (`HEAD:latest`), and push/tag `v17` too; then update `memory/version_state.md`.
+### Push state (verified 2026-07-03)
+- `origin/v21` = `origin/latest` = `0ff4e6c` — jadi **v21.1.0 + v21.2.0 (sampai `7e3ddee`) + seluruh v22 masih LOKAL, belum dipush**. Rule 1 tetap: push hanya dengan otorisasi eksplisit user. Saat diotorisasi: push `v21.2.0` (opsional, atau langsung) + `git push origin v22.0.0`, lalu advance `latest`; update `memory/version_state.md`.
 
 ### Notes
-- Latest installer `Installers/HR-Absensi-Setup-v18.0.0.exe` (in-app v18, but pre-HR-officer-fix → rebuild per step 2). Older v17/v16.x installers preserved for rollback.
-- Product screenshots were captured via a dummy dev DB (`seed_dummy.py` + `worktree/data/hr.db`) and then **removed** (tree clean). Re-seed only if more screenshots are needed; never point screenshots at production data.
+- Suite penuh hijau (500+ tests, ±2 menit). Test lama yang nge-hang di dialog native sudah dipatch (`test_settings_screen_severe_lateness.py`).
+- Screenshots di `Screenshots/` + 4 mockup HTML `_mockup_v*.html` + `color-palette.txt` di root = artefak eksplorasi desain (untracked, sengaja).
+- Arah desain laporan cetak (editorial dsb.) BELUM dieksekusi — kandidat v22.1/v23 (lihat item P2 di plan doc).
 
-Subsequent work forks from `v18.0.0`.
+Subsequent work forks from `v22.0.0`.
