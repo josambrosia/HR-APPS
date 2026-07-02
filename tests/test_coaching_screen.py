@@ -50,3 +50,25 @@ def test_coaching_writes_period_state_on_change(temp_db_path, monkeypatch, tk_ro
     tk_root.update_idletasks()
     assert period_state.get() == "minggu_3"
     screen.destroy()
+
+
+def test_coaching_on_show_resyncs_nav_and_threshold(temp_db_path, monkeypatch, tk_root):
+    """on_show re-reads month/threshold and re-syncs the pills. With
+    include_all=False, a session 'semua' falls back to minggu_1 exactly
+    like __init__ does."""
+    from src.core.session_state import period_state
+    import src.ui.screens.coaching as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    _setup_db(temp_db_path)
+    period_state.set("minggu_2")
+    screen = mod.CoachingScreen(tk_root)
+    tk_root.update_idletasks()
+    assert screen.nav.active == "minggu_2"
+    period_state.reset()  # back to "semua" (chosen on another screen)
+    with get_connection(temp_db_path) as conn:
+        set_setting(conn, "coaching_threshold_per_day", "25")
+    screen.on_show()
+    tk_root.update_idletasks()
+    assert screen.nav.active == "minggu_1"   # internal fallback, same as __init__
+    assert screen._daily_threshold == 25     # threshold re-read from DB
+    screen.destroy()

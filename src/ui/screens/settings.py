@@ -1,20 +1,21 @@
 from tkinter import ttk
 import customtkinter as ctk
-from tkinter import messagebox
 
 from src.config import DB_PATH
+from src.core.session_state import notify_data_changed
 from src.db.connection import get_connection
 from src.db.settings import get_setting, set_setting
-from src.db.employees import list_employees
+from src.db.employees import list_employees, toggle_employee_active
+from src.ui import feedback
+from src.ui.components.tree_style import style_treeview
 from src.ui.theme import (
-    FONT_FAMILY,
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
     COLOR_BORDER,
     COLOR_ACCENT, COLOR_ACCENT_HOVER,
     COLOR_SECONDARY, COLOR_SECONDARY_HOVER,
     COLOR_INFO, COLOR_SUCCESS,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
-    FONT_DISPLAY, FONT_HEADING,
+    FONT_DISPLAY,
     FONT_BODY, FONT_BODY_BOLD, FONT_SMALL,
     SPACE_XS, SPACE_SM, SPACE_MD,
     RADIUS_MD,
@@ -28,27 +29,7 @@ class SettingsScreen(ctk.CTkFrame):
         self._build()
 
     def _setup_treeview_style(self):
-        style = ttk.Style()
-        try:
-            style.theme_use("clam")
-        except Exception:
-            pass
-        style.configure(
-            "Pegawai.Treeview",
-            background=COLOR_SURFACE, fieldbackground=COLOR_SURFACE,
-            foreground=COLOR_TEXT, rowheight=24, borderwidth=0,
-            font=FONT_SMALL,
-        )
-        style.configure(
-            "Pegawai.Treeview.Heading",
-            background=COLOR_SURFACE_HIGH, foreground=COLOR_TEXT_MUTED,
-            relief="flat", font=(FONT_FAMILY, 9, "bold"),
-        )
-        style.map(
-            "Pegawai.Treeview",
-            background=[("selected", COLOR_SURFACE_HIGH)],
-            foreground=[("selected", COLOR_TEXT)],
-        )
+        style_treeview("Pegawai.Treeview", rowheight=24)
 
     def _build(self):
         ctk.CTkLabel(
@@ -138,10 +119,11 @@ class SettingsScreen(ctk.CTkFrame):
             corner_radius=RADIUS_MD,
         )
         row3.pack(fill="x", pady=SPACE_SM)
-        ctk.CTkLabel(
+        self._sched_label = ctk.CTkLabel(
             row3, text=f"Jadwal Kerja: {sched_start} - {sched_end}",
             font=FONT_BODY, text_color=COLOR_TEXT,
-        ).pack(side="left", padx=SPACE_MD, pady=SPACE_SM + 2)
+        )
+        self._sched_label.pack(side="left", padx=SPACE_MD, pady=SPACE_SM + 2)
 
         row4 = ctk.CTkFrame(
             parent, fg_color=COLOR_SURFACE,
@@ -327,10 +309,7 @@ class SettingsScreen(ctk.CTkFrame):
 
     def _toggle_active(self, employee_id: int):
         with get_connection(DB_PATH) as conn:
-            conn.execute(
-                "UPDATE employees SET active = 1 - active WHERE id = ?",
-                (employee_id,),
-            )
+            toggle_employee_active(conn, employee_id)
         self._reload_pegawai()
 
     def _save(self):
@@ -339,14 +318,14 @@ class SettingsScreen(ctk.CTkFrame):
         try:
             penalty = int(raw)
         except ValueError:
-            messagebox.showwarning(
-                "Penalti tidak valid",
+            feedback.show_warning(
+                self, "Penalti tidak valid",
                 f"'{raw}' bukan angka. Penalti harus berupa bilangan "
                 f"bulat antara 0 dan 999.")
             return
         if penalty < 0 or penalty > 999:
-            messagebox.showwarning(
-                "Penalti di luar rentang",
+            feedback.show_warning(
+                self, "Penalti di luar rentang",
                 f"{penalty} di luar rentang yang diizinkan. "
                 f"Penalti harus antara 0 dan 999 menit.")
             return
@@ -355,14 +334,14 @@ class SettingsScreen(ctk.CTkFrame):
         try:
             severe = int(raw_sev)
         except ValueError:
-            messagebox.showwarning(
-                "Threshold tidak valid",
+            feedback.show_warning(
+                self, "Threshold tidak valid",
                 f"'{raw_sev}' bukan angka. Threshold harus bilangan bulat "
                 f"antara 1 dan 999.")
             return
         if severe < 1 or severe > 999:
-            messagebox.showwarning(
-                "Threshold di luar rentang",
+            feedback.show_warning(
+                self, "Threshold di luar rentang",
                 f"{severe} di luar rentang. Threshold harus antara 1 dan 999 menit.")
             return
         # Validate Toleransi Telat: integer in [0, 999]
@@ -370,14 +349,14 @@ class SettingsScreen(ctk.CTkFrame):
         try:
             tol = int(raw_tol)
         except ValueError:
-            messagebox.showwarning(
-                "Toleransi tidak valid",
+            feedback.show_warning(
+                self, "Toleransi tidak valid",
                 f"'{raw_tol}' bukan angka. Toleransi harus bilangan bulat "
                 f"antara 0 dan 999.")
             return
         if tol < 0 or tol > 999:
-            messagebox.showwarning(
-                "Toleransi di luar rentang",
+            feedback.show_warning(
+                self, "Toleransi di luar rentang",
                 f"{tol} di luar rentang. Toleransi harus antara 0 dan 999 menit.")
             return
         with get_connection(DB_PATH) as conn:
@@ -386,9 +365,34 @@ class SettingsScreen(ctk.CTkFrame):
             set_setting(conn, "lupa_absen_datang_penalty_min", str(penalty))
             set_setting(conn, "severe_lateness_threshold_min", str(severe))
             set_setting(conn, "late_tolerance_min", str(tol))
-        messagebox.showinfo("Tersimpan", "Pengaturan disimpan.")
+        # Thresholds/tolerance/month feed cached analytics (Dashboard memoizes
+        # per data_version) — bump so cached screens refetch on next show.
+        notify_data_changed()
+        feedback.show_info(self, "Tersimpan", "Pengaturan disimpan.")
 
     def _save_profil(self):
         with get_connection(DB_PATH) as conn:
             set_setting(conn, "hr_officer_name", self.hr_name_var.get().strip())
-        messagebox.showinfo("Tersimpan", "Profil disimpan.")
+        feedback.show_info(self, "Tersimpan", "Profil disimpan.")
+
+    def on_show(self):
+        """Shell hook — called on every re-display of the cached screen.
+
+        Re-reads every editable value from the DB (unsaved edits in the
+        entries are discarded — same as the old rebuild-on-navigation
+        behavior) and refreshes the pegawai list. Chrome is reused."""
+        with get_connection(DB_PATH) as conn:
+            self.month_var.set(get_setting(conn, "current_month", default=""))
+            self.thr_var.set(
+                get_setting(conn, "coaching_threshold_per_day", default="15"))
+            self.lupa_penalty_var.set(
+                get_setting(conn, "lupa_absen_datang_penalty_min", default="15"))
+            self.severe_var.set(
+                get_setting(conn, "severe_lateness_threshold_min", default="60"))
+            self.tol_var.set(get_setting(conn, "late_tolerance_min", default="12"))
+            self.hr_name_var.set(get_setting(conn, "hr_officer_name", default=""))
+            sched_start = get_setting(conn, "schedule_start", default="08.00")
+            sched_end = get_setting(conn, "schedule_end", default="16.00")
+        self._sched_label.configure(
+            text=f"Jadwal Kerja: {sched_start} - {sched_end}")
+        self._reload_pegawai()

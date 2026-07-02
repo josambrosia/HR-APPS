@@ -7,27 +7,27 @@ import customtkinter as ctk
 
 from src.config import DB_PATH
 from src.core.report_generator import month_label
+from src.core.session_state import notify_data_changed
 from src.db.connection import get_connection
 from src.db.settings import get_setting
 from src.db.outlier import (
     month_roster, list_active_exclusions,
     exclude_employee, revert_employee, revert_all,
 )
+from src.ui.components.active_month_banner import ActiveMonthBanner
+from src.ui.components.empty_state import EmptyStateCard
 from src.ui.components.search_bar import SearchBar
 from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
     COLOR_BORDER, COLOR_BORDER_STRONG,
-    COLOR_INFO, COLOR_SECONDARY,
+    COLOR_SECONDARY,
+    COLOR_VIOLET_TINT_BG, COLOR_VIOLET_TINT_BORDER,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
-    FONT_DISPLAY, FONT_SUBHEAD, FONT_BODY_BOLD,
+    FONT_DISPLAY, FONT_BODY_BOLD,
     FONT_SMALL, FONT_LABEL, FONT_MONO_SMALL,
-    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
+    SPACE_XS, SPACE_SM, SPACE_MD,
     RADIUS_SM, RADIUS_MD,
 )
-
-# Violet-tinted treatment for excluded rows (matches approved mockup)
-_EXCLUDED_BG = "#160E1C"
-_EXCLUDED_BORDER = "#3A2348"
 
 
 class OutlierScreen(ctk.CTkFrame):
@@ -68,21 +68,12 @@ class OutlierScreen(ctk.CTkFrame):
             font=FONT_SMALL, text_color=COLOR_TEXT_DIM,
         ).pack(anchor="w", pady=(2, 0))
 
+        self._badge = ActiveMonthBanner(
+            header, variant="badge",
+            value=month_label(self._month) if self._month else "",
+        )
         if self._month:
-            badge = ctk.CTkFrame(
-                header, fg_color="#08222B",
-                border_width=1, border_color="#12454F",
-                corner_radius=RADIUS_SM,
-            )
-            badge.pack(side="right")
-            ctk.CTkLabel(
-                badge, text="BULAN AKTIF", font=FONT_LABEL,
-                text_color="#5FB8C8",  # cyan 30% label (matches active-month badge)
-            ).pack(anchor="e", padx=SPACE_MD, pady=(SPACE_XS, 0))
-            ctk.CTkLabel(
-                badge, text=month_label(self._month),
-                font=FONT_BODY_BOLD, text_color=COLOR_INFO,
-            ).pack(anchor="e", padx=SPACE_MD, pady=(0, SPACE_XS))
+            self._badge.pack(side="right")
 
     def _build_filter_row(self):
         """Slim row between header and scroll content containing the
@@ -106,10 +97,11 @@ class OutlierScreen(ctk.CTkFrame):
         self._disertakan_rows = []
 
         if not self._month:
-            self._render_empty(
+            EmptyStateCard(
+                self.scroll,
                 "Belum ada bulan aktif.",
                 "Pilih bulan di menu Active Month dulu.",
-            )
+            ).pack(fill="x", pady=SPACE_SM, padx=SPACE_XS)
             return
 
         with get_connection(DB_PATH) as conn:
@@ -117,10 +109,11 @@ class OutlierScreen(ctk.CTkFrame):
             active = list_active_exclusions(conn)
 
         if not roster:
-            self._render_empty(
+            EmptyStateCard(
+                self.scroll,
                 "Belum ada data untuk bulan aktif.",
                 "Import fingerprint dulu via menu Import.",
-            )
+            ).pack(fill="x", pady=SPACE_SM, padx=SPACE_XS)
             return
 
         excluded_ids = {a["employee_id"] for a in active}
@@ -150,20 +143,6 @@ class OutlierScreen(ctk.CTkFrame):
             self._render_footer(len(excluded_rows))
 
         self._apply_filter(self._search_query)
-
-    def _render_empty(self, title: str, hint: str):
-        box = ctk.CTkFrame(
-            self.scroll, fg_color=COLOR_SURFACE,
-            border_width=1, border_color=COLOR_BORDER,
-            corner_radius=RADIUS_MD,
-        )
-        box.pack(fill="x", pady=SPACE_SM, padx=SPACE_XS)
-        ctk.CTkLabel(
-            box, text=title, font=FONT_SUBHEAD, text_color=COLOR_TEXT,
-        ).pack(anchor="w", padx=SPACE_LG, pady=(SPACE_LG, SPACE_XS))
-        ctk.CTkLabel(
-            box, text=hint, font=FONT_SMALL, text_color=COLOR_TEXT_DIM,
-        ).pack(anchor="w", padx=SPACE_LG, pady=(0, SPACE_LG))
 
     def _render_infobar(self, excluded_count: int, total: int):
         bar = ctk.CTkFrame(
@@ -198,9 +177,9 @@ class OutlierScreen(ctk.CTkFrame):
     def _render_row(self, emp: dict, excluded: bool, since):
         card = ctk.CTkFrame(
             self.scroll,
-            fg_color=_EXCLUDED_BG if excluded else COLOR_SURFACE,
+            fg_color=COLOR_VIOLET_TINT_BG if excluded else COLOR_SURFACE,
             border_width=1,
-            border_color=_EXCLUDED_BORDER if excluded else COLOR_BORDER,
+            border_color=COLOR_VIOLET_TINT_BORDER if excluded else COLOR_BORDER,
             corner_radius=RADIUS_MD,
         )
         card.pack(fill="x", pady=2, padx=SPACE_XS)
@@ -279,20 +258,41 @@ class OutlierScreen(ctk.CTkFrame):
         self._search.set_count(visible, total)
 
     # -- actions --
+    # Each action bumps the shared data_version: exclusions feed the
+    # Dashboard insights filter, whose queries are memoized per version.
     def _on_exclude(self, employee_id: int):
         with get_connection(DB_PATH) as conn:
             exclude_employee(conn, employee_id, self._month)
             conn.commit()
+        notify_data_changed()
         self._render()
 
     def _on_revert(self, employee_id: int):
         with get_connection(DB_PATH) as conn:
             revert_employee(conn, employee_id, self._month)
             conn.commit()
+        notify_data_changed()
         self._render()
 
     def _on_revert_all(self):
         with get_connection(DB_PATH) as conn:
             revert_all(conn, self._month)
             conn.commit()
+        notify_data_changed()
+        self._render()
+
+    def on_show(self):
+        """Shell hook — called on every re-display of the cached screen.
+
+        Re-reads the active month, updates the header badge, and re-renders
+        the roster. The SearchBar keeps its query — _render re-applies it
+        over the fresh rows and refreshes the match count."""
+        with get_connection(DB_PATH) as conn:
+            self._month = get_setting(conn, "current_month") or ""
+        if self._month:
+            self._badge.set_value(month_label(self._month))
+            if not self._badge.winfo_manager():
+                self._badge.pack(side="right")
+        else:
+            self._badge.pack_forget()
         self._render()

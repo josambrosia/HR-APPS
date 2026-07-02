@@ -126,6 +126,42 @@ def list_issues_for_period(
     return conn.execute(base_sql, params).fetchall()
 
 
+def list_employees_with_open_issues(conn: sqlite3.Connection, start: str, end: str):
+    """Employees that have >= 1 open issue (has_issue=1, reason unset) in
+    [start, end], each with its open-issue count. Sorted by nama.
+
+    Returns list[dict] with keys: id, nama, dept, phone, open_cnt.
+    Feeds the WhatsApp Assistant employee list."""
+    sql = """
+        SELECT e.id, e.nama, e.dept, e.phone, COUNT(*) AS open_cnt
+          FROM attendance_records ar
+          JOIN employees e ON ar.employee_id = e.id
+         WHERE ar.has_issue = 1 AND ar.reason_category IS NULL
+           AND ar.tanggal BETWEEN ? AND ?
+         GROUP BY e.id
+         ORDER BY e.nama
+    """
+    return [dict(r) for r in conn.execute(sql, (start, end)).fetchall()]
+
+
+def list_open_issues_for_employee(
+    conn: sqlite3.Connection, employee_id: int, start: str, end: str,
+):
+    """Open issues (has_issue=1, reason unset) for ONE employee in
+    [start, end], oldest first.
+
+    Returns list[dict] with keys: tanggal, hari, masuk, keluar.
+    Feeds the WhatsApp Assistant compose panel."""
+    sql = """
+        SELECT tanggal, hari, masuk, keluar
+          FROM attendance_records
+         WHERE employee_id = ? AND has_issue = 1 AND reason_category IS NULL
+           AND tanggal BETWEEN ? AND ?
+         ORDER BY tanggal
+    """
+    return [dict(r) for r in conn.execute(sql, (employee_id, start, end)).fetchall()]
+
+
 def count_issues_for_period(conn: sqlite3.Connection, start: str, end: str):
     """Return {open, resolved, na, total} counts for has_issue=1 rows in range."""
     row = conn.execute(

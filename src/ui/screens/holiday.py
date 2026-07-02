@@ -7,36 +7,31 @@ import customtkinter as ctk
 
 from src.config import DB_PATH
 from src.core.report_generator import month_label
+from src.core.session_state import notify_data_changed
+from src.core.week_utils import MONTH_NAMES_ID
 from src.db.connection import get_connection
 from src.db.settings import get_setting
 from src.db.holidays import workday_roster, mark_holidays, unmark_holidays
+from src.ui.components.active_month_banner import ActiveMonthBanner
+from src.ui.components.empty_state import EmptyStateCard
 from src.ui.components.toast import show_success_toast
 from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE,
     COLOR_BORDER,
-    COLOR_ACCENT, COLOR_ACCENT_HOVER, COLOR_INFO, COLOR_SECONDARY,
+    COLOR_ACCENT, COLOR_ACCENT_HOVER, COLOR_SECONDARY,
+    COLOR_VIOLET_TINT_BG, COLOR_VIOLET_TINT_BORDER,
     COLOR_TEXT, COLOR_TEXT_DIM,
-    FONT_DISPLAY, FONT_SUBHEAD, FONT_BODY, FONT_BODY_BOLD,
+    FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD,
     FONT_SMALL, FONT_LABEL,
-    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
-    RADIUS_SM, RADIUS_MD,
+    SPACE_XS, SPACE_SM, SPACE_MD,
+    RADIUS_MD,
 )
-
-_MONTH_ID = {
-    1: "Januari", 2: "Februari", 3: "Maret", 4: "April", 5: "Mei", 6: "Juni",
-    7: "Juli", 8: "Agustus", 9: "September", 10: "Oktober",
-    11: "November", 12: "Desember",
-}
-
-# Violet-tinted treatment for already-holiday rows (matches Outlier screen)
-_HOLIDAY_BG = "#160E1C"
-_HOLIDAY_BORDER = "#3A2348"
 
 
 def _format_tanggal(iso: str, hari: str) -> str:
     """'2026-04-03', 'Jumat' -> 'Jumat, 3 April 2026'."""
     y, m, d = iso.split("-")
-    label = f"{int(d)} {_MONTH_ID[int(m)]} {y}"
+    label = f"{int(d)} {MONTH_NAMES_ID[int(m)]} {y}"
     return f"{hari}, {label}" if hari else label
 
 
@@ -70,20 +65,12 @@ class HolidayScreen(ctk.CTkFrame):
             text="Tandai tanggal sebagai hari libur - tidak dihitung sebagai hari kerja",
             font=FONT_SMALL, text_color=COLOR_TEXT_DIM,
         ).pack(anchor="w", pady=(2, 0))
+        self._badge = ActiveMonthBanner(
+            header, variant="badge",
+            value=month_label(self._month) if self._month else "",
+        )
         if self._month:
-            badge = ctk.CTkFrame(
-                header, fg_color="#08222B",
-                border_width=1, border_color="#12454F",
-                corner_radius=RADIUS_SM,
-            )
-            badge.pack(side="right")
-            ctk.CTkLabel(
-                badge, text="BULAN AKTIF", font=FONT_LABEL, text_color="#5FB8C8",
-            ).pack(anchor="e", padx=SPACE_MD, pady=(SPACE_XS, 0))
-            ctk.CTkLabel(
-                badge, text=month_label(self._month),
-                font=FONT_BODY_BOLD, text_color=COLOR_INFO,
-            ).pack(anchor="e", padx=SPACE_MD, pady=(0, SPACE_XS))
+            self._badge.pack(side="right")
 
     def _build_scroll(self):
         self.scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_BG)
@@ -111,10 +98,11 @@ class HolidayScreen(ctk.CTkFrame):
         self._rows.clear()
 
         if not self._month:
-            self._render_empty(
+            EmptyStateCard(
+                self.scroll,
                 "Belum ada bulan aktif.",
                 "Pilih bulan di menu Active Month dulu.",
-            )
+            ).pack(fill="x", pady=SPACE_SM, padx=SPACE_XS)
             self.footer.grid_remove()
             return
 
@@ -122,10 +110,11 @@ class HolidayScreen(ctk.CTkFrame):
             roster = workday_roster(conn, self._month)
 
         if not roster:
-            self._render_empty(
+            EmptyStateCard(
+                self.scroll,
                 "Belum ada data untuk bulan aktif.",
                 "Import fingerprint dulu via menu Import.",
-            )
+            ).pack(fill="x", pady=SPACE_SM, padx=SPACE_XS)
             self.footer.grid_remove()
             return
 
@@ -135,17 +124,6 @@ class HolidayScreen(ctk.CTkFrame):
         for r in roster:
             self._render_row(r)
         self._update_preview()
-
-    def _render_empty(self, title: str, hint: str):
-        box = ctk.CTkFrame(
-            self.scroll, fg_color=COLOR_SURFACE,
-            border_width=1, border_color=COLOR_BORDER, corner_radius=RADIUS_MD,
-        )
-        box.pack(fill="x", pady=SPACE_SM, padx=SPACE_XS)
-        ctk.CTkLabel(box, text=title, font=FONT_SUBHEAD, text_color=COLOR_TEXT).pack(
-            anchor="w", padx=SPACE_LG, pady=(SPACE_LG, SPACE_XS))
-        ctk.CTkLabel(box, text=hint, font=FONT_SMALL, text_color=COLOR_TEXT_DIM).pack(
-            anchor="w", padx=SPACE_LG, pady=(0, SPACE_LG))
 
     def _render_infobar(self, marked_count: int):
         bar = ctk.CTkFrame(
@@ -168,9 +146,9 @@ class HolidayScreen(ctk.CTkFrame):
         is_holiday = r["is_holiday"]
         card = ctk.CTkFrame(
             self.scroll,
-            fg_color=_HOLIDAY_BG if is_holiday else COLOR_SURFACE,
+            fg_color=COLOR_VIOLET_TINT_BG if is_holiday else COLOR_SURFACE,
             border_width=1,
-            border_color=_HOLIDAY_BORDER if is_holiday else COLOR_BORDER,
+            border_color=COLOR_VIOLET_TINT_BORDER if is_holiday else COLOR_BORDER,
             corner_radius=RADIUS_MD,
         )
         card.pack(fill="x", pady=2, padx=SPACE_XS)
@@ -241,6 +219,9 @@ class HolidayScreen(ctk.CTkFrame):
             if to_unmark:
                 unmark_holidays(conn, to_unmark)
             conn.commit()
+        # Holiday writes auto-resolve/reopen issues + change hari-kerja
+        # counts — bump so cached analytics (Dashboard) refetch on next show.
+        notify_data_changed()
         show_success_toast(
             self.winfo_toplevel(),
             title="Hari Libur Diperbarui",
@@ -249,4 +230,19 @@ class HolidayScreen(ctk.CTkFrame):
                 f"{len(to_unmark)} dibuka kembali."
             ),
         )
+        self._render()
+
+    def on_show(self):
+        """Shell hook — called on every re-display of the cached screen.
+
+        Re-reads the active month, updates the header badge, and rebuilds
+        the date list + impact preview via the existing render path."""
+        with get_connection(DB_PATH) as conn:
+            self._month = get_setting(conn, "current_month") or ""
+        if self._month:
+            self._badge.set_value(month_label(self._month))
+            if not self._badge.winfo_manager():
+                self._badge.pack(side="right")
+        else:
+            self._badge.pack_forget()
         self._render()

@@ -1,18 +1,24 @@
 import webbrowser
 from datetime import datetime
-from tkinter import messagebox
 
 import customtkinter as ctk
 import pyperclip
 
 from src.config import DB_PATH
+from src.db.attendance import (
+    list_employees_with_open_issues, list_open_issues_for_employee,
+)
 from src.db.connection import get_connection
+from src.db.employees import get_employee_by_id
 from src.db.settings import get_setting
 from src.db.wa_contacts import (
     contacted_map, is_contacted, mark_contacted, unmark_contacted,
 )
 from src.core.week_utils import full_month_range
 from src.core.wa_message import build_wa_message, format_issue, wa_me_url
+from src.ui import feedback
+from src.ui.components.search_bar import SearchBar
+from src.ui.components.toast import show_success_toast
 from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
     COLOR_BORDER, COLOR_BORDER_STRONG,
@@ -37,6 +43,12 @@ _WA_DAYPILL_TX = "#8AA69D"
 
 _AVATAR_TINTS = ["#7C3AED", "#DB2777", "#0891B2", "#CA8A04", "#4F46E5", "#0D9488"]
 _TONE_LABELS = {"Formal": "formal", "Ramah": "ramah"}
+
+# Debounce for the name filter — same rationale as resolve_base: a burst
+# of keystrokes re-renders the employee list once, not once per key.
+SEARCH_DEBOUNCE_MS = 200
+
+_EMPTY_PANEL_MSG = "Pilih pegawai di kiri untuk menyusun pesan"
 
 
 def _initials(nama: str) -> str:
@@ -72,10 +84,13 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
         self._note_visible = False
         self._wall = None
         self._contact_btn = None
-        self._search_var = ctk.StringVar()
-        self._search_var.trace_add("write", lambda *_: self._render_list())
+        self._search_query = ""
         self._build()
         self._reload()
+        # Search shortcuts (Ctrl+F focus + click-outside blur) live in the
+        # SearchBar component so the corrected focus logic is shared, not
+        # copy-pasted across screens.
+        self._search.install_shortcuts(self)
 
     # ---- layout -----------------------------------------------------------
     def _build(self):
@@ -87,14 +102,15 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
         ctk.CTkLabel(left, text="Pegawai · open issues", font=FONT_SUBHEAD,
                      text_color=COLOR_TEXT).grid(row=0, column=0, sticky="w",
                                                  pady=(0, SPACE_SM))
-        search = ctk.CTkFrame(left, fg_color=COLOR_SURFACE, corner_radius=RADIUS_MD,
-                              border_width=1, border_color=COLOR_BORDER)
-        search.grid(row=1, column=0, sticky="ew", pady=(0, SPACE_SM))
-        ctk.CTkLabel(search, text="⌕", font=FONT_BODY,
-                     text_color=COLOR_TEXT_MUTED).pack(side="left", padx=(SPACE_SM, 0))
-        ctk.CTkEntry(search, textvariable=self._search_var, placeholder_text="Cari nama…",
-                     border_width=0, fg_color="transparent", height=30
-                     ).pack(side="left", fill="x", expand=True, padx=(SPACE_XS, SPACE_SM))
+        # Shared SearchBar (debounced) — replaces the hand-rolled Entry +
+        # StringVar-trace this screen carried pre-v22. Filter semantics are
+        # unchanged: case-insensitive substring match on nama only.
+        # width=170 keeps entry + clear + "N dari M" inside the 288px column.
+        self._search = SearchBar(
+            left, on_change=self._apply_filter, placeholder="🔍 Cari nama…",
+            width=170, debounce_ms=SEARCH_DEBOUNCE_MS,
+        )
+        self._search.grid(row=1, column=0, sticky="ew", pady=(0, SPACE_SM))
 
         self.list_frame = ctk.CTkScrollableFrame(left, fg_color=COLOR_SURFACE,
                                                  corner_radius=RADIUS_MD)
@@ -104,7 +120,7 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
                              border_color=COLOR_BORDER, corner_radius=RADIUS_MD)
         right.grid(row=0, column=1, sticky="nsew")
         self.right = right
-        self._show_empty("Pilih pegawai di kiri untuk menyusun pesan")
+        self._show_empty(_EMPTY_PANEL_MSG)
 
     def _show_empty(self, text):
         for w in self.right.winfo_children():
@@ -123,20 +139,40 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
                 self._render_list(empty_msg="(belum ada bulan aktif — pilih di Active Month)")
                 return
             start, end = full_month_range(month)
-            rows = conn.execute(
-                """
-                SELECT e.id, e.nama, e.dept, e.phone, COUNT(*) AS open_cnt
-                  FROM attendance_records ar
-                  JOIN employees e ON ar.employee_id = e.id
-                 WHERE ar.has_issue = 1 AND ar.reason_category IS NULL
-                   AND ar.tanggal BETWEEN ? AND ?
-                 GROUP BY e.id
-                 ORDER BY e.nama
-                """,
-                (start, end),
-            ).fetchall()
-            self._rows_cache = [dict(r) for r in rows]
+            self._rows_cache = list_employees_with_open_issues(conn, start, end)
             self._contacted = contacted_map(conn, month)
+        self._render_list()
+
+    def on_show(self):
+        """Shell contract — called by the app shell every time this cached
+        screen is re-displayed (NOT after first construction).
+
+        Re-reads the active month + employee list (open-issue counts change
+        when issues are resolved on other screens) while preserving the
+        typed search query, then re-renders the selected employee's compose
+        panel with fresh issue data and a re-read 'sudah dihubungi' mark.
+        If the selected employee no longer has open issues, the right panel
+        falls back to the placeholder. Idempotent; empty DB / no active
+        month behaves exactly like __init__.
+        """
+        self._reload()
+        emp_id = self._current_employee_id
+        if emp_id is None:
+            return
+        if any(r["id"] == emp_id for r in self._rows_cache):
+            self._show_for(emp_id)
+        else:
+            self._current_employee_id = None
+            self._show_empty(_EMPTY_PANEL_MSG)
+
+    def _apply_filter(self, query: str):
+        # Skip the list rebuild when the EFFECTIVE query (matching is
+        # case/whitespace-insensitive) didn't change — the debounced
+        # KeyRelease also fires for modifier/navigation keys.
+        if query.lower().strip() == self._search_query.lower().strip():
+            self._search_query = query
+            return
+        self._search_query = query
         self._render_list()
 
     def _render_list(self, empty_msg="(tidak ada open issue)"):
@@ -144,8 +180,9 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
             return
         for w in self.list_frame.winfo_children():
             w.destroy()
-        q = self._search_var.get().strip().lower()
+        q = self._search_query.strip().lower()
         rows = [r for r in self._rows_cache if q in r["nama"].lower()]
+        self._search.set_count(len(rows), len(self._rows_cache))
         if not rows:
             msg = "(tak ada nama yang cocok)" if q and self._rows_cache else empty_msg
             ctk.CTkLabel(self.list_frame, text=msg, font=FONT_BODY,
@@ -190,20 +227,9 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
         self._note = ""
         self._note_visible = False
         with get_connection(DB_PATH) as conn:
-            emp = conn.execute(
-                "SELECT nama, dept, phone FROM employees WHERE id = ?", (emp_id,)
-            ).fetchone()
+            emp = get_employee_by_id(conn, emp_id)
             start, end = full_month_range(self._current_month)
-            issues = conn.execute(
-                """
-                SELECT tanggal, hari, masuk, keluar
-                  FROM attendance_records
-                 WHERE employee_id = ? AND has_issue = 1 AND reason_category IS NULL
-                   AND tanggal BETWEEN ? AND ?
-                 ORDER BY tanggal
-                """,
-                (emp_id, start, end),
-            ).fetchall()
+            issues = list_open_issues_for_employee(conn, emp_id, start, end)
             self._officer = (get_setting(conn, "hr_officer_name") or "").strip()
             contacted = is_contacted(conn, employee_id=emp_id,
                                      year_month=self._current_month)
@@ -211,7 +237,7 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
             self._show_empty("(tidak ada open issue)")
             return
         self._emp = dict(emp)
-        self._issues = [dict(i) for i in issues]
+        self._issues = issues
         self._build_compose(contacted)
 
     def _build_compose(self, contacted):
@@ -354,14 +380,17 @@ class WhatsAppAssistantScreen(ctk.CTkFrame):
         text = self._preview.get("1.0", "end").strip()
         url = wa_me_url((self._emp.get("phone") or "").strip(), text)
         if not url:
-            messagebox.showwarning("Nomor tidak valid",
-                                   "Nomor WhatsApp pegawai belum diset atau tidak valid.")
+            feedback.show_warning(
+                self, "Nomor tidak valid",
+                "Nomor WhatsApp pegawai belum diset atau tidak valid.")
             return
         webbrowser.open(url)
 
     def _salin(self):
         pyperclip.copy(self._preview.get("1.0", "end").strip())
-        messagebox.showinfo("Tersalin", "Teks pesan sudah masuk clipboard.")
+        show_success_toast(
+            self.winfo_toplevel(), title="Tersalin",
+            message="Teks pesan sudah masuk clipboard.")
 
     def _render_contact_btn(self, contacted):
         if contacted:

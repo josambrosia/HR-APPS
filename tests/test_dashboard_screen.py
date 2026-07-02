@@ -60,3 +60,36 @@ def test_dashboard_query_cache_invalidated_by_data_version(temp_db_path, monkeyp
     screen._query(start, end)                      # version changed -> cache cleared -> refetch
     assert calls["n"] == base + 1
     screen.destroy()
+
+
+def test_dashboard_on_show_resyncs_nav_from_period_state(temp_db_path, monkeypatch, tk_root):
+    """A cached screen must pick up the session week chosen on another
+    screen when it is re-displayed."""
+    from src.core.session_state import period_state
+    import src.ui.screens.dashboard as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    _setup_db(temp_db_path)
+    screen = mod.DashboardScreen(tk_root)
+    tk_root.update_idletasks()
+    assert screen.nav.active == "semua"
+    period_state.set("minggu_3")   # changed elsewhere (e.g. Issues screen)
+    screen.on_show()
+    tk_root.update_idletasks()
+    assert screen.nav.active == "minggu_3"
+    screen.destroy()
+
+
+def test_dashboard_on_show_picks_up_month_change(temp_db_path, monkeypatch, tk_root):
+    """Active-month change made in Settings must reflect on re-display."""
+    import src.ui.screens.dashboard as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    _setup_db(temp_db_path)  # sets 2026-05
+    screen = mod.DashboardScreen(tk_root)
+    tk_root.update_idletasks()
+    with get_connection(temp_db_path) as conn:
+        set_setting(conn, "current_month", "2026-06")
+    screen.on_show()
+    tk_root.update_idletasks()
+    assert screen._current_month == "2026-06"
+    assert "2026-06" in screen._kpi_labels["periode"].cget("text")
+    screen.destroy()

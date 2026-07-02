@@ -2,8 +2,10 @@
 
 The dense per-employee grid is painted on a single tk.Canvas (fast for ~1k+
 cells); toolbar / legend / detail strip are CTk widgets. Hover a cell for a
-floating tooltip; click to pin its detail to the strip. Search + sort + month
-nav repaint in place. Print renders heatmap_print.html.j2 to a temp file and
+floating tooltip; click to pin its detail to the strip. Search (debounced,
+skip when the match set is unchanged) + sort + month nav repaint in place;
+window resizes reflow on a 120 ms trailing edge; on_show() refreshes a cached
+instance in place. Print renders heatmap_print.html.j2 to a temp file and
 opens it in the browser (Ctrl-P / Save PDF) — no server.
 See docs/superpowers/specs/2026-06-10-v18-heatmap-dashboard-design.md.
 """
@@ -70,16 +72,20 @@ class HeatmapScreen(ctk.CTkFrame):
 
         with get_connection(DB_PATH) as conn:
             m = get_setting(conn, "current_month", default="")
-        self._month = m or date.today().strftime("%Y-%m")
+        self._db_month = m or date.today().strftime("%Y-%m")
+        self._month = self._db_month
         self._query = ""
         self._sortkey = "nama"
         self._ctx = None
         self._cell_by_item = {}
         self._visible_employees = []
+        self._painted_ids = None       # ordered employee-id tuple of the last repaint
         self._tip = None
         self._cetak_hover = None
         self._ncols = None
         self._last_w = None
+        self._pending_width = None     # latest <Configure> width awaiting the throttle
+        self._resize_after_id = None   # trailing-edge reflow timer
 
         self._build_header()
         self._build_toolbar()
@@ -104,7 +110,9 @@ class HeatmapScreen(ctk.CTkFrame):
     def _build_toolbar(self):
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.grid(row=1, column=0, sticky="ew", padx=SPACE_XL, pady=(0, SPACE_SM))
-        self._search = SearchBar(bar, on_change=self._on_search, width=240)
+        # Debounced: a typing burst repaints the whole canvas once, not per key.
+        self._search = SearchBar(bar, on_change=self._on_search, width=240,
+                                 debounce_ms=200)
         self._search.pack(side="left")
         self._sort_var = ctk.StringVar(value="Nama (A–Z)")
         ctk.CTkOptionMenu(
@@ -203,12 +211,55 @@ class HeatmapScreen(ctk.CTkFrame):
         self._month = self._ctx["next_month"]
         self._load()
 
+    def on_show(self) -> None:
+        """Shell contract: called each time this cached screen is re-displayed
+        (NOT after first construction). Fast + idempotent — one context query,
+        one repaint; static chrome (header/search/sort widgets) is not rebuilt.
+
+        Follows the current_month setting when it changed while the screen was
+        hidden (e.g. a new import); otherwise stays on the month the user
+        navigated to. The search query and sort selection live in their
+        widgets, so they survive and are re-applied against the fresh data;
+        the scroll position is restored when the same employees end up painted
+        in the same order (empty DB falls into the same 'Belum ada data'
+        state as __init__ via the shared _load path)."""
+        with get_connection(DB_PATH) as conn:
+            m = get_setting(conn, "current_month", default="")
+        db_month = m or date.today().strftime("%Y-%m")
+        if db_month != self._db_month:
+            self._db_month = db_month
+            self._month = db_month
+        # A pending trailing-edge reflow would repaint a second time right
+        # after _load(); drop it — _load() paints at the live width anyway.
+        self._cancel_resize_job()
+        # Sync a mid-debounce query (typed just before switching screens) so
+        # the refresh filters by what the entry actually shows.
+        self._query = self._search.get()
+        try:
+            scroll = self._canvas.yview()[0]
+        except Exception:
+            scroll = 0.0
+        before = self._painted_ids
+        self._load()
+        if scroll > 0 and before and self._painted_ids == before:
+            self._canvas.yview_moveto(scroll)
+
     def _on_search(self, q):
         self._query = q
+        if not self._ctx or self._ctx.get("is_empty"):
+            return
+        # Debounced by the SearchBar (200 ms); on top of that, skip the
+        # repaint when the match set is unchanged — "AND" -> "ANDI" usually
+        # matches the same people, so compare resulting id lists, not strings.
+        if tuple(e["employee_id"] for e in self._visible()) == self._painted_ids:
+            return
         self._repaint()
 
     def _on_sort(self, label):
-        self._sortkey = _SORT_OPTIONS.get(label, "nama")
+        key = _SORT_OPTIONS.get(label, "nama")
+        if key == self._sortkey:
+            return   # re-picked the current option — repaint would be a no-op
+        self._sortkey = key
         self._repaint()
 
     # ---------- paint ----------
@@ -222,10 +273,36 @@ class HeatmapScreen(ctk.CTkFrame):
     def _on_canvas_configure(self, event):
         if not self._ctx or self._ctx.get("is_empty"):
             return
-        w = event.width
-        if self._last_w is None or abs(w - self._last_w) > 8:
-            self._last_w = w
-            self._repaint()
+        # Trailing-edge throttle: a live window drag fires <Configure> per
+        # pixel and repainting every card each time janks. Restart a 120 ms
+        # timer and reflow once, after the size settles.
+        self._pending_width = event.width
+        self._cancel_resize_job()
+        self._resize_after_id = self.after(120, self._apply_resize)
+
+    def _apply_resize(self):
+        self._resize_after_id = None
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+        w = self._pending_width
+        # Same width bucket (±8 px) -> same column count / card width, so the
+        # reflow would repaint identical geometry; skip it. Height-only
+        # <Configure> events land here too and are skipped the same way.
+        if w is None or (self._last_w is not None and abs(w - self._last_w) <= 8):
+            return
+        self._last_w = w
+        self._repaint()
+
+    def _cancel_resize_job(self):
+        if self._resize_after_id is not None:
+            try:
+                self.after_cancel(self._resize_after_id)
+            except Exception:
+                pass
+            self._resize_after_id = None
 
     def _repaint(self):
         c = self._canvas
@@ -237,11 +314,13 @@ class HeatmapScreen(ctk.CTkFrame):
             c.create_text(20, 36, anchor="nw", fill=COLOR_TEXT_DIM, font=FONT_BODY,
                           text="Belum ada data untuk bulan ini — import data fingerprint dulu.")
             self._visible_employees = []
+            self._painted_ids = ()
             self._search.set_count(0, total)
             c.configure(scrollregion=(0, 0, 0, 80))
             return
         emps = self._visible()
         self._visible_employees = emps
+        self._painted_ids = tuple(e["employee_id"] for e in emps)
         self._search.set_count(len(emps), total)
         if not emps:
             c.create_text(20, 36, anchor="nw", fill=COLOR_TEXT_DIM, font=FONT_BODY,
@@ -612,6 +691,7 @@ class HeatmapScreen(ctk.CTkFrame):
 
     # ---------- cleanup ----------
     def _on_destroy_cleanup(self, _e=None):
+        self._cancel_resize_job()
         if self._tip is not None:
             try:
                 self._tip.destroy()

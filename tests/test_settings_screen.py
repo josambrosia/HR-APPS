@@ -17,7 +17,7 @@ def test_settings_screen_constructs(temp_db_path, monkeypatch, tk_root):
 def test_settings_screen_saves_lupa_penalty(temp_db_path, monkeypatch, tk_root):
     import src.ui.screens.settings as settings_mod
     monkeypatch.setattr(settings_mod, "DB_PATH", temp_db_path)
-    monkeypatch.setattr(settings_mod.messagebox, "showinfo", lambda *a, **k: None)
+    monkeypatch.setattr(settings_mod.feedback, "show_info", lambda *a, **k: None)
     init_db(temp_db_path)
     screen = settings_mod.SettingsScreen(tk_root)
     tk_root.update_idletasks()
@@ -44,7 +44,7 @@ def test_settings_screen_loads_saved_lupa_penalty(temp_db_path, monkeypatch, tk_
 def test_settings_screen_saves_hr_officer_name(temp_db_path, monkeypatch, tk_root):
     import src.ui.screens.settings as settings_mod
     monkeypatch.setattr(settings_mod, "DB_PATH", temp_db_path)
-    monkeypatch.setattr(settings_mod.messagebox, "showinfo", lambda *a, **k: None)
+    monkeypatch.setattr(settings_mod.feedback, "show_info", lambda *a, **k: None)
     init_db(temp_db_path)
     screen = settings_mod.SettingsScreen(tk_root)
     tk_root.update_idletasks()
@@ -72,7 +72,7 @@ def test_settings_screen_saves_threshold_per_day(temp_db_path, monkeypatch, tk_r
     """Edit thr_var and save → coaching_threshold_per_day persists."""
     import src.ui.screens.settings as settings_mod
     monkeypatch.setattr(settings_mod, "DB_PATH", temp_db_path)
-    monkeypatch.setattr(settings_mod.messagebox, "showinfo", lambda *a, **k: None)
+    monkeypatch.setattr(settings_mod.feedback, "show_info", lambda *a, **k: None)
     init_db(temp_db_path)
     screen = settings_mod.SettingsScreen(tk_root)
     tk_root.update_idletasks()
@@ -104,10 +104,10 @@ def test_save_rejects_lupa_penalty_negative(temp_db_path, monkeypatch, tk_root):
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
         set_setting(conn, "lupa_absen_datang_penalty_min", "15")
-    monkeypatch.setattr(mod.messagebox, "showinfo", lambda *a, **k: None)
+    monkeypatch.setattr(mod.feedback, "show_info", lambda *a, **k: None)
     warnings = []
     monkeypatch.setattr(
-        mod.messagebox, "showwarning",
+        mod.feedback, "show_warning",
         lambda *a, **k: warnings.append(a))
     screen = mod.SettingsScreen(tk_root)
     screen.lupa_penalty_var.set("-1")
@@ -124,8 +124,8 @@ def test_save_rejects_lupa_penalty_too_large(temp_db_path, monkeypatch, tk_root)
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
         set_setting(conn, "lupa_absen_datang_penalty_min", "15")
-    monkeypatch.setattr(mod.messagebox, "showinfo", lambda *a, **k: None)
-    monkeypatch.setattr(mod.messagebox, "showwarning", lambda *a, **k: None)
+    monkeypatch.setattr(mod.feedback, "show_info", lambda *a, **k: None)
+    monkeypatch.setattr(mod.feedback, "show_warning", lambda *a, **k: None)
     screen = mod.SettingsScreen(tk_root)
     screen.lupa_penalty_var.set("1000")
     screen._save()
@@ -140,8 +140,8 @@ def test_save_rejects_lupa_penalty_non_integer(temp_db_path, monkeypatch, tk_roo
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
         set_setting(conn, "lupa_absen_datang_penalty_min", "15")
-    monkeypatch.setattr(mod.messagebox, "showinfo", lambda *a, **k: None)
-    monkeypatch.setattr(mod.messagebox, "showwarning", lambda *a, **k: None)
+    monkeypatch.setattr(mod.feedback, "show_info", lambda *a, **k: None)
+    monkeypatch.setattr(mod.feedback, "show_warning", lambda *a, **k: None)
     screen = mod.SettingsScreen(tk_root)
     screen.lupa_penalty_var.set("abc")
     screen._save()
@@ -154,9 +154,46 @@ def test_save_accepts_lupa_penalty_zero(temp_db_path, monkeypatch, tk_root):
     import src.ui.screens.settings as mod
     monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
     init_db(temp_db_path)
-    monkeypatch.setattr(mod.messagebox, "showinfo", lambda *a, **k: None)
+    monkeypatch.setattr(mod.feedback, "show_info", lambda *a, **k: None)
     screen = mod.SettingsScreen(tk_root)
     screen.lupa_penalty_var.set("0")
     screen._save()
     with get_connection(temp_db_path) as conn:
         assert get_setting(conn, "lupa_absen_datang_penalty_min") == "0"
+
+
+def test_on_show_discards_unsaved_edits_and_rereads_db(temp_db_path, monkeypatch, tk_root):
+    """on_show re-reads every field from the DB — unsaved entry edits are
+    discarded, matching the old rebuild-on-navigation behavior."""
+    import src.ui.screens.settings as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        set_setting(conn, "coaching_threshold_per_day", "15")
+    screen = mod.SettingsScreen(tk_root)
+    tk_root.update_idletasks()
+    screen.thr_var.set("99")  # typed but never saved
+    with get_connection(temp_db_path) as conn:
+        set_setting(conn, "current_month", "2026-06")  # changed elsewhere
+    screen.on_show()
+    tk_root.update_idletasks()
+    assert screen.thr_var.get() == "15"          # unsaved edit discarded
+    assert screen.month_var.get() == "2026-06"   # fresh DB value picked up
+    screen.destroy()
+
+
+def test_on_show_refreshes_pegawai_list(temp_db_path, monkeypatch, tk_root):
+    """Employees imported while the cached screen was hidden must appear."""
+    from src.db.employees import upsert_employee
+    import src.ui.screens.settings as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    screen = mod.SettingsScreen(tk_root)
+    tk_root.update_idletasks()
+    assert len(screen.tree.get_children()) == 0
+    with get_connection(temp_db_path) as conn:
+        upsert_employee(conn, no_staff="9001", nama="BUDI", dept="TEST")
+    screen.on_show()
+    tk_root.update_idletasks()
+    assert len(screen.tree.get_children()) == 1
+    screen.destroy()

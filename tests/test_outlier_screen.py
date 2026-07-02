@@ -172,3 +172,44 @@ def test_outlier_uses_searchbar_shortcuts_helper(temp_db_path, monkeypatch, tk_r
     assert getattr(screen._search, "_click_bind_id", None) is not None
     assert not hasattr(screen, "_on_click_outside_search")
     screen.destroy()
+
+
+def test_outlier_on_show_refreshes_data_and_preserves_search(temp_db_path, monkeypatch, tk_root):
+    """on_show must re-render fresh roster data while keeping the current
+    search query applied over it."""
+    import src.ui.screens.outlier as mod
+    monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        set_setting(conn, "current_month", "2026-05")
+        e1 = upsert_employee(conn, no_staff="1", nama="BUDI", dept="X")
+        upsert_attendance(
+            conn, employee_id=e1, tanggal="2026-05-01", hari="Jumat",
+            tipe="Hari Kerja", jadwal="08.00 - 16.00",
+            masuk="08.00", keluar="16.00", kerja_jam=8.0,
+            lembur_jam=None, terlambat_menit=0, has_issue=0,
+            imported_from="W1.xls",
+        )
+        conn.commit()
+    screen = mod.OutlierScreen(tk_root)
+    tk_root.update_idletasks()
+    assert len(screen._disertakan_rows) == 1
+    screen._apply_filter("bud")
+    # New employee imported while the user was on another screen.
+    with get_connection(temp_db_path) as conn:
+        e2 = upsert_employee(conn, no_staff="2", nama="ANI", dept="Y")
+        upsert_attendance(
+            conn, employee_id=e2, tanggal="2026-05-02", hari="Sabtu",
+            tipe="Hari Kerja", jadwal="08.00 - 16.00",
+            masuk="08.00", keluar="16.00", kerja_jam=8.0,
+            lembur_jam=None, terlambat_menit=0, has_issue=0,
+            imported_from="W1.xls",
+        )
+        conn.commit()
+    screen.on_show()
+    tk_root.update_idletasks()
+    assert len(screen._disertakan_rows) == 2      # fresh data rendered
+    assert screen._search_query == "bud"          # query preserved
+    visible = [r for r in screen._disertakan_rows if r.winfo_manager() == "pack"]
+    assert len(visible) == 1                      # filter re-applied to fresh rows
+    screen.destroy()

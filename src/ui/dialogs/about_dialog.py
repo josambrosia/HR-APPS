@@ -160,17 +160,15 @@ class AboutDialog(ctk.CTkToplevel):
         scroll.grid_columnconfigure(0, weight=1)
 
         # Color + label per kind. Semantic mapping:
-        #   feat   → emerald (success) — new functionality
-        #   fix    → amber (caution)   — bug fix; uses literal #FBBF24
-        #                                 instead of COLOR_WARN (rose) because
-        #                                 yellow is the conventional "caution"
-        #                                 signal for bugfixes, not danger.
-        #   change → cyan (info)       — behavior change
-        #   remove → muted gray        — feature removal (no dedicated tag color)
+        #   feat   → emerald (success)   — new functionality
+        #   fix    → amber (COLOR_WARN)  — bug fix; amber is the caution
+        #                                  signal, matching the token.
+        #   change → cyan (info)         — behavior change
+        #   remove → muted gray          — feature removal (no dedicated tag color)
         # Badge text uses COLOR_BG (dark) — works for all four backgrounds.
         kind_meta = {
             "feat":   ("BARU",  COLOR_SUCCESS),
-            "fix":    ("FIX",   "#FBBF24"),
+            "fix":    ("FIX",   COLOR_WARN),
             "change": ("UBAH",  COLOR_INFO),
             "remove": ("HAPUS", COLOR_TEXT_MUTED),
         }

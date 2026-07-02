@@ -7,8 +7,8 @@ from src.db.settings import get_setting
 
 def test_settings_saves_late_tolerance(temp_db_path, monkeypatch, tk_root):
     monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
-    # _save() ends with messagebox.showinfo(); patch it or the modal blocks the test.
-    monkeypatch.setattr(mod.messagebox, "showinfo", lambda *a, **k: None)
+    # _save() ends with feedback.show_info(); patch it or the modal blocks the test.
+    monkeypatch.setattr(mod.feedback, "show_info", lambda *a, **k: None)
     init_db(temp_db_path)
     screen = mod.SettingsScreen(tk_root)
     tk_root.update_idletasks()
@@ -24,7 +24,7 @@ def test_settings_saves_late_tolerance(temp_db_path, monkeypatch, tk_root):
 def test_settings_rejects_out_of_range_tolerance(temp_db_path, monkeypatch, tk_root):
     monkeypatch.setattr(mod, "DB_PATH", temp_db_path)
     # silence the modal warning during the test
-    monkeypatch.setattr(mod.messagebox, "showwarning", lambda *a, **k: None)
+    monkeypatch.setattr(mod.feedback, "show_warning", lambda *a, **k: None)
     init_db(temp_db_path)
     screen = mod.SettingsScreen(tk_root)
     tk_root.update_idletasks()

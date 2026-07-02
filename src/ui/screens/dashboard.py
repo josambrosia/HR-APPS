@@ -3,7 +3,6 @@ import tempfile
 from pathlib import Path
 
 import customtkinter as ctk
-from tkinter import messagebox
 from tkinter import ttk
 
 from src.config import DB_PATH
@@ -14,12 +13,13 @@ from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
     karyawan_teladan_top_n, ranking_departemen, hari_paling_rawan,
 )
-from src.core.week_utils import weeks_in_month, full_month_range
+from src.core.week_utils import full_month_range, resolve_period
 from src.reports.html_renderer import render_dashboard_html
 from PIL import ImageTk
 from src.ui.components.attendance_strip import render_strip, month_status_map
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.components.tree_style import style_treeview, apply_zebra_tags
+from src.ui import feedback
 from src.core.session_state import period_state, data_version
 from src.ui.theme import (
     FONT_FAMILY, FONT_MONO,
@@ -60,9 +60,9 @@ class DashboardScreen(ctk.CTkFrame):
         with get_connection(DB_PATH) as conn:
             self._current_month = get_setting(conn, "current_month") or ""
 
-        # Per-(start, end) query cache. Reset each time the screen is
-        # constructed (i.e., user navigates away and back), so writes in
-        # other screens won't show stale data.
+        # Per-(start, end) query cache. Invalidated whenever the shared
+        # data_version bumps (writes in other screens call
+        # notify_data_changed), so a cached screen won't show stale data.
         self._query_cache: dict = {}
         # Version the cache was built at; cleared when issue data changes.
         self._cache_version: int = data_version.get()
@@ -340,18 +340,12 @@ class DashboardScreen(ctk.CTkFrame):
             from datetime import date, timedelta
             today = date.today()
             return (today - timedelta(days=30)).isoformat(), today.isoformat(), "Last 30 days"
-        if self.nav.active == "semua":
-            start, end = full_month_range(self._current_month)
+        start, end, num = resolve_period(
+            self._current_month, self.nav.active, default_week=1,
+        )
+        if num is None:
             return start, end, f"Bulanan ({self._current_month})"
-        try:
-            num = int(self.nav.active.split("_")[1])
-        except (IndexError, ValueError):
-            num = 1
-        for n, start, end in weeks_in_month(self._current_month):
-            if n == num:
-                return start, end, f"Minggu {n} ({start} → {end})"
-        start, end = full_month_range(self._current_month)
-        return start, end, f"Bulanan ({self._current_month})"
+        return start, end, f"Minggu {num} ({start} → {end})"
 
     def _previous_range(self):
         """Return (prev_start, prev_end) for the period immediately before the current one.
@@ -419,6 +413,18 @@ class DashboardScreen(ctk.CTkFrame):
 
     def _on_period_change(self, _key):
         period_state.set(_key)
+        self._update_data()
+
+    def on_show(self):
+        """Shell hook — called on every re-display of the cached screen.
+
+        Re-reads volatile inputs (active month + session week), re-syncs
+        the week pills, then reruns the populate path. Queries are
+        memoized per (period, data_version) so an unchanged revisit is a
+        cache hit; the pooled widgets are reused, never rebuilt."""
+        with get_connection(DB_PATH) as conn:
+            self._current_month = get_setting(conn, "current_month") or ""
+        self.nav.sync(self._current_month, period_state.get())
         self._update_data()
 
     def _apply_layout(self, is_bulanan: bool):
@@ -607,7 +613,7 @@ class DashboardScreen(ctk.CTkFrame):
                     period_type=period_type,
                 )
         except Exception as e:
-            messagebox.showerror("Error generating PDF", str(e))
+            feedback.show_error(self, "Error generating PDF", str(e))
             return
 
         success, browser_name = open_html_in_browser(html_path)
@@ -621,7 +627,8 @@ class DashboardScreen(ctk.CTkFrame):
                 ),
             )
         else:
-            messagebox.showwarning(
+            feedback.show_warning(
+                self,
                 "Browser tidak ditemukan",
                 f"Tidak menemukan browser (Chrome/Edge/Firefox).\n\n"
                 f"File HTML tersimpan di:\n{html_path}\n\n"

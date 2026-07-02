@@ -5,7 +5,7 @@ import customtkinter as ctk
 
 from src.config import DB_PATH
 from src.core.session_state import period_state
-from src.core.week_utils import weeks_in_month
+from src.core.week_utils import parse_week_key, week_range
 from src.db.coaching import (
     list_coaching_for_week, mark_coached, unmark_coached,
     get_coaching_notes, update_notes,
@@ -14,9 +14,9 @@ from src.db.connection import get_connection
 from src.db.holidays import working_days_count
 from src.db.settings import get_setting
 from src.ui.components.kpi_card import KPICard
+from src.ui.components.tree_style import style_treeview
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.theme import (
-    FONT_FAMILY,
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
     COLOR_BORDER,
     COLOR_ACCENT, COLOR_ACCENT_HOVER,
@@ -55,30 +55,7 @@ class CoachingScreen(ctk.CTkFrame):
         self._reload()
 
     def _setup_treeview_style(self):
-        style = ttk.Style()
-        try:
-            style.theme_use("clam")
-        except Exception:
-            pass
-        style.configure(
-            "Coaching.Treeview",
-            background=COLOR_SURFACE, fieldbackground=COLOR_SURFACE,
-            foreground=COLOR_TEXT, rowheight=24, borderwidth=0,
-            font=FONT_SMALL,
-        )
-        style.configure(
-            "Coaching.Treeview.Heading",
-            background=COLOR_SURFACE_HIGH, foreground=COLOR_TEXT_MUTED,
-            relief="flat", font=(FONT_FAMILY, 9, "bold"),
-        )
-        # Phase 4a: drop lavender selection workaround (was commit 3af2277).
-        # New semantic palette: Sudah=emerald, Belum=rose. COLOR_SURFACE_HIGH
-        # is now a clean neutral hover that doesn't conflict with either.
-        style.map(
-            "Coaching.Treeview",
-            background=[("selected", COLOR_SURFACE_HIGH)],
-            foreground=[("selected", COLOR_TEXT)],
-        )
+        style_treeview("Coaching.Treeview", rowheight=24)
 
     def _build_header(self):
         header = ctk.CTkFrame(self, fg_color="transparent")
@@ -95,6 +72,28 @@ class CoachingScreen(ctk.CTkFrame):
 
     def _on_period_change(self, _key):
         period_state.set(_key)
+        self._reload()
+
+    def on_show(self):
+        """Shell hook — called on every re-display of the cached screen.
+
+        Re-reads volatile inputs (active month + daily threshold + session
+        week), re-syncs the pills (include_all=False, so 'semua' falls back
+        to the first pill exactly like __init__), resets the detail panel
+        and reloads the table. Static chrome is reused."""
+        with get_connection(DB_PATH) as conn:
+            self._current_month = get_setting(conn, "current_month") or ""
+            daily_raw = get_setting(conn, "coaching_threshold_per_day") or "15"
+            try:
+                self._daily_threshold = int(daily_raw)
+            except ValueError:
+                self._daily_threshold = 15
+        self.nav.sync(self._current_month, period_state.get())
+        # Old rebuild-on-nav behavior: a fresh screen always starts with the
+        # empty right panel; a cached one must match (selection is gone
+        # after _reload repopulates the tree anyway).
+        self.selected_row = None
+        self._build_panel_empty()
         self._reload()
 
     def _build_stats(self):
@@ -188,17 +187,16 @@ class CoachingScreen(ctk.CTkFrame):
 
     def _active_range(self):
         """Return (start, end, num) for the currently selected week pill."""
-        key = self.nav.active
-        try:
-            num = int(key.split("_")[1])
-        except (IndexError, ValueError):
+        num = parse_week_key(self.nav.active)
+        if num is None:
             num = 1
         if not self._current_month:
             return None, None, num
-        for n, start, end in weeks_in_month(self._current_month):
-            if n == num:
-                return start, end, num
-        return None, None, num
+        rng = week_range(self._current_month, num)
+        if rng is None:
+            return None, None, num
+        start, end = rng
+        return start, end, num
 
     def _reload(self):
         start, end, _num = self._active_range()
