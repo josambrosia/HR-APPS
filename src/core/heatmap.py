@@ -7,6 +7,7 @@ from datetime import date
 
 from src.config import HEATMAP_DINAS_REASONS
 from src.core.reason_mapper import render_alasan_ijin
+from src.core.week_utils import MONTH_NAMES_ID
 from src.db.settings import read_late_tolerance, read_severe_lateness_threshold
 from src.db.employees import list_employees
 from src.db.attendance import list_attendance_matrix
@@ -75,8 +76,6 @@ def cell_status(row, *, tolerance, severe, is_weekend, is_holiday):
     return "mangkir"
 
 
-_INDO_MONTHS = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-                "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 # status -> summary column code (na folds into X)
 _SUMMARY_OF = {"hadir": "H", "dinas": "D", "sedang": "TR", "parah": "TB",
                "sakit": "S", "cuti": "C", "lupa": "LA", "mangkir": "X", "na": "X"}
@@ -216,7 +215,7 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
     return {
         "year_month": year_month,
         "today_day": today_day,
-        "month_label": f"{_INDO_MONTHS[m]} {y}",
+        "month_label": f"{MONTH_NAMES_ID[m]} {y}",
         "prev_month": prev_m, "next_month": next_m,
         "days": list(range(1, n_days + 1)),
         "weekday_of": weekday_of,

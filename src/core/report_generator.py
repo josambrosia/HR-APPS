@@ -17,13 +17,14 @@ from openpyxl.styles import PatternFill
 
 from src.config import TEMPLATE_LAPORAN_BULANAN, REASON_CATEGORIES, DEFAULT_SCHEDULE_START
 from src.core.reason_mapper import render_alasan_ijin, effective_attendance
+from src.core.week_utils import MONTH_NAMES_ID as _MONTH_NAMES_BY_NUM
 from src.db.settings import get_setting, read_lupa_penalty_min
 
 
-MONTH_NAMES_ID = [
-    None, "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-]
+# Canonical Indonesian month names live in src.core.week_utils
+# (MONTH_NAMES_ID, dict keyed 1-12). Kept here as the legacy 1-indexed
+# list (index 0 = None) for existing importers.
+MONTH_NAMES_ID = [None] + [_MONTH_NAMES_BY_NUM[m] for m in range(1, 13)]
 
 # Schedule end (16:00) in minutes-from-midnight, for pulang_cepat computation.
 JADWAL_END_MINUTES = 16 * 60

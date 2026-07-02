@@ -81,3 +81,26 @@ FONT_MONO_SMALL  = (FONT_MONO, 10)
 RADIUS_SM = 4
 RADIUS_MD = 8
 RADIUS_LG = 12
+
+# === SEMANTIC TINTS (v22 — bg/border/text sets for banners, badges, chips) ===
+# Low-saturation dark tints paired with the SEMANTIC colors above. Formerly
+# duplicated hex literals across Import/Export/Outlier/Holiday/app sidebar.
+COLOR_INFO_TINT_BG        = "#08222B"   # cyan 8% on dark — active-month banner/badge bg
+COLOR_INFO_TINT_BORDER    = "#12454F"   # cyan tint border
+COLOR_INFO_TINT_TEXT      = "#5FB8C8"   # cyan 30% — "BULAN AKTIF" caption on tint bg
+
+COLOR_WARN_TINT_BG        = "#2A0A14"   # rose — mismatch / warning banner bg
+COLOR_WARN_TINT_BORDER    = "#5C1E2A"   # rose tint border
+COLOR_WARN_TINT_BADGE_BG  = "#22141A"   # muted rose — partial-result badge bg (export history)
+
+COLOR_SUCCESS_TINT_BG     = "#0F2218"   # emerald — success strip / full-result badge bg
+COLOR_SUCCESS_TINT_BORDER = "#1A4434"   # emerald tint border
+
+COLOR_VIOLET_TINT_BG      = "#160E1C"   # violet — excluded (Outlier) / holiday row bg
+COLOR_VIOLET_TINT_BORDER  = "#3A2348"   # violet tint border
+
+COLOR_ACCENT_TINT_BG      = "#27101C"   # magenta 10% — sidebar active-month chip bg
+COLOR_ACCENT_TINT_BORDER  = "#5A1E3A"   # magenta 25% — sidebar active-month chip border
+
+# === TEXT TIER (extension) ===
+COLOR_TEXT_SOFT           = "#C0C0C0"   # Nav item resting text — between TEXT and TEXT_DIM

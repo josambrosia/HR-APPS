@@ -7,11 +7,7 @@ it is unit-tested directly.
 from datetime import datetime
 from urllib.parse import quote
 
-_MONTH_ID = {
-    1: "Januari", 2: "Februari", 3: "Maret", 4: "April",
-    5: "Mei", 6: "Juni", 7: "Juli", 8: "Agustus",
-    9: "September", 10: "Oktober", 11: "November", 12: "Desember",
-}
+from src.core.week_utils import MONTH_NAMES_ID
 
 # attendance 'hari' is a full Indonesian day name; shorten to 3 letters.
 _HARI3 = {
@@ -34,7 +30,7 @@ def greeting_for_hour(hour: int) -> str:
 def _month_year(year_month: str) -> tuple[str, str]:
     """('Mei', '2026') from 'YYYY-MM'."""
     y, m = year_month.split("-")[:2]
-    return _MONTH_ID[int(m)], y
+    return MONTH_NAMES_ID[int(m)], y
 
 
 def kind_phrase(masuk, keluar) -> str:

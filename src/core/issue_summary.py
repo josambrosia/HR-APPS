@@ -1,17 +1,12 @@
 import sqlite3
 from datetime import datetime
 
-# Indonesian month names
-_MONTH_ID = {
-    1: "Januari", 2: "Februari", 3: "Maret", 4: "April",
-    5: "Mei", 6: "Juni", 7: "Juli", 8: "Agustus",
-    9: "September", 10: "Oktober", 11: "November", 12: "Desember",
-}
+from src.core.week_utils import MONTH_NAMES_ID, full_month_range
 
 
 def _format_date_id(iso_date: str) -> str:
     dt = datetime.strptime(iso_date, "%Y-%m-%d")
-    return f"{dt.day} {_MONTH_ID[dt.month]} {dt.year}"
+    return f"{dt.day} {MONTH_NAMES_ID[dt.month]} {dt.year}"
 
 
 def _describe_kind(masuk, keluar) -> str:
@@ -51,7 +46,6 @@ def render_summary_for_employee(
         return ""
 
     if year_month:
-        from src.core.week_utils import full_month_range
         start, end = full_month_range(year_month)
         issues = conn.execute(
             """
