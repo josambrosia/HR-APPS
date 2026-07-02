@@ -562,6 +562,22 @@ class ResolveScreenBase(ctk.CTkFrame):
         self._search_query = query
         self._render_rows(query)
 
+    def on_show(self):
+        """Shell hook — runs on every re-display of this cached screen.
+
+        Re-reads volatile inputs (bulan aktif + per-screen settings),
+        syncs the persistent WeekNavBar to the session week, reloads
+        counts/rows through the preserved search query, and resets the
+        detail panel — matching the pre-cache rebuild-on-nav behavior
+        (the selected row may have been resolved from another screen)."""
+        with get_connection(self._db_path()) as conn:
+            self._current_month = get_setting(conn, "current_month") or ""
+            self._load_extra_settings(conn)
+        self.nav.sync(self._current_month, period_state.get())
+        self.selected_id = None
+        self._reload()
+        self._build_panel_empty()
+
     def _reload(self):
         start, end = self._active_range()
         self._row_cache = {}

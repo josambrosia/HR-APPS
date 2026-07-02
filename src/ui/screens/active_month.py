@@ -32,6 +32,14 @@ class ActiveMonthScreen(ctk.CTkFrame):
         self._build_header()
         self._build_list()
 
+    def on_show(self):
+        """Shell hook — cached re-display: re-read the active month and
+        re-render the month cards (stats change after imports/resolves
+        made elsewhere)."""
+        with get_connection(DB_PATH) as conn:
+            self._current_month = get_setting(conn, "current_month") or ""
+        self._render_cards()
+
     def _build_header(self):
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", pady=(0, SPACE_LG))

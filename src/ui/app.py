@@ -5,7 +5,9 @@ from src.ui.theme import (
     FONT_FAMILY,
     COLOR_BG, COLOR_SIDEBAR, COLOR_SURFACE, COLOR_SURFACE_HIGH,
     COLOR_BORDER, COLOR_ACCENT, COLOR_ACCENT_HOVER,
+    COLOR_ACCENT_TINT_BG, COLOR_ACCENT_TINT_BORDER,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED, COLOR_TEXT_DISABLED,
+    COLOR_TEXT_SOFT,
     SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
     FONT_BODY, FONT_BODY_BOLD, FONT_LABEL,
     FONT_MONO_SMALL,
@@ -33,7 +35,13 @@ class HRApp(ctk.CTk):
 
         self._build_sidebar()
         self._build_content_area()
+        # Screen instances are cached: built once on first visit, then
+        # hidden/re-shown via grid_remove()/grid() so navigation is instant
+        # and per-screen UI state (search query, scroll, picked file)
+        # survives. Cached screens get .on_show() on every re-display to
+        # re-read volatile data — see _show().
         self._screens: Dict[str, ctk.CTkFrame] = {}
+        self._visible_name: str = ""
         self._show("Dashboard")
 
     def _on_return_key(self, event):
@@ -102,9 +110,9 @@ class HRApp(ctk.CTk):
         # ── Active month chip — clickable card with subtle magenta tint ──
         self._active_month_chip = ctk.CTkFrame(
             self.sidebar,
-            fg_color="#27101C",  # magenta 10% on dark bg
+            fg_color=COLOR_ACCENT_TINT_BG,
             border_width=1,
-            border_color="#5A1E3A",  # magenta 25% on dark bg
+            border_color=COLOR_ACCENT_TINT_BORDER,
             corner_radius=RADIUS_MD,
             cursor="hand2",
         )
@@ -251,7 +259,7 @@ class HRApp(ctk.CTk):
 
         text_lbl = ctk.CTkLabel(
             content, text=label, font=FONT_BODY,
-            text_color="#C0C0C0", anchor="w",
+            text_color=COLOR_TEXT_SOFT, anchor="w",
         )
         text_lbl.pack(side="left", padx=(SPACE_SM, 0))
 
@@ -306,7 +314,7 @@ class HRApp(ctk.CTk):
         if prev is not None:
             prev.configure(fg_color="transparent")
             prev._left_bar.pack_forget()
-            prev._text_lbl.configure(text_color="#C0C0C0", font=FONT_BODY)
+            prev._text_lbl.configure(text_color=COLOR_TEXT_SOFT, font=FONT_BODY)
             prev._icon_lbl.configure(text_color=COLOR_TEXT_DIM)
 
         new = self._nav_items.get(screen_key)
@@ -389,6 +397,54 @@ class HRApp(ctk.CTk):
             except Exception:
                 pass
 
+    def _create_screen(self, name: str) -> ctk.CTkFrame:
+        """Construct (without gridding) the screen instance for `name`.
+
+        Imports stay lazy inside each branch so startup only pays for the
+        first screen actually shown."""
+        if name == "Dashboard":
+            from src.ui.screens.dashboard import DashboardScreen
+            return DashboardScreen(self.content)
+        elif name == "Heatmap":
+            from src.ui.screens.heatmap import HeatmapScreen
+            return HeatmapScreen(self.content)
+        elif name == "Import":
+            from src.ui.screens.import_screen import ImportScreen
+            return ImportScreen(self.content)
+        elif name == "Issues":
+            from src.ui.screens.issues import IssuesScreen
+            return IssuesScreen(self.content)
+        elif name == "SevereLateness":
+            from src.ui.screens.severe_lateness import SevereLatenessScreen
+            return SevereLatenessScreen(self.content)
+        elif name == "WhatsAppAssistant":
+            from src.ui.screens.whatsapp_assistant import WhatsAppAssistantScreen
+            return WhatsAppAssistantScreen(self.content)
+        elif name == "Export":
+            from src.ui.screens.export import ExportScreen
+            return ExportScreen(self.content)
+        elif name == "ActiveMonth":
+            from src.ui.screens.active_month import ActiveMonthScreen
+            return ActiveMonthScreen(self.content)
+        elif name == "Coaching":
+            from src.ui.screens.coaching import CoachingScreen
+            return CoachingScreen(self.content)
+        elif name == "Outlier":
+            from src.ui.screens.outlier import OutlierScreen
+            return OutlierScreen(self.content)
+        elif name == "Holiday":
+            from src.ui.screens.holiday import HolidayScreen
+            return HolidayScreen(self.content)
+        elif name == "Settings":
+            from src.ui.screens.settings import SettingsScreen
+            return SettingsScreen(self.content)
+        # Placeholder for unknown names (defensive; nav never sends these).
+        frame = ctk.CTkFrame(self.content, fg_color="transparent")
+        ctk.CTkLabel(frame, text=name, font=(FONT_FAMILY, 28, "bold")).pack(pady=40)
+        ctk.CTkLabel(frame, text=f"Screen '{name}' — to be implemented in next tasks.",
+                     font=(FONT_FAMILY, 13)).pack()
+        return frame
+
     def _show(self, name: str):
         # Dialogs open as overlays without navigating away from the current screen.
         if name == "About":
@@ -398,52 +454,33 @@ class HRApp(ctk.CTk):
         self._refresh_active_month_label()
         # Update sidebar nav visual state
         self._set_active_nav_item(name)
-        # Clear current content
-        for child in self.content.winfo_children():
-            child.destroy()
-        if name == "Dashboard":
-            from src.ui.screens.dashboard import DashboardScreen
-            DashboardScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Heatmap":
-            from src.ui.screens.heatmap import HeatmapScreen
-            HeatmapScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Import":
-            from src.ui.screens.import_screen import ImportScreen
-            ImportScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Issues":
-            from src.ui.screens.issues import IssuesScreen
-            IssuesScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "SevereLateness":
-            from src.ui.screens.severe_lateness import SevereLatenessScreen
-            SevereLatenessScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "WhatsAppAssistant":
-            from src.ui.screens.whatsapp_assistant import WhatsAppAssistantScreen
-            WhatsAppAssistantScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Export":
-            from src.ui.screens.export import ExportScreen
-            ExportScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "ActiveMonth":
-            from src.ui.screens.active_month import ActiveMonthScreen
-            ActiveMonthScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Coaching":
-            from src.ui.screens.coaching import CoachingScreen
-            CoachingScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Outlier":
-            from src.ui.screens.outlier import OutlierScreen
-            OutlierScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Holiday":
-            from src.ui.screens.holiday import HolidayScreen
-            HolidayScreen(self.content).grid(row=0, column=0, sticky="nsew")
-        elif name == "Settings":
-            from src.ui.screens.settings import SettingsScreen
-            SettingsScreen(self.content).grid(row=0, column=0, sticky="nsew")
+
+        screen = self._screens.get(name)
+        if screen is not None and not screen.winfo_exists():
+            screen = None  # defensive: stale entry (should not happen)
+
+        # Hide the currently visible screen. grid_remove (not destroy)
+        # keeps the instance + its grid options for instant re-show.
+        prev = self._screens.get(self._visible_name)
+        if prev is not None and prev is not screen and prev.winfo_exists():
+            prev.grid_remove()
+
+        if screen is None:
+            # First visit — build fresh. __init__ already renders current
+            # data, so on_show() is NOT called here (see contract below).
+            screen = self._create_screen(name)
+            self._screens[name] = screen
+            screen.grid(row=0, column=0, sticky="nsew")
         else:
-            # placeholder for other screens (will be replaced in next tasks)
-            frame = ctk.CTkFrame(self.content, fg_color="transparent")
-            frame.grid(row=0, column=0, sticky="nsew")
-            ctk.CTkLabel(frame, text=name, font=(FONT_FAMILY, 28, "bold")).pack(pady=40)
-            ctk.CTkLabel(frame, text=f"Screen '{name}' — to be implemented in next tasks.",
-                         font=(FONT_FAMILY, 13)).pack()
+            # Cached — re-show, then let the screen re-read volatile data.
+            # on_show() contract: fast + idempotent; re-reads current_month/
+            # settings/period_state and refreshes rows WITHOUT rebuilding
+            # its chrome, so user state (search, scroll, picks) survives.
+            screen.grid()
+            on_show = getattr(screen, "on_show", None)
+            if callable(on_show):
+                on_show()
+        self._visible_name = name
 
     def _show_about(self):
         from src.ui.dialogs.about_dialog import AboutDialog

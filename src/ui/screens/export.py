@@ -147,7 +147,33 @@ class ExportScreen(ctk.CTkFrame):
         self._generate_panel = ctk.CTkFrame(self, fg_color="transparent")
         self._build_export_mode(self._export_panel)
         self._build_generate_mode(self._generate_panel)
+        self._gen_built_sig = self._gen_signature()
         self._show_mode("export")
+
+    def _gen_signature(self):
+        """(active month, known months) the Generate panels were built
+        from — their dropdown/week pills bake these in."""
+        with get_connection(DB_PATH) as conn:
+            months = tuple(r["year_month"] for r in list_months_with_stats(conn))
+            active = get_setting(conn, "current_month") or ""
+        return active, months
+
+    def on_show(self):
+        """Shell hook — cached re-display. The picked template/chip, mode,
+        and preview survive (the point of caching); banner + history
+        re-read the DB, and the Generate panels are rebuilt only when the
+        active month / month list changed since they were built."""
+        sig = self._gen_signature()
+        if sig != self._gen_built_sig:
+            self._gen_built_sig = sig
+            for panel in (self._gen_bulanan_panel, self._gen_mingguan_panel):
+                for child in panel.winfo_children():
+                    child.destroy()
+            self._build_gen_bulanan(self._gen_bulanan_panel)
+            self._build_gen_mingguan(self._gen_mingguan_panel)
+            self._show_gen_sub(self._gen_sub)
+        self._update_banner()
+        self._refresh_history()
 
     def _show_mode(self, mode):
         self._mode = mode

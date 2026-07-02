@@ -353,6 +353,13 @@ class ImportScreen(ctk.CTkFrame):
         # before= is needed here because pack() defaults to appending at end of slave list.
         self.dropzone.pack(fill="x", pady=(0, SPACE_LG), before=self.preview_frame)
 
+    def on_show(self):
+        """Shell hook — cached re-display: banner + history re-read the DB
+        (bulan aktif may have changed elsewhere). A parsed-but-unconfirmed
+        batch (chip + preview cards) deliberately survives navigation."""
+        self._update_banner()
+        self._render_history()
+
     def _update_banner(self):
         """Refresh banner based on current state (active month + pending file)."""
         with get_connection(DB_PATH) as conn:
