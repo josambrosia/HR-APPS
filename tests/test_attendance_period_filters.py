@@ -4,6 +4,7 @@ from src.db.employees import upsert_employee
 from src.db.attendance import (
     upsert_attendance, set_reason,
     list_issues_for_period, count_issues_for_period,
+    count_summary_for_period,
 )
 
 
@@ -80,3 +81,22 @@ def test_count_issues_returns_breakdown(temp_db_path):
         _seed_issues(conn)
         counts = count_issues_for_period(conn, "2026-04-08", "2026-04-14")
     assert counts == {"open": 1, "resolved": 1, "na": 1, "total": 3}
+
+
+def test_count_summary_for_period_breakdown(temp_db_path):
+    """Export-banner summary: distinct employees / issues / still-open issues."""
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        _seed_issues(conn)
+        stats = count_summary_for_period(conn, "2026-04-08", "2026-04-14")
+    # ANDIKA + BUDI; 3 has_issue rows; only BUDI's has no reason yet
+    # ('na' counts as handled here — reason_category IS NOT NULL)
+    assert stats == {"employees": 2, "issues": 3, "unresolved": 1}
+
+
+def test_count_summary_for_period_empty_range_returns_zeros(temp_db_path):
+    init_db(temp_db_path)
+    with get_connection(temp_db_path) as conn:
+        _seed_issues(conn)
+        stats = count_summary_for_period(conn, "2026-01-01", "2026-01-31")
+    assert stats == {"employees": 0, "issues": 0, "unresolved": 0}

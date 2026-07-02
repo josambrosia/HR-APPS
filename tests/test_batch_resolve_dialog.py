@@ -18,6 +18,14 @@ def _issue(conn, emp_id, tanggal, hari):
     )
 
 
+def test_format_tanggal_uses_shared_month_names():
+    """v22: _MONTH_ID local dict replaced by core.week_utils.MONTH_NAMES_ID."""
+    from src.ui.components.batch_resolve_dialog import _format_tanggal
+    assert _format_tanggal("2026-04-06", "Senin") == "Senin, 6 April 2026"
+    assert _format_tanggal("2026-12-01", None) == "1 Desember 2026"
+    assert _format_tanggal("not-a-date", "Senin") == "not-a-date"
+
+
 def test_group_open_issues_by_employee(temp_db_path):
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:

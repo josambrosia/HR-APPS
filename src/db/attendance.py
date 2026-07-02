@@ -149,6 +149,33 @@ def count_issues_for_period(conn: sqlite3.Connection, start: str, end: str):
     }
 
 
+def count_summary_for_period(conn: sqlite3.Connection, start: str, end: str) -> dict:
+    """Return {employees, issues, unresolved} counts for rows in [start, end].
+
+    employees  — distinct employee_id with any record in range
+    issues     — has_issue=1 rows
+    unresolved — has_issue=1 AND reason_category IS NULL (still open)
+
+    Used by the Export screen's active-month banner summary line.
+    """
+    row = conn.execute(
+        """
+        SELECT
+            COUNT(DISTINCT employee_id) AS emp_count,
+            SUM(CASE WHEN has_issue = 1 THEN 1 ELSE 0 END) AS issue_count,
+            SUM(CASE WHEN has_issue = 1 AND reason_category IS NULL THEN 1 ELSE 0 END) AS unresolved_count
+          FROM attendance_records
+         WHERE tanggal BETWEEN ? AND ?
+        """,
+        (start, end),
+    ).fetchone()
+    return {
+        "employees": row["emp_count"] or 0,
+        "issues": row["issue_count"] or 0,
+        "unresolved": row["unresolved_count"] or 0,
+    }
+
+
 def list_severe_lateness_for_period(conn, start, end, threshold_min, resolved=None):
     """Hari Kerja rows with both punches present and terlambat_menit >=
     threshold_min, in [start, end]. resolved=False -> reason_category IS NULL;

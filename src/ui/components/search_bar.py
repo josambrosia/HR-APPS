@@ -1,9 +1,9 @@
 """Reusable search input — pill input with placeholder, clear button,
 'N dari M' counter. Caller is responsible for the actual filtering
 logic; this component only owns the input UI and emits on_change(query)
-on every keystroke.
+on every keystroke (or after a typing pause when debounce_ms > 0).
 """
-from typing import Callable
+from typing import Callable, Optional
 
 import customtkinter as ctk
 
@@ -21,8 +21,12 @@ class SearchBar(ctk.CTkFrame):
 
     Layout: [🔍 input field] [✕] [12 dari 47]
 
-    Caller passes on_change(query: str) which is invoked on every
-    keystroke with the current query text.
+    Caller passes on_change(query: str) which is invoked with the current
+    query text — on every keystroke by default, or coalesced after a
+    typing pause when `debounce_ms` > 0 (screens that rebuild whole
+    treeviews per change use this so bursts of keystrokes cost one
+    re-render). Clear (✕) and Escape flush immediately — they never wait
+    out the debounce timer.
 
     NOTE on placeholder lifecycle: we deliberately do NOT use a
     textvariable here. CTkEntry's placeholder is suppressed when a
@@ -37,10 +41,13 @@ class SearchBar(ctk.CTkFrame):
         on_change: Callable[[str], None],
         placeholder: str = "🔍 Cari karyawan...",
         width: int = 240,
+        debounce_ms: int = 0,
         **kwargs,
     ):
         super().__init__(parent, fg_color="transparent", **kwargs)
         self._on_change = on_change
+        self._debounce_ms = int(debounce_ms)
+        self._pending_after_id: Optional[str] = None
 
         self._entry = ctk.CTkEntry(
             self,
@@ -55,6 +62,11 @@ class SearchBar(ctk.CTkFrame):
         )
         self._entry.pack(side="left", padx=(0, SPACE_XS))
         self._entry.bind("<KeyRelease>", self._on_key_release)
+        if self._debounce_ms > 0:
+            # Escape flushes a pending debounced notification NOW so power
+            # users never wait out the timer. Only bound in debounce mode —
+            # debounce_ms=0 callers keep the exact pre-v22 behavior.
+            self._entry.bind("<Escape>", self._flush_pending)
 
         self._clear_btn = ctk.CTkButton(
             self, text="✕", command=self.clear,
@@ -75,20 +87,55 @@ class SearchBar(ctk.CTkFrame):
         self._counter_label.pack(side="left")
 
     def _on_key_release(self, _e=None):
+        if self._debounce_ms <= 0:
+            self._on_change(self.get())
+            return
+        # Debounce: every keystroke restarts the timer; only the pause
+        # fires on_change, so rapid typing coalesces into one event.
+        self._cancel_pending()
+        self._pending_after_id = self.after(self._debounce_ms, self._fire_pending)
+
+    def _cancel_pending(self) -> None:
+        if self._pending_after_id is not None:
+            try:
+                self.after_cancel(self._pending_after_id)
+            except Exception:
+                pass
+            self._pending_after_id = None
+
+    def _fire_pending(self) -> None:
+        self._pending_after_id = None
+        try:
+            if not self.winfo_exists():
+                return  # timer outlived the widget (screen was switched)
+        except Exception:
+            return
         self._on_change(self.get())
+
+    def _flush_pending(self, _e=None) -> None:
+        """Deliver a pending debounced change immediately (Escape path)."""
+        if self._pending_after_id is not None:
+            self._cancel_pending()
+            self._on_change(self.get())
 
     def get(self) -> str:
         return self._entry.get()
 
     def set(self, value: str) -> None:
         """Programmatically set the query value. Used by tests to
-        simulate typing; production code should never call this."""
+        simulate typing; production code should never call this.
+        Always notifies immediately — never debounced."""
         self._entry.delete(0, "end")
         if value:
             self._entry.insert(0, value)
+        self._cancel_pending()
         self._on_change(self.get())
 
     def clear(self) -> None:
+        # A pending debounced notification would deliver a stale query
+        # after the field is emptied — cancel it and notify "" NOW so the
+        # clear feels instant.
+        self._cancel_pending()
         self._entry.delete(0, "end")
         # Move focus away from the entry so CTkEntry naturally re-activates
         # its placeholder on the FocusOut event. Avoids the ghost-placeholder

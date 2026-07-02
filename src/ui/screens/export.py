@@ -2,7 +2,7 @@ import os
 import tempfile
 import time
 from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 import customtkinter as ctk
 
 from src.config import DB_PATH
@@ -14,9 +14,14 @@ from src.core.week_utils import full_month_range, weeks_in_month
 from src.core.weekly_export import generate_weekly_export
 from src.core.filename_parser import detect_year_month_from_filename
 from src.core.report_generator import generate_monthly_report, month_label
-from src.db.attendance import list_months_with_stats
+from src.db.attendance import list_months_with_stats, count_summary_for_period
+from src.ui import feedback
+from src.ui.tasks import BusyGuard, run_bg
 from src.ui.components.kpi_card import KPICard
 from src.ui.components.toast import show_success_toast
+from src.ui.components.active_month_banner import ActiveMonthBanner
+from src.ui.components.file_chip import FileChip, FileChipAction
+from src.ui.components.history_list import HistoryList, HistoryRow
 from src.ui.screens.import_screen import _format_month_id, _format_relative_time
 from src.ui.theme import (
     FONT_FAMILY,
@@ -24,13 +29,85 @@ from src.ui.theme import (
     COLOR_BORDER, COLOR_BORDER_STRONG,
     COLOR_ACCENT, COLOR_ACCENT_HOVER,
     COLOR_INFO, COLOR_SUCCESS, COLOR_WARN,
-    COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED, COLOR_TEXT_DISABLED,
+    COLOR_SUCCESS_TINT_BG, COLOR_SUCCESS_TINT_BORDER,
+    COLOR_WARN_TINT_BADGE_BG,
+    COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
     FONT_DISPLAY,
     FONT_BODY, FONT_BODY_BOLD, FONT_LABEL, FONT_SMALL,
     FONT_MONO_DATA, FONT_MONO_SMALL,
     SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
-    RADIUS_SM, RADIUS_MD,
+    RADIUS_MD,
 )
+
+_KIND_LABELS = {
+    "fill": "Isi Template",
+    "generate_bulanan": "Generate Bulanan",
+    "generate_mingguan": "Generate Mingguan",
+}
+
+
+# ── Worker bodies (run in a background thread via run_bg) ──────────────
+# Module-level and Tk-free so tests can call them synchronously. Each one
+# opens its OWN SQLite connection — get_connection() creates a fresh
+# connection per use, the sanctioned cross-thread pattern (see the
+# src/ui/tasks.py docstring). NEVER touch widgets from these functions.
+
+def export_fill_work(db_path, template_path: Path, out_dir: Path):
+    """Fill the Laporan Bulanan template + record export history.
+
+    Returns (out_path, FillSummary).
+    """
+    with get_connection(db_path) as conn:
+        out_path, summary = fill_monthly_report(
+            template_path, conn, dry_run=False, out_dir=out_dir,
+        )
+        ym = get_setting(conn, "current_month") or "?"
+        record_export(
+            conn,
+            out_path=str(out_path),
+            template=str(template_path),
+            year_month=ym,
+            filled=summary.filled_count,
+            na=summary.na_count,
+            not_found=summary.not_found_count,
+        )
+    return out_path, summary
+
+
+def preview_fill_work(db_path, template_path: Path, tmp_dir: Path) -> Path:
+    """Fill the template into a temp dir (no history entry). Returns out_path."""
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    with get_connection(db_path) as conn:
+        out_path, _summary = fill_monthly_report(
+            template_path, conn, dry_run=False, out_dir=tmp_dir,
+        )
+    return out_path
+
+
+def generate_bulanan_work(db_path, year_month: str, out_path: Path):
+    """Generate Laporan Bulanan from DB + record history. Returns GenerateSummary."""
+    with get_connection(db_path) as conn:
+        summary = generate_monthly_report(
+            conn, year_month=year_month, out_path=out_path,
+        )
+        record_export(
+            conn, out_path=str(out_path), template="-",
+            year_month=year_month, filled=summary.rows_generated,
+            na=summary.na_count, not_found=0, kind="generate_bulanan",
+        )
+    return summary
+
+
+def generate_mingguan_work(db_path, week_start: str, week_end: str, out_path: Path):
+    """Generate Laporan Mingguan from DB + record history. Returns WeeklyExportSummary."""
+    with get_connection(db_path) as conn:
+        summary = generate_weekly_export(conn, week_start, week_end, out_path)
+        record_export(
+            conn, out_path=str(out_path), template="-",
+            year_month=week_start[:7], filled=summary.rows, na=0,
+            not_found=0, kind="generate_mingguan",
+        )
+    return summary
 
 
 class ExportScreen(ctk.CTkFrame):
@@ -40,6 +117,7 @@ class ExportScreen(ctk.CTkFrame):
         self._filename_mismatch = False
         self._detected_ym: str | None = None
         self._mode = "export"
+        self._busy_guard: BusyGuard | None = None
         self._build_shell()
 
     def _build_shell(self):
@@ -91,25 +169,8 @@ class ExportScreen(ctk.CTkFrame):
 
     def _build_export_mode(self, parent):
         # ── Active month banner ──
-        self.banner = ctk.CTkFrame(
-            parent, fg_color="#08222B",  # cyan tint
-            border_width=1, border_color="#12454F",
-            corner_radius=RADIUS_MD,
-        )
+        self.banner = ActiveMonthBanner(parent, variant="banner")
         self.banner.pack(fill="x", pady=(0, SPACE_MD))
-        self.banner_icon = ctk.CTkLabel(
-            self.banner, text="📆",
-            font=(FONT_FAMILY, 16),
-            text_color=COLOR_INFO,
-        )
-        self.banner_icon.pack(side="left", padx=(SPACE_MD, SPACE_SM), pady=SPACE_SM)
-        self.banner_text = ctk.CTkLabel(
-            self.banner, text="",
-            font=FONT_BODY,
-            text_color=COLOR_TEXT,
-            anchor="w", justify="left",
-        )
-        self.banner_text.pack(side="left", fill="x", expand=True, pady=SPACE_SM)
         self._update_banner()
 
         # ── R8: Save Destination dropdown ──
@@ -121,11 +182,7 @@ class ExportScreen(ctk.CTkFrame):
         self.picker_zone.pack(fill="x", pady=(0, SPACE_LG))
 
         # ── File chip (shown after pick) ──
-        self.chip_frame = ctk.CTkFrame(
-            parent, fg_color=COLOR_SURFACE,
-            border_width=1, border_color=COLOR_BORDER,
-            corner_radius=RADIUS_MD,
-        )
+        self.chip = FileChip(parent)
         # Not packed initially
 
         # ── Preview cards (after dry-run) ──
@@ -138,13 +195,12 @@ class ExportScreen(ctk.CTkFrame):
         # Not packed initially
 
         # ── History list at bottom ──
-        self.history_frame = ctk.CTkFrame(
-            parent, fg_color=COLOR_SURFACE,
-            border_width=1, border_color=COLOR_BORDER,
-            corner_radius=RADIUS_MD,
+        self.history = HistoryList(
+            parent, header="RIWAYAT EXPORT TERAKHIR",
+            empty_text="(belum ada riwayat export)",
         )
-        self.history_frame.pack(fill="x", pady=(SPACE_LG, 0))
-        self._render_history()
+        self.history.pack(fill="x", pady=(SPACE_LG, 0))
+        self._refresh_history()
 
     def _build_picker_zone(self, parent):
         """Build the picker card shown when no template selected."""
@@ -188,73 +244,26 @@ class ExportScreen(ctk.CTkFrame):
         self.picker_zone.pack_forget()
         self.result_frame.pack_forget()
 
-        for w in self.chip_frame.winfo_children():
-            w.destroy()
-
-        icon = ctk.CTkLabel(
-            self.chip_frame, text="📄",
-            font=(FONT_FAMILY, 24),
-            text_color=COLOR_TEXT,
-        )
-        icon.pack(side="left", padx=(SPACE_MD, SPACE_SM), pady=SPACE_MD)
-
-        info = ctk.CTkFrame(self.chip_frame, fg_color="transparent")
-        info.pack(side="left", fill="x", expand=True, pady=SPACE_MD)
-        ctk.CTkLabel(
-            info, text="TEMPLATE LAPORAN BULANAN",
-            font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
-            anchor="w",
-        ).pack(fill="x")
-        ctk.CTkLabel(
-            info, text=template_path.name,
-            font=FONT_MONO_DATA, text_color=COLOR_TEXT,
-            anchor="w",
-        ).pack(fill="x")
         size_kb = template_path.stat().st_size // 1024
-        ctk.CTkLabel(
-            info, text=f"{template_path.parent} · {size_kb} KB",
-            font=FONT_MONO_SMALL, text_color=COLOR_TEXT_MUTED,
-            anchor="w",
-        ).pack(fill="x")
         display_name = predicted_out_name or template_path.name  # fallback to template name
-        ctk.CTkLabel(
-            info, text=f"→ Akan menyimpan sebagai: {display_name}",
-            font=FONT_MONO_SMALL, text_color=COLOR_TEXT_DISABLED,
-            anchor="w",
-        ).pack(fill="x", pady=(SPACE_XS, 0))
+        self.chip.set_content(
+            label="TEMPLATE LAPORAN BULANAN",
+            filename=template_path.name,
+            meta=f"{template_path.parent} · {size_kb} KB",
+            extra=f"→ Akan menyimpan sebagai: {display_name}",
+            actions=(
+                FileChipAction("↻ Ganti", self._pick),
+                FileChipAction("👁 Preview", self._preview_file, kind="info", width=100),
+                FileChipAction("💾 Export", self._do_export, kind="primary", width=110),
+            ),
+        )
+        # Fresh buttons after every set_content — keep refs so the busy
+        # guard can freeze them and put "Memproses…" on the clicked one.
+        (self._chip_ganti_btn,
+         self._chip_preview_btn,
+         self._chip_export_btn) = self.chip.action_buttons
 
-        actions = ctk.CTkFrame(self.chip_frame, fg_color="transparent")
-        actions.pack(side="right", padx=SPACE_MD, pady=SPACE_MD)
-        ctk.CTkButton(
-            actions, text="↻ Ganti",
-            command=self._pick,
-            fg_color="transparent",
-            border_width=1, border_color=COLOR_BORDER_STRONG,
-            text_color=COLOR_TEXT_DIM,
-            hover_color=COLOR_SURFACE_HIGH,
-            font=FONT_BODY_BOLD,
-            width=80,
-        ).pack(side="left", padx=(0, SPACE_XS))
-        ctk.CTkButton(
-            actions, text="👁 Preview",
-            command=self._preview_file,
-            fg_color="transparent",
-            border_width=1, border_color=COLOR_INFO,
-            text_color=COLOR_INFO,
-            hover_color=COLOR_SURFACE_HIGH,
-            font=FONT_BODY_BOLD,
-            width=100,
-        ).pack(side="left", padx=(0, SPACE_XS))
-        ctk.CTkButton(
-            actions, text="💾 Export",
-            command=self._do_export,
-            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
-            text_color=COLOR_BG,
-            font=FONT_BODY_BOLD,
-            width=110,
-        ).pack(side="left")
-
-        self.chip_frame.pack(fill="x", pady=(0, SPACE_MD), before=self.preview_frame)
+        self.chip.pack(fill="x", pady=(0, SPACE_MD), before=self.preview_frame)
 
     def _update_banner(self):
         """Refresh banner with current_month info + data summary + R2 mismatch warn."""
@@ -263,49 +272,29 @@ class ExportScreen(ctk.CTkFrame):
             emp = issues = unresolved = 0
             if current:
                 start, end = full_month_range(current)
-                row = conn.execute("""
-                    SELECT
-                        COUNT(DISTINCT employee_id) AS emp_count,
-                        SUM(CASE WHEN has_issue = 1 THEN 1 ELSE 0 END) AS issue_count,
-                        SUM(CASE WHEN has_issue = 1 AND reason_category IS NULL THEN 1 ELSE 0 END) AS unresolved_count
-                    FROM attendance_records
-                    WHERE tanggal BETWEEN ? AND ?
-                """, (start, end)).fetchone()
-                if row:
-                    emp = row["emp_count"] or 0
-                    issues = row["issue_count"] or 0
-                    unresolved = row["unresolved_count"] or 0
+                stats = count_summary_for_period(conn, start, end)
+                emp = stats["employees"]
+                issues = stats["issues"]
+                unresolved = stats["unresolved"]
 
         # R2 — filename mismatch state takes priority over standard cyan/rose
         mismatch = getattr(self, "_filename_mismatch", False)
         detected = getattr(self, "_detected_ym", None)
         if mismatch and detected:
-            self.banner.configure(fg_color="#2A0A14", border_color="#5C1E2A")
-            self.banner_icon.configure(text="⚠", text_color=COLOR_WARN)
-            self.banner_text.configure(
-                text=(
-                    f"Mismatch: File mention '{_format_month_id(detected)}' "
-                    f"tapi bulan aktif '{_format_month_id(current)}'.\n"
-                    f"Data dari {_format_month_id(current)} akan dimasukkan ke template tersebut."
-                ),
+            self.banner.set_warn(
+                f"Mismatch: File mention '{_format_month_id(detected)}' "
+                f"tapi bulan aktif '{_format_month_id(current)}'.\n"
+                f"Data dari {_format_month_id(current)} akan dimasukkan ke template tersebut."
             )
             return
 
         if current:
-            self.banner.configure(fg_color="#08222B", border_color="#12454F")
-            self.banner_icon.configure(text="📆", text_color=COLOR_INFO)
-            self.banner_text.configure(
-                text=(
-                    f"Akan mengisi laporan untuk: {_format_month_id(current)}\n"
-                    f"{emp} pegawai · {issues} issues · {unresolved} unresolved"
-                ),
+            self.banner.set_info(
+                f"Akan mengisi laporan untuk: {_format_month_id(current)}\n"
+                f"{emp} pegawai · {issues} issues · {unresolved} unresolved"
             )
         else:
-            self.banner.configure(fg_color="#2A0A14", border_color="#5C1E2A")
-            self.banner_icon.configure(text="⚠", text_color=COLOR_WARN)
-            self.banner_text.configure(
-                text="Belum ada bulan aktif — pilih di Active Month dulu.",
-            )
+            self.banner.set_warn("Belum ada bulan aktif — pilih di Active Month dulu.")
 
     def _render_preview_placeholder(self):
         for child in self.preview_frame.winfo_children():
@@ -341,8 +330,8 @@ class ExportScreen(ctk.CTkFrame):
 
         strip = ctk.CTkFrame(
             self.result_frame,
-            fg_color="#0F2218",
-            border_width=1, border_color="#1A4434",
+            fg_color=COLOR_SUCCESS_TINT_BG,
+            border_width=1, border_color=COLOR_SUCCESS_TINT_BORDER,
             corner_radius=RADIUS_MD,
         )
         strip.pack(fill="x")
@@ -396,79 +385,40 @@ class ExportScreen(ctk.CTkFrame):
             width=90,
         ).pack(side="left")
 
-        self.result_frame.pack(fill="x", pady=(0, SPACE_LG), before=self.history_frame)
+        self.result_frame.pack(fill="x", pady=(0, SPACE_LG), before=self.history)
 
     def _open_folder(self, folder: Path):
         try:
             os.startfile(str(folder))
         except Exception as e:
-            messagebox.showwarning("Tidak bisa buka folder", str(e))
+            feedback.show_warning(self, "Tidak bisa buka folder", str(e))
 
     def _open_file(self, file_path: Path):
         try:
             os.startfile(str(file_path))
         except Exception as e:
-            messagebox.showwarning("Tidak bisa buka file", str(e))
+            feedback.show_warning(self, "Tidak bisa buka file", str(e))
 
-    def _render_history(self):
-        """Render the 'Riwayat Export Terakhir' list at the bottom."""
-        for w in self.history_frame.winfo_children():
-            w.destroy()
-
-        ctk.CTkLabel(
-            self.history_frame, text="RIWAYAT EXPORT TERAKHIR",
-            font=FONT_LABEL, text_color=COLOR_TEXT_MUTED,
-            anchor="w",
-        ).pack(fill="x", padx=SPACE_MD, pady=(SPACE_SM, SPACE_XS))
-
+    def _refresh_history(self):
+        """Reload 'Riwayat Export Terakhir' rows from the DB."""
         with get_connection(DB_PATH) as conn:
             items = list_recent_exports(conn, limit=5)
 
-        if not items:
-            ctk.CTkLabel(
-                self.history_frame, text="(belum ada riwayat export)",
-                font=FONT_BODY, text_color=COLOR_TEXT_MUTED,
-                anchor="w",
-            ).pack(fill="x", padx=SPACE_MD, pady=(0, SPACE_SM))
-            return
-
-        _KIND_LABELS = {
-            "fill": "Isi Template",
-            "generate_bulanan": "Generate Bulanan",
-            "generate_mingguan": "Generate Mingguan",
-        }
-
+        rows = []
         for it in items:
-            row = ctk.CTkFrame(self.history_frame, fg_color="transparent")
-            row.pack(fill="x", padx=SPACE_MD, pady=2)
-            ctk.CTkLabel(
-                row, text=_format_relative_time(it["created_at"]),
-                font=FONT_MONO_SMALL, text_color=COLOR_TEXT_MUTED,
-                anchor="w", width=120,
-            ).pack(side="left")
-            kind = it.get("kind", "fill")
-            ctk.CTkLabel(
-                row, text=_KIND_LABELS.get(kind, kind),
-                font=FONT_LABEL, text_color=COLOR_TEXT_DIM,
-                anchor="w", width=140,
-            ).pack(side="left", padx=(SPACE_SM, 0))
-            ctk.CTkLabel(
-                row, text=Path(it["out_path"]).name,
-                font=FONT_MONO_DATA, text_color=COLOR_TEXT,
-                anchor="w",
-            ).pack(side="left", fill="x", expand=True, padx=(SPACE_SM, SPACE_SM))
             total = it["filled"] + it["na"] + it["not_found"]
             is_full = it["na"] == 0 and it["not_found"] == 0
-            badge_text = f"✓ {it['filled']}/{total}" if is_full else f"{it['filled']}/{total}"
-            badge_bg = "#0F2218" if is_full else "#22141A"
-            badge_color = COLOR_SUCCESS if is_full else COLOR_WARN
-            ctk.CTkLabel(
-                row, text=badge_text,
-                font=FONT_MONO_SMALL, text_color=badge_color,
-                fg_color=badge_bg, corner_radius=RADIUS_SM,
-                anchor="e", width=80,
-            ).pack(side="right")
-        ctk.CTkFrame(self.history_frame, fg_color="transparent", height=SPACE_SM).pack()
+            kind = it.get("kind", "fill")
+            rows.append(HistoryRow(
+                time=_format_relative_time(it["created_at"]),
+                title=Path(it["out_path"]).name,
+                tag=_KIND_LABELS.get(kind, kind),
+                badge_text=f"✓ {it['filled']}/{total}" if is_full else f"{it['filled']}/{total}",
+                badge_color=COLOR_SUCCESS if is_full else COLOR_WARN,
+                badge_bg=COLOR_SUCCESS_TINT_BG if is_full else COLOR_WARN_TINT_BADGE_BG,
+                badge_width=80,
+            ))
+        self.history.set_rows(rows)
 
     def _build_save_destination(self, parent):
         """R8 — dropdown to choose where exported file is saved."""
@@ -553,8 +503,8 @@ class ExportScreen(ctk.CTkFrame):
                 target.mkdir(parents=True, exist_ok=True)
                 return target
             except OSError as e:
-                messagebox.showwarning(
-                    "Folder HR Reports tidak bisa dibuat",
+                feedback.show_warning(
+                    self, "Folder HR Reports tidak bisa dibuat",
                     f"Fallback ke folder template.\n\n{e}",
                 )
                 return template_path.parent
@@ -563,41 +513,86 @@ class ExportScreen(ctk.CTkFrame):
             if custom_path.exists():
                 return custom_path
             # Custom path is stale — folder was deleted/moved. Fall back.
-            messagebox.showwarning(
-                "Folder custom tidak ditemukan",
+            feedback.show_warning(
+                self, "Folder custom tidak ditemukan",
                 f"Fallback ke folder template.\n\nFolder hilang: {custom}",
             )
             return template_path.parent
         # default: template's parent
         return template_path.parent
 
-    def _preview_file(self):
-        """R7 — generate the filled .xlsx in a fresh temp subdir and open with default viewer.
+    # ── Busy guard (one scope shared by export + generate actions) ──
 
-        Uses timestamped subdir so repeated Preview clicks don't collide on Windows
-        file locks (Excel holds exclusive write lock when file is open).
+    def _screen_action_buttons(self) -> list:
+        """Every button that must freeze while an export/generate runs:
+        the file-chip actions + both Generate CTAs (those that exist)."""
+        buttons = list(self.chip.action_buttons)
+        for name in ("_gen_bulanan_btn", "_gen_mingguan_btn"):
+            btn = getattr(self, name, None)
+            if btn is not None:
+                buttons.append(btn)
+        return buttons
+
+    def _acquire_busy(self, primary) -> BusyGuard | None:
+        """Acquire the screen-wide busy scope. Returns the guard, or None
+        when an operation is already running (double-click → caller no-ops).
+
+        The clicked primary is passed first so BusyGuard shows "Memproses…"
+        on it; every other action button just gets disabled. The guard is
+        rebuilt per acquire because the chip's buttons are recreated on
+        every set_content()."""
+        if self._busy_guard is not None and self._busy_guard.busy:
+            return None
+        ordered = [primary] + [
+            b for b in self._screen_action_buttons() if b is not primary
+        ]
+        guard = BusyGuard(*ordered, busy_text="Memproses…")
+        guard.acquire()
+        self._busy_guard = guard
+        return guard
+
+    # ── Export-mode actions ──
+
+    def _preview_file(self):
+        """R7 — generate the filled .xlsx in a fresh temp subdir (in the
+        background) and open with the default viewer.
+
+        Uses timestamped subdir so repeated Preview clicks don't collide on
+        Windows file locks (Excel holds exclusive write lock when file is open).
         """
         if not self._selected:
             return
-        tmp_dir = Path(tempfile.gettempdir()) / f"hr-preview-{int(time.time())}"
-        try:
-            tmp_dir.mkdir(parents=True, exist_ok=True)
-            with get_connection(DB_PATH) as conn:
-                out_path, _summary = fill_monthly_report(
-                    self._selected, conn, dry_run=False, out_dir=tmp_dir,
-                )
-        except Exception as e:
-            messagebox.showerror("Error generate preview", str(e))
+        guard = self._acquire_busy(self._chip_preview_btn)
+        if guard is None:
             return
+        # Gather inputs on the UI thread before spawning the worker
+        db_path, template = DB_PATH, self._selected
+        tmp_dir = Path(tempfile.gettempdir()) / f"hr-preview-{int(time.time())}"
+        run_bg(
+            self,
+            work=lambda progress: preview_fill_work(db_path, template, tmp_dir),
+            on_done=lambda out_path: self._on_preview_done(guard, out_path),
+            on_error=lambda exc: self._on_preview_error(guard, exc),
+        )
+
+    def _on_preview_done(self, guard: BusyGuard, out_path: Path):
+        guard.release()  # release before the (blocking) failure dialog below
         try:
             os.startfile(str(out_path))
         except Exception as e:
-            messagebox.showwarning(
-                "Tidak bisa buka file",
+            feedback.show_warning(
+                self, "Tidak bisa buka file",
                 f"File tergenerate di:\n{out_path}\n\nTapi gagal dibuka otomatis:\n{e}",
             )
 
+    def _on_preview_error(self, guard: BusyGuard, exc: Exception):
+        guard.release()
+        feedback.show_error(self, "Error generate preview", str(exc))
+
     def _pick(self):
+        if self._busy_guard is not None and self._busy_guard.busy:
+            return  # an export/generate is running — don't rebuild the chip mid-flight
+
         # Reset state from any previous selection
         self._filename_mismatch = False
         self._detected_ym = None
@@ -631,7 +626,7 @@ class ExportScreen(ctk.CTkFrame):
                     self._selected, conn, dry_run=True,
                 )
         except Exception as e:
-            messagebox.showerror("Error preview", str(e))
+            feedback.show_error(self, "Error preview", str(e))
             self._selected = None
             return
 
@@ -646,32 +641,34 @@ class ExportScreen(ctk.CTkFrame):
     def _do_export(self):
         if not self._selected:
             return
-        try:
-            out_dir = self._resolve_save_destination(self._selected)
-            with get_connection(DB_PATH) as conn:
-                out_path, summary = fill_monthly_report(
-                    self._selected, conn, dry_run=False, out_dir=out_dir,
-                )
-                ym = get_setting(conn, "current_month") or "?"
-                record_export(
-                    conn,
-                    out_path=str(out_path),
-                    template=str(self._selected),
-                    year_month=ym,
-                    filled=summary.filled_count,
-                    na=summary.na_count,
-                    not_found=summary.not_found_count,
-                )
-        except Exception as e:
-            messagebox.showerror("Error export", str(e))
+        guard = self._acquire_busy(self._chip_export_btn)
+        if guard is None:
             return
+        # Gather inputs on the UI thread before spawning the worker
+        db_path, template = DB_PATH, self._selected
+        out_dir = self._resolve_save_destination(template)
+        run_bg(
+            self,
+            work=lambda progress: export_fill_work(db_path, template, out_dir),
+            on_done=lambda result: self._on_export_done(guard, result),
+            on_error=lambda exc: self._on_export_error(guard, exc),
+        )
 
-        self._render_result_strip(out_path, summary)
-        self._render_history()
-        # Reset mismatch flag — action already done, banner shouldn't say "akan dimasukkan"
-        self._filename_mismatch = False
-        self._detected_ym = None
-        self._update_banner()
+    def _on_export_done(self, guard: BusyGuard, result):
+        out_path, summary = result
+        try:
+            self._render_result_strip(out_path, summary)
+            self._refresh_history()
+            # Reset mismatch flag — action already done, banner shouldn't say "akan dimasukkan"
+            self._filename_mismatch = False
+            self._detected_ym = None
+            self._update_banner()
+        finally:
+            guard.release()
+
+    def _on_export_error(self, guard: BusyGuard, exc: Exception):
+        guard.release()
+        feedback.show_error(self, "Error export", str(exc))
 
     def _build_generate_mode(self, parent):
         """Generate mode — build a report from the database. Sub-modes:
@@ -750,12 +747,13 @@ class ExportScreen(ctk.CTkFrame):
             text_color=COLOR_TEXT,
         ).pack(anchor="w", padx=SPACE_XS, pady=(SPACE_XS, SPACE_MD))
 
-        ctk.CTkButton(
+        self._gen_bulanan_btn = ctk.CTkButton(
             parent, text="⚙ Generate Laporan Bulanan", height=36,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
             text_color=COLOR_BG, font=FONT_BODY_BOLD,
             command=self._on_generate_bulanan,
-        ).pack(anchor="w", padx=SPACE_XS)
+        )
+        self._gen_bulanan_btn.pack(anchor="w", padx=SPACE_XS)
 
     def _build_gen_mingguan(self, parent):
         with get_connection(DB_PATH) as conn:
@@ -794,12 +792,13 @@ class ExportScreen(ctk.CTkFrame):
             self._mingguan_week_btns[n] = b
         self._on_select_week(self._mingguan_weeks[0])
 
-        ctk.CTkButton(
+        self._gen_mingguan_btn = ctk.CTkButton(
             parent, text="⚙ Generate Laporan Mingguan", height=36,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
             text_color=COLOR_BG, font=FONT_BODY_BOLD,
             command=self._on_generate_mingguan,
-        ).pack(anchor="w", padx=SPACE_XS)
+        )
+        self._gen_mingguan_btn.pack(anchor="w", padx=SPACE_XS)
 
     def _on_select_week(self, week):
         self._mingguan_sel = week
@@ -811,6 +810,9 @@ class ExportScreen(ctk.CTkFrame):
                 btn.configure(fg_color=COLOR_SURFACE, text_color=COLOR_TEXT_DIM)
 
     def _on_generate_mingguan(self):
+        guard = self._acquire_busy(self._gen_mingguan_btn)
+        if guard is None:
+            return
         n, start, end = self._mingguan_sel
         default_name = f"Laporan Mingguan {start} sd {end}.xlsx"
         out_path = filedialog.asksaveasfilename(
@@ -819,30 +821,39 @@ class ExportScreen(ctk.CTkFrame):
             title=f"Simpan Laporan Mingguan (Minggu {n})",
         )
         if not out_path:
+            guard.release()
             return
-        try:
-            with get_connection(DB_PATH) as conn:
-                summary = generate_weekly_export(conn, start, end, Path(out_path))
-                record_export(
-                    conn, out_path=str(out_path), template="-",
-                    year_month=start[:7], filled=summary.rows, na=0,
-                    not_found=0, kind="generate_mingguan",
-                )
-        except Exception as e:
-            messagebox.showerror(
-                "Error generate mingguan", f"Tidak bisa generate file:\n{e}",
-            )
-            return
-        self._render_history()
-        show_success_toast(
-            self.winfo_toplevel(), title="Laporan Mingguan Dibuat",
-            message=(
-                f"Minggu {n} ({start} sd {end}) disimpan.\n"
-                f"{summary.rows} baris · {summary.employees} pegawai"
+        db_path = DB_PATH
+        run_bg(
+            self,
+            work=lambda progress: generate_mingguan_work(
+                db_path, start, end, Path(out_path),
+            ),
+            on_done=lambda summary: self._on_generate_mingguan_done(
+                guard, n, start, end, summary,
+            ),
+            on_error=lambda exc: self._on_generate_error(
+                guard, "Error generate mingguan", exc,
             ),
         )
 
+    def _on_generate_mingguan_done(self, guard: BusyGuard, n, start, end, summary):
+        try:
+            self._refresh_history()
+            show_success_toast(
+                self.winfo_toplevel(), title="Laporan Mingguan Dibuat",
+                message=(
+                    f"Minggu {n} ({start} sd {end}) disimpan.\n"
+                    f"{summary.rows} baris · {summary.employees} pegawai"
+                ),
+            )
+        finally:
+            guard.release()
+
     def _on_generate_bulanan(self):
+        guard = self._acquire_busy(self._gen_bulanan_btn)
+        if guard is None:
+            return
         year_month = self._gen_month_map[self._gen_month_var.get()]
         default_name = f"Laporan Bulanan {month_label(year_month)} [Auto Filled].xlsx"
         out_path = filedialog.asksaveasfilename(
@@ -851,27 +862,35 @@ class ExportScreen(ctk.CTkFrame):
             title=f"Simpan Laporan {month_label(year_month)}",
         )
         if not out_path:
+            guard.release()
             return
-        try:
-            with get_connection(DB_PATH) as conn:
-                summary = generate_monthly_report(
-                    conn, year_month=year_month, out_path=Path(out_path),
-                )
-                record_export(
-                    conn, out_path=str(out_path), template="-",
-                    year_month=year_month, filled=summary.rows_generated,
-                    na=summary.na_count, not_found=0, kind="generate_bulanan",
-                )
-        except Exception as e:
-            messagebox.showerror(
-                "Error generate laporan", f"Tidak bisa generate file:\n{e}",
-            )
-            return
-        self._render_history()
-        show_success_toast(
-            self.winfo_toplevel(), title="Laporan Berhasil Dibuat",
-            message=(
-                f"Laporan Bulanan {month_label(year_month)} disimpan.\n"
-                f"{summary.rows_generated} baris · {summary.na_count} NA"
+        db_path = DB_PATH
+        run_bg(
+            self,
+            work=lambda progress: generate_bulanan_work(
+                db_path, year_month, Path(out_path),
+            ),
+            on_done=lambda summary: self._on_generate_bulanan_done(
+                guard, year_month, summary,
+            ),
+            on_error=lambda exc: self._on_generate_error(
+                guard, "Error generate laporan", exc,
             ),
         )
+
+    def _on_generate_bulanan_done(self, guard: BusyGuard, year_month: str, summary):
+        try:
+            self._refresh_history()
+            show_success_toast(
+                self.winfo_toplevel(), title="Laporan Berhasil Dibuat",
+                message=(
+                    f"Laporan Bulanan {month_label(year_month)} disimpan.\n"
+                    f"{summary.rows_generated} baris · {summary.na_count} NA"
+                ),
+            )
+        finally:
+            guard.release()
+
+    def _on_generate_error(self, guard: BusyGuard, title: str, exc: Exception):
+        guard.release()
+        feedback.show_error(self, title, f"Tidak bisa generate file:\n{exc}")

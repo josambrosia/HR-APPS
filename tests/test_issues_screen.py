@@ -271,7 +271,9 @@ def test_issues_on_unresolve_bumps_data_version(temp_db_path, monkeypatch, tk_ro
     screen = mod.IssuesScreen(tk_root)
     tk_root.update_idletasks()
     screen.selected_id = rid
-    monkeypatch.setattr(mod.messagebox, "askyesno", lambda *a, **k: True)
+    # v22: unresolve confirms via the dark feedback dialog, not messagebox.
+    from src.ui import feedback
+    monkeypatch.setattr(feedback, "ask_yes_no", lambda *a, **k: True)
     calls = []
     monkeypatch.setattr(mod, "notify_data_changed", lambda: calls.append(1))
     screen._on_unresolve()

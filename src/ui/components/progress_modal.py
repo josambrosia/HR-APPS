@@ -1,6 +1,6 @@
 """Shared progress overlay modal — reusable for long operations.
 
-Usage:
+Usage (sync loop on the main thread — legacy style):
     with ProgressModal(parent, title="Memproses file") as p:
         p.update_progress(0.0, "Parsing...")
         # ... work ...
@@ -8,9 +8,17 @@ Usage:
         # ... more work ...
         p.update_progress(1.0, "Selesai")
 
-The modal uses Tk's single-threaded update() to refresh during long
-loops. Acceptable since this is a single-user desktop app — no
-concurrent user requests to block.
+update_progress() pumps Tk's single-threaded update() so the bar
+repaints while the main loop is blocked by the work loop.
+
+Usage (async — run_bg flows, main loop stays free):
+    modal = ProgressModal(parent, title="Memproses Import")
+    modal.open()
+    # on_progress (main thread) → modal.set_progress(done / total, "...")
+    # on_done / on_error       → modal.close()
+
+set_progress() does NOT pump the event loop — with run_bg the main loop
+is already free, so widgets repaint on the next idle by themselves.
 """
 import customtkinter as ctk
 
@@ -81,13 +89,31 @@ class ProgressModal:
         self.window.update()
         return self
 
+    def open(self):
+        """Show the modal outside a `with` block (async run_bg flows)."""
+        return self.__enter__()
+
+    def close(self):
+        """Destroy a modal shown via open(). Safe to call when closed."""
+        self.__exit__(None, None, None)
+
     def update_progress(self, pct: float, status: str):
-        """Set progress bar (0.0-1.0) and status text. Forces redraw."""
+        """Set progress bar (0.0-1.0) and status text. Forces redraw —
+        for sync loops that block the main loop between calls."""
         if self.window is None:
             return
         self.bar.set(max(0.0, min(1.0, pct)))
         self.status_lbl.configure(text=status)
         self.window.update()
+
+    def set_progress(self, pct: float, status: str):
+        """Set progress bar (0.0-1.0) and status text WITHOUT pumping the
+        event loop — for async flows (run_bg on_progress callbacks) where
+        the main loop is free and update() would re-enter it mid-callback."""
+        if self.window is None:
+            return
+        self.bar.set(max(0.0, min(1.0, pct)))
+        self.status_lbl.configure(text=status)
 
     def __exit__(self, *args):
         if self.window is not None:

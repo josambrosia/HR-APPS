@@ -7,13 +7,14 @@ checked date via the existing set_reason DB function.
 from typing import Callable, Optional
 
 import customtkinter as ctk
-from tkinter import messagebox
 
 from src.config import DB_PATH
 from src.db.connection import get_connection
 from src.core.session_state import notify_data_changed
+from src.core.week_utils import MONTH_NAMES_ID
 from src.db.attendance import set_reason, list_issues_for_period
 from src.core.reason_mapper import REASON_LABELS, REASON_NEEDS_DETAIL
+from src.ui import feedback
 from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
     COLOR_BORDER,
@@ -29,18 +30,12 @@ DIALOG_W = 520
 DIALOG_H = 600
 _SCREEN_BUFFER = 100
 
-_MONTH_ID = {
-    1: "Januari", 2: "Februari", 3: "Maret", 4: "April", 5: "Mei", 6: "Juni",
-    7: "Juli", 8: "Agustus", 9: "September", 10: "Oktober",
-    11: "November", 12: "Desember",
-}
-
 
 def _format_tanggal(iso: str, hari: Optional[str]) -> str:
     """'2026-04-06', 'Senin' -> 'Senin, 6 April 2026'."""
     try:
         y, m, d = iso.split("-")
-        label = f"{int(d)} {_MONTH_ID[int(m)]} {y}"
+        label = f"{int(d)} {MONTH_NAMES_ID[int(m)]} {y}"
     except (ValueError, KeyError):
         return iso
     return f"{hari}, {label}" if hari else label
@@ -328,16 +323,26 @@ class BatchResolveDialog(ctk.CTkToplevel):
         self._preview.configure(text=f"{n} tanggal dipilih")
         self._submit_btn.configure(text=f"Resolve {n} Issue" if n else "Resolve")
 
+    def _regrab(self):
+        """Re-assert modality after a nested MessageDialog closed — Tk
+        releases its grab on destroy but does NOT restore ours."""
+        try:
+            self.grab_set()
+        except Exception:
+            pass
+
     def _on_submit(self):
         ids = self._checked_ids()
         if not ids:
-            messagebox.showwarning("Pilih tanggal",
-                                   "Belum ada tanggal yang dipilih.")
+            feedback.show_warning(self, "Pilih tanggal",
+                                  "Belum ada tanggal yang dipilih.")
+            self._regrab()
             return
         cat = self._label_to_key.get(self._cat_var.get(), "")
         if cat not in REASON_LABELS:
-            messagebox.showwarning("Pilih kategori",
-                                   "Belum memilih kategori alasan.")
+            feedback.show_warning(self, "Pilih kategori",
+                                  "Belum memilih kategori alasan.")
+            self._regrab()
             return
         detail = (self._detail_entry.get().strip()
                   if cat in REASON_NEEDS_DETAIL else None) or None
