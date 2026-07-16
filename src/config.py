@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "22.0.0"
-APP_BUILD_DATE = "2026-07-03"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "23.0.0"
+APP_BUILD_DATE = "2026-07-16"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,24 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "23.0.0",
+        "date": "2026-07-16",
+        "changes": [
+            ("feat", "Edit Data langsung dari Heatmap: klik sel mana pun untuk "
+                     "menyunting, menambah, atau menghapus data absensi satu hari. "
+                     "Status issue, menit telat, jam kerja, dan lembur dihitung "
+                     "ulang otomatis. Tidak perlu import ulang untuk membetulkan data."),
+            ("feat", "Backup & Restore di Settings: snapshot seluruh database dibuat "
+                     "otomatis sebelum tiap import dan sebelum hapus baris, plus "
+                     "tombol backup manual. Riwayat disimpan 1 tahun terakhir dan "
+                     "bisa dipulihkan kapan saja."),
+            ("feat", "Perlindungan konflik import: saat import akan menimpa data yang "
+                     "pernah kamu sunting manual, muncul jendela konfirmasi per baris "
+                     "untuk memilih pertahankan koreksianmu atau pakai data import. "
+                     "Data lama tidak lagi tertimpa diam-diam."),
+        ],
+    },
     {
         "version": "22.0.0",
         "date": "2026-07-03",
