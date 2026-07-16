@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
     resolved_at     TEXT,
     imported_from   TEXT,
     imported_at     TEXT,
+    manual_edited_at TEXT,
     UNIQUE (employee_id, tanggal)
 );
 
@@ -115,6 +116,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ALTER TABLE export_history "
             "ADD COLUMN kind TEXT NOT NULL DEFAULT 'fill'"
         )
+
+    # v23: manual_edited_at marks rows the user corrected by hand (feeds import
+    # conflict detection). CREATE TABLE IF NOT EXISTS never adds a column to an
+    # existing table, so an ALTER is required for pre-existing databases.
+    acols = {row[1] for row in conn.execute("PRAGMA table_info(attendance_records)")}
+    if "manual_edited_at" not in acols:
+        conn.execute("ALTER TABLE attendance_records ADD COLUMN manual_edited_at TEXT")
 
     # Coaching threshold: weekly → daily (idempotent — only writes if new key absent).
     row = conn.execute(
