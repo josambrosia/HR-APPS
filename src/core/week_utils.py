@@ -29,6 +29,17 @@ MONTH_NAMES_ID: Dict[int, str] = {
 }
 
 
+# Indonesian day names indexed by date.weekday() (Monday=0 .. Sunday=6).
+# Single source of truth for turning an ISO date into a 'hari' when the app
+# creates an attendance row manually (imports carry 'hari' from the machine).
+HARI_NAMES_ID = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+
+
+def hari_name(date_iso: str) -> str:
+    """ISO 'YYYY-MM-DD' → Indonesian day name (Senin..Minggu)."""
+    return HARI_NAMES_ID[date.fromisoformat(date_iso).weekday()]
+
+
 def parse_month(month_str: str) -> Tuple[int, int]:
     """Parse 'YYYY-MM' into (year, month). Raises ValueError on bad input."""
     year_s, month_s = month_str.split("-")
