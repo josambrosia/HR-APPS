@@ -7,6 +7,7 @@ Data Absensi/
 data/*.db
 data/*.db-journal
 data/*.bak
+data/backups/
 output/
 
 # ---- Brainstorm session (local-only artifacts) ----

@@ -6,6 +6,7 @@ from src.core.session_state import notify_data_changed
 from src.db.connection import get_connection
 from src.db.settings import get_setting, set_setting
 from src.db.employees import list_employees, toggle_employee_active
+from src.db import backup as backup_mod
 from src.ui import feedback
 from src.ui.components.tree_style import style_treeview
 from src.ui.theme import (
@@ -13,10 +14,10 @@ from src.ui.theme import (
     COLOR_BORDER,
     COLOR_ACCENT, COLOR_ACCENT_HOVER,
     COLOR_SECONDARY, COLOR_SECONDARY_HOVER,
-    COLOR_INFO, COLOR_SUCCESS,
+    COLOR_INFO, COLOR_SUCCESS, COLOR_WARN, COLOR_ERROR,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
     FONT_DISPLAY,
-    FONT_BODY, FONT_BODY_BOLD, FONT_SMALL,
+    FONT_BODY, FONT_BODY_BOLD, FONT_SMALL, FONT_MONO_SMALL,
     SPACE_XS, SPACE_SM, SPACE_MD,
     RADIUS_MD,
 )
@@ -56,10 +57,12 @@ class SettingsScreen(ctk.CTkFrame):
         self.tabs.add("General")
         self.tabs.add("Pegawai")
         self.tabs.add("Profil")
+        self.tabs.add("Backup & Restore")
 
         self._build_general(self.tabs.tab("General"))
         self._build_pegawai(self.tabs.tab("Pegawai"))
         self._build_profil(self.tabs.tab("Profil"))
+        self._build_backup(self.tabs.tab("Backup & Restore"))
 
     def _build_general(self, parent):
         with get_connection(DB_PATH) as conn:
@@ -235,6 +238,144 @@ class SettingsScreen(ctk.CTkFrame):
             corner_radius=RADIUS_MD,
         ).pack(anchor="w", pady=SPACE_MD)
 
+    # ── Backup & Restore tab ──────────────────────────────────────────
+    _BADGE_COLOR = {
+        "sebelum-import": COLOR_WARN, "manual": COLOR_ACCENT_HOVER,
+        "sebelum-hapus": COLOR_ERROR, "sebelum-restore": COLOR_INFO,
+    }
+
+    def _build_backup(self, parent):
+        bar = ctk.CTkFrame(parent, fg_color="transparent")
+        bar.pack(fill="x", pady=(SPACE_SM, SPACE_XS))
+        ctk.CTkButton(
+            bar, text="＋ Backup sekarang", command=self._do_manual_backup,
+            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+            text_color=COLOR_BG, font=FONT_BODY_BOLD, corner_radius=RADIUS_MD,
+            width=150,
+        ).pack(side="left")
+        ctk.CTkButton(
+            bar, text="📂 Buka folder", command=self._open_backup_folder,
+            fg_color="transparent", border_width=1, border_color=COLOR_INFO,
+            text_color=COLOR_INFO, hover_color=COLOR_SURFACE_HIGH,
+            font=FONT_BODY_BOLD, corner_radius=RADIUS_MD, width=130,
+        ).pack(side="left", padx=(SPACE_SM, 0))
+        ctk.CTkLabel(
+            bar,
+            text="Backup otomatis dibuat sebelum tiap import & sebelum hapus baris.",
+            font=FONT_SMALL, text_color=COLOR_TEXT_DIM,
+        ).pack(side="left", padx=(SPACE_MD, 0))
+
+        ctk.CTkLabel(
+            parent,
+            text="data/backups/  ·  retensi 1 tahun · snapshot lama auto-hapus "
+                 "(batas ~1 GB, min. 5 terbaru disimpan)",
+            font=FONT_MONO_SMALL, text_color=COLOR_TEXT_MUTED, anchor="w",
+        ).pack(fill="x", pady=(0, SPACE_SM))
+
+        self._backup_list = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+        self._backup_list.pack(fill="both", expand=True)
+        self._render_backups()
+
+    def _render_backups(self):
+        for w in self._backup_list.winfo_children():
+            w.destroy()
+        items = backup_mod.list_backups(DB_PATH)
+        if not items:
+            ctk.CTkLabel(
+                self._backup_list, text="(belum ada backup)",
+                font=FONT_BODY, text_color=COLOR_TEXT_MUTED,
+            ).pack(anchor="w", pady=SPACE_SM)
+            return
+        for it in items:
+            row = ctk.CTkFrame(
+                self._backup_list, fg_color=COLOR_SURFACE,
+                border_width=1, border_color=COLOR_BORDER, corner_radius=RADIUS_MD,
+            )
+            row.pack(fill="x", pady=SPACE_XS)
+
+            meta = ctk.CTkFrame(row, fg_color="transparent")
+            meta.pack(side="left", fill="x", expand=True, padx=SPACE_MD, pady=SPACE_SM)
+            ctk.CTkLabel(
+                meta, text=it["filename"], font=FONT_MONO_SMALL,
+                text_color=COLOR_TEXT, anchor="w",
+            ).pack(anchor="w")
+            size_mb = it["size_bytes"] / (1024 * 1024)
+            size_txt = (f"{size_mb:.1f} MB" if size_mb >= 0.1
+                        else f"{max(1, it['size_bytes'] // 1024)} KB")
+            ctk.CTkLabel(
+                meta, text=f"{it['created_at']:%d %b %Y · %H:%M}  ·  {size_txt}",
+                font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, anchor="w",
+            ).pack(anchor="w")
+
+            ctk.CTkLabel(
+                row, text=it["reason"], font=FONT_SMALL,
+                text_color=self._BADGE_COLOR.get(it["reason"], COLOR_TEXT_MUTED),
+            ).pack(side="left", padx=SPACE_SM)
+
+            ctk.CTkButton(
+                row, text="Hapus", width=64,
+                command=lambda p=it["path"]: self._delete_backup(p),
+                fg_color="transparent", border_width=1, border_color=COLOR_ERROR,
+                text_color=COLOR_ERROR, hover_color=COLOR_SURFACE_HIGH,
+                font=FONT_SMALL, corner_radius=RADIUS_MD,
+            ).pack(side="right", padx=(0, SPACE_SM), pady=SPACE_SM)
+            ctk.CTkButton(
+                row, text="Restore", width=72,
+                command=lambda p=it["path"]: self._restore(p),
+                fg_color="transparent", border_width=1, border_color=COLOR_INFO,
+                text_color=COLOR_INFO, hover_color=COLOR_SURFACE_HIGH,
+                font=FONT_SMALL, corner_radius=RADIUS_MD,
+            ).pack(side="right", padx=(0, SPACE_XS), pady=SPACE_SM)
+
+    def _do_manual_backup(self):
+        try:
+            backup_mod.create_backup(DB_PATH, reason="manual")
+        except Exception as exc:  # noqa: BLE001 — surface any copy failure
+            feedback.show_error(self, "Backup gagal", str(exc))
+            return
+        self._render_backups()
+        feedback.show_info(self, "Backup dibuat",
+                           "Snapshot database berhasil dibuat.")
+
+    def _open_backup_folder(self):
+        import os
+        d = backup_mod.backup_dir(DB_PATH)
+        d.mkdir(parents=True, exist_ok=True)
+        try:
+            os.startfile(str(d))  # noqa: S606 — Windows Explorer on a known dir
+        except Exception as exc:  # noqa: BLE001
+            feedback.show_error(self, "Tidak bisa membuka folder", str(exc))
+
+    def _restore(self, path):
+        if not feedback.ask_yes_no(
+            self, "Restore data?",
+            "Seluruh data akan diganti dengan snapshot ini.\n"
+            "Data saat ini otomatis di-backup dulu (bisa dikembalikan).\n\nLanjut?",
+        ):
+            return
+        try:
+            backup_mod.restore_backup(DB_PATH, path)
+        except Exception as exc:  # noqa: BLE001
+            feedback.show_error(self, "Restore gagal", str(exc))
+            return
+        notify_data_changed()
+        self._render_backups()
+        self._reload_pegawai()
+        feedback.show_info(
+            self, "Restore selesai",
+            "Data dipulihkan. Disarankan menutup & membuka ulang aplikasi.")
+
+    def _delete_backup(self, path):
+        if not feedback.ask_yes_no(self, "Hapus backup?",
+                                   f"Hapus snapshot ini permanen?\n{path.name}"):
+            return
+        try:
+            path.unlink(missing_ok=True)
+        except Exception as exc:  # noqa: BLE001
+            feedback.show_error(self, "Gagal hapus", str(exc))
+            return
+        self._render_backups()
+
     def _build_pegawai(self, parent):
         ctk.CTkLabel(
             parent,
@@ -396,3 +537,5 @@ class SettingsScreen(ctk.CTkFrame):
         self._sched_label.configure(
             text=f"Jadwal Kerja: {sched_start} - {sched_end}")
         self._reload_pegawai()
+        if hasattr(self, "_backup_list"):
+            self._render_backups()
