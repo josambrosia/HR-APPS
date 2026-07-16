@@ -42,13 +42,100 @@ def upsert_attendance(
             terlambat_menit = excluded.terlambat_menit,
             has_issue = excluded.has_issue,
             imported_from = excluded.imported_from,
-            imported_at = excluded.imported_at
-            -- reason_category, reason_detail, resolved_at NOT updated (preserved)
+            imported_at = excluded.imported_at,
+            manual_edited_at = NULL
+            -- reason_category, reason_detail, resolved_at NOT updated (preserved).
+            -- manual_edited_at reset to NULL: an import overwrite means this row
+            -- is import-owned again (conflict 'keep' rows are skipped upstream).
         """,
         (employee_id, tanggal, hari, tipe, jadwal, masuk, keluar,
          kerja_jam, lembur_jam, terlambat_menit, has_issue,
          imported_from, now),
     )
+
+
+def get_attendance(conn: sqlite3.Connection, *, employee_id: int, tanggal: str):
+    """Single attendance row for (employee_id, tanggal) as a dict, or None.
+
+    Feeds the Heatmap edit dialog (load existing values before editing)."""
+    row = conn.execute(
+        "SELECT * FROM attendance_records WHERE employee_id = ? AND tanggal = ?",
+        (employee_id, tanggal),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def save_manual_attendance(
+    conn: sqlite3.Connection,
+    *,
+    employee_id: int,
+    tanggal: str,
+    hari: Optional[str],
+    tipe: Optional[str],
+    jadwal: Optional[str],
+    masuk: Optional[str],
+    keluar: Optional[str],
+    kerja_jam: Optional[float],
+    lembur_jam: Optional[float],
+    terlambat_menit: Optional[int],
+    has_issue: int,
+    now: Optional[str] = None,
+) -> None:
+    """Insert or update ONE row from the manual editor. Stamps manual_edited_at
+    (so future imports know it was hand-edited) and PRESERVES reason_category /
+    reason_detail / resolved_at on conflict — same ownership rule as import."""
+    ts = now or datetime.now(UTC).isoformat(timespec="seconds")
+    conn.execute(
+        """
+        INSERT INTO attendance_records (
+            employee_id, tanggal, hari, tipe, jadwal, masuk, keluar,
+            kerja_jam, lembur_jam, terlambat_menit, has_issue, manual_edited_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(employee_id, tanggal) DO UPDATE SET
+            hari = excluded.hari,
+            tipe = excluded.tipe,
+            jadwal = excluded.jadwal,
+            masuk = excluded.masuk,
+            keluar = excluded.keluar,
+            kerja_jam = excluded.kerja_jam,
+            lembur_jam = excluded.lembur_jam,
+            terlambat_menit = excluded.terlambat_menit,
+            has_issue = excluded.has_issue,
+            manual_edited_at = excluded.manual_edited_at
+        """,
+        (employee_id, tanggal, hari, tipe, jadwal, masuk, keluar,
+         kerja_jam, lembur_jam, terlambat_menit, has_issue, ts),
+    )
+
+
+def delete_attendance(conn: sqlite3.Connection, *, employee_id: int, tanggal: str) -> None:
+    """Remove ONE attendance row (manual editor 'Hapus baris')."""
+    conn.execute(
+        "DELETE FROM attendance_records WHERE employee_id = ? AND tanggal = ?",
+        (employee_id, tanggal),
+    )
+
+
+def manual_rows_for_import(conn: sqlite3.Connection, no_staff_list, start: str, end: str) -> dict:
+    """Manual-edited rows in [start, end] for the given staff, keyed by
+    (no_staff, tanggal). Each value carries the fields import would overwrite
+    plus nama — feeds src.core.import_conflicts.find_conflicts."""
+    if not no_staff_list:
+        return {}
+    qs = ",".join("?" * len(no_staff_list))
+    rows = conn.execute(
+        f"""
+        SELECT e.no_staff, e.nama, ar.tanggal, ar.tipe, ar.jadwal,
+               ar.masuk, ar.keluar, ar.kerja_jam, ar.lembur_jam, ar.terlambat_menit
+          FROM attendance_records ar
+          JOIN employees e ON ar.employee_id = e.id
+         WHERE ar.manual_edited_at IS NOT NULL
+           AND ar.tanggal BETWEEN ? AND ?
+           AND e.no_staff IN ({qs})
+        """,
+        [start, end, *no_staff_list],
+    ).fetchall()
+    return {(r["no_staff"], r["tanggal"]): dict(r) for r in rows}
 
 
 def set_reason(
