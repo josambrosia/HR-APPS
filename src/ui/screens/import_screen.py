@@ -10,7 +10,10 @@ from src.db.connection import get_connection
 from src.core.session_state import notify_data_changed
 from src.core.week_utils import MONTH_NAMES_ID
 from src.db.employees import upsert_employee, get_employee_by_no_staff
-from src.db.attendance import upsert_attendance, list_recent_imports, count_overlap
+from src.db.attendance import (upsert_attendance, list_recent_imports,
+                               count_overlap, manual_rows_for_import)
+from src.db import backup as backup_mod
+from src.core.import_conflicts import find_conflicts
 from src.db.holidays import restamp_holidays
 from src.db.settings import set_setting, get_setting
 from src.parsers.fingerprint import parse_fingerprint_file
@@ -133,7 +136,7 @@ def parse_import_files(paths: list, progress=None) -> dict:
     return {"rows": all_rows, "parse_ms": parse_ms}
 
 
-def run_import_confirm(db_path, rows: list, progress=None) -> dict:
+def run_import_confirm(db_path, rows: list, resolution=None, progress=None) -> dict:
     """Upsert parsed fingerprint rows — the Import screen's confirm-phase
     worker. Opens its OWN connection (the sanctioned SQLite-in-worker
     pattern from src.ui.tasks) so the whole confirm transaction lives
@@ -151,6 +154,13 @@ def run_import_confirm(db_path, rows: list, progress=None) -> dict:
 
     Returns {"row_count": int, "mode_month": 'YYYY-MM' | None}.
     """
+    resolution = resolution or {}
+    # Auto-backup before writing (best-effort — never block the import itself).
+    try:
+        backup_mod.create_backup(db_path, reason="import")
+    except Exception:  # noqa: BLE001
+        pass
+
     months = [r.tanggal[:7] for r in rows if r.tanggal]
     mode_month = Counter(months).most_common(1)[0][0] if months else None
     total = len(rows)
@@ -159,6 +169,11 @@ def run_import_confirm(db_path, rows: list, progress=None) -> dict:
         progress(0, total)
     with get_connection(db_path) as conn:
         for i, r in enumerate(rows):
+            if resolution.get((r.no_staff, r.tanggal)) == "keep":
+                # conflict resolved as "keep manual" — leave the edited row intact
+                if progress is not None and (i + 1) % 10 == 0:
+                    progress(i + 1, total)
+                continue
             emp_id = upsert_employee(
                 conn, no_staff=r.no_staff, nama=r.nama, dept=r.dept
             )
@@ -555,6 +570,37 @@ class ImportScreen(ctk.CTkFrame):
             return  # confirm already running — double-click no-ops
 
         rows = self._pending_rows
+        # Detect conflicts against manual-edited rows BEFORE writing anything.
+        dates = sorted({r.tanggal for r in rows if r.tanggal})
+        conflicts = []
+        if dates:
+            with get_connection(DB_PATH) as conn:
+                no_staff = list({r.no_staff for r in rows})
+                existing = manual_rows_for_import(conn, no_staff, dates[0], dates[-1])
+            conflicts = find_conflicts(rows, existing)
+
+        if conflicts:
+            from src.ui.components.import_conflict_dialog import ImportConflictDialog
+            ImportConflictDialog(
+                self.winfo_toplevel(), conflicts=conflicts,
+                file_label=self._file_label(),
+                non_conflict_count=len(rows) - len(conflicts),
+                on_resolved=lambda res: self._proceed_confirm(rows, res),
+            )
+            return
+        self._proceed_confirm(rows, {})
+
+    def _file_label(self) -> str:
+        if len(self._pending_paths) == 1:
+            return self._pending_paths[0].name
+        return f"{len(self._pending_paths)} file"
+
+    def _proceed_confirm(self, rows, resolution):
+        """Continue import after conflict resolution (or when there were none).
+        resolution None = user cancelled the conflict dialog → abort."""
+        if resolution is None:
+            self._guard.release()
+            return
         if len(rows) > 50:
             self._confirm_modal = ProgressModal(
                 self.winfo_toplevel(), title="Memproses Import",
@@ -563,7 +609,7 @@ class ImportScreen(ctk.CTkFrame):
 
         run_bg(
             self,
-            work=lambda progress: run_import_confirm(DB_PATH, rows, progress),
+            work=lambda progress: run_import_confirm(DB_PATH, rows, resolution, progress),
             on_progress=self._on_confirm_progress,
             on_done=self._on_confirm_done,
             on_error=self._on_confirm_error,
