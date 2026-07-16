@@ -78,6 +78,7 @@ class HeatmapScreen(ctk.CTkFrame):
         self._sortkey = "nama"
         self._ctx = None
         self._cell_by_item = {}
+        self._edit_by_item = {}   # canvas item -> {employee_id, tanggal, nama} for click-to-edit
         self._visible_employees = []
         self._painted_ids = None       # ordered employee-id tuple of the last repaint
         self._tip = None
@@ -308,6 +309,7 @@ class HeatmapScreen(ctk.CTkFrame):
         c = self._canvas
         c.delete("all")
         self._cell_by_item = {}
+        self._edit_by_item = {}
         self._cetak_hover = None
         total = len(self._ctx["employees"]) if self._ctx else 0
         if not self._ctx or self._ctx["is_empty"]:
@@ -421,6 +423,10 @@ class HeatmapScreen(ctk.CTkFrame):
                                         font=(FONT_FAMILY, 10, "bold"), text=str(day), tags=("cell",))
                 self._cell_by_item[rid] = cell
                 self._cell_by_item[tid] = cell
+                edit_t = {"employee_id": e["employee_id"],
+                          "tanggal": f"{self._month}-{day:02d}", "nama": e["nama"]}
+                self._edit_by_item[rid] = edit_t
+                self._edit_by_item[tid] = edit_t
                 if today_day and day == today_day:
                     c.create_rectangle(cx, ry, cx + _CELL_W, ry + _CELL_H,
                                        outline=COLOR_TEXT, width=2)
@@ -629,9 +635,19 @@ class HeatmapScreen(ctk.CTkFrame):
             self._tip.withdraw()
 
     def _on_cell_click(self, _event):
-        cell = self._current_cell()
+        item = self._canvas.find_withtag("current")
+        item_id = item[0] if item else None
+        cell = self._cell_by_item.get(item_id) if item_id else None
         if cell:
             self._show_detail(cell)
+        target = self._edit_by_item.get(item_id) if item_id else None
+        if target:
+            from src.ui.components.attendance_edit_dialog import AttendanceEditDialog
+            AttendanceEditDialog(
+                self.winfo_toplevel(),
+                employee_id=target["employee_id"], nama=target["nama"],
+                tanggal=target["tanggal"],
+                on_saved=self._load, on_deleted=self._load)
 
     def _show_detail(self, cell):
         self._detail_var.set(
