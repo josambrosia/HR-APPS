@@ -462,6 +462,52 @@ def count_overlap(conn: sqlite3.Connection, pending_rows: list) -> dict:
     return {"new": new_count, "overwrite": overwrite_count}
 
 
+# Kategori yang menyusun Rekap Dinas (spec §2 B1/B2). tugas_belajar sengaja
+# TIDAK dihitung — rekap hanya memisah Dinas (lapangan) vs Paparan.
+DINAS_CATEGORY = "tugas_lapangan"
+PAPARAN_CATEGORY = "tugas_paparan"
+
+
+def count_dinas_paparan_by_employee(
+    conn: sqlite3.Connection, start: str, end: str,
+) -> list[dict]:
+    """Jumlah hari dinas & paparan per pegawai dalam [start, end] (inklusif).
+
+    Hanya pegawai dengan minimal 1 dinas/paparan yang dikembalikan (spec D2).
+    Urutan: total DESC, dinas DESC, nama ASC — deterministik untuk peringkat.
+
+    Returns list[dict] dengan kunci:
+      employee_id, nama, dept, dinas, paparan, total
+    """
+    rows = conn.execute(
+        """
+        SELECT e.id AS employee_id, e.nama, e.dept,
+               SUM(CASE WHEN ar.reason_category = ? THEN 1 ELSE 0 END) AS dinas,
+               SUM(CASE WHEN ar.reason_category = ? THEN 1 ELSE 0 END) AS paparan
+          FROM attendance_records ar
+          JOIN employees e ON ar.employee_id = e.id
+         WHERE ar.tanggal BETWEEN ? AND ?
+           AND ar.reason_category IN (?, ?)
+         GROUP BY e.id
+        HAVING (dinas + paparan) >= 1
+         ORDER BY (dinas + paparan) DESC, dinas DESC, e.nama ASC
+        """,
+        (DINAS_CATEGORY, PAPARAN_CATEGORY, start, end,
+         DINAS_CATEGORY, PAPARAN_CATEGORY),
+    ).fetchall()
+    return [
+        {
+            "employee_id": r["employee_id"],
+            "nama": r["nama"],
+            "dept": r["dept"] or "",
+            "dinas": r["dinas"],
+            "paparan": r["paparan"],
+            "total": r["dinas"] + r["paparan"],
+        }
+        for r in rows
+    ]
+
+
 def list_attendance_matrix(conn, start, end):
     """All attendance rows in [start,end] joined with employee, for the heatmap.
     Returns only rows that exist; the renderer fills missing (employee,date)
