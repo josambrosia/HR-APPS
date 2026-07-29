@@ -26,14 +26,21 @@ from src.ui.theme import (
     COLOR_SURFACE, COLOR_SURFACE_HIGH, COLOR_BORDER,
     COLOR_ACCENT, COLOR_ACCENT_HOVER, COLOR_SECONDARY,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED, COLOR_TEXT_DISABLED,
-    FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_SMALL, FONT_LABEL,
-    FONT_MONO_DATA, FONT_MONO_SMALL,
+    FONT_DISPLAY, FONT_BODY_BOLD, FONT_SMALL, FONT_LABEL, FONT_MONO_SMALL,
     SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG, SPACE_XL, RADIUS_MD,
 )
 
 _TEAL = "#0D9488"          # Dinas — sama dengan STATUS_COLORS['dinas'] di core.heatmap
 _BAR_TRACK = "#1F1F1F"
-_BAR_H = 6
+_BAR_H = 5
+# Baris sengaja pendek & satu baris. Tinggi SELALU eksplisit + propagate off:
+# CTkFrame default-nya 200x200, dan tanpa ini satu baris bisa membengkak
+# sampai ratusan piksel (bug tampilan v24 pertama).
+_HDR_H = 16
+_ROW_H = 21
+_RANK_ROW_H = 34
+_NUM_W = 34
+_DEPT_W = 78
 # Warna angka peringkat: magenta memudar sesuai tier, abu untuk sisanya.
 _RANK_COLORS = {1: COLOR_ACCENT, 2: COLOR_ACCENT_HOVER, 3: "#F9A8D4"}
 _RANK_ACCENTS = {1: COLOR_ACCENT, 2: "#8E2C58", 3: "#5A1E3A"}
@@ -157,88 +164,113 @@ class DinasRecapScreen(ctk.CTkFrame):
         for w in frame.winfo_children():
             w.destroy()
 
-    def _num(self, parent, text, color, width):
-        return ctk.CTkLabel(parent, text=str(text), font=FONT_MONO_DATA,
-                            text_color=color, width=width, anchor="e")
+    def _num(self, parent, value, color, *, dim_zero=True):
+        """Sel angka mono rata-kanan; nol diredupkan agar angka penting menonjol."""
+        return ctk.CTkLabel(
+            parent, text=str(value), font=FONT_MONO_SMALL, width=_NUM_W, anchor="e",
+            text_color=(COLOR_TEXT_DISABLED if (dim_zero and not value) else color))
+
+    def _line(self, parent, height):
+        """Baris berketinggian tetap — propagate dimatikan supaya ukuran default
+        CTkFrame (200px) tidak pernah menaikkan tinggi baris."""
+        f = ctk.CTkFrame(parent, fg_color="transparent", height=height)
+        f.pack(fill="x")
+        f.pack_propagate(False)
+        return f
+
+    def _empty(self, parent, text):
+        ctk.CTkLabel(parent, text=text, font=FONT_SMALL,
+                     text_color=COLOR_TEXT_MUTED).pack(pady=SPACE_LG)
 
     def _render_month(self):
         self._clear(self._month_list)
         if not self._month_rows:
-            ctk.CTkLabel(self._month_list, text="Belum ada dinas atau paparan bulan ini.",
-                         font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(pady=SPACE_LG)
+            self._empty(self._month_list, "Belum ada pegawai aktif.")
             return
-        hdr = ctk.CTkFrame(self._month_list, fg_color="transparent")
-        hdr.pack(fill="x", pady=(0, SPACE_XS))
+        hdr = self._line(self._month_list, _HDR_H)
         ctk.CTkLabel(hdr, text="NAMA", font=FONT_LABEL, text_color=COLOR_TEXT_DISABLED,
                      anchor="w").pack(side="left", fill="x", expand=True)
-        for cap, col in (("DIN", _TEAL), ("PAP", COLOR_SECONDARY), ("TOT", COLOR_TEXT_DIM)):
+        for cap, col in (("TOT", COLOR_TEXT_DIM), ("PAP", COLOR_SECONDARY),
+                         ("DIN", _TEAL)):
             ctk.CTkLabel(hdr, text=cap, font=FONT_LABEL, text_color=col,
-                         width=38, anchor="e").pack(side="left")
+                         width=_NUM_W, anchor="e").pack(side="right")
+
         for r in self._month_rows:
-            row = ctk.CTkFrame(self._month_list, fg_color="transparent")
-            row.pack(fill="x", pady=1)
-            name = ctk.CTkFrame(row, fg_color="transparent")
-            name.pack(side="left", fill="x", expand=True)
-            ctk.CTkLabel(name, text=r["nama"], font=FONT_BODY,
-                         text_color=COLOR_TEXT, anchor="w").pack(anchor="w")
+            row = self._line(self._month_list, _ROW_H)
+            self._num(row, r["total"], COLOR_TEXT).pack(side="right")
+            self._num(row, r["paparan"], COLOR_SECONDARY).pack(side="right")
+            self._num(row, r["dinas"], _TEAL).pack(side="right")
+            # Nama + dept menempel jadi satu blok; dept dibiarkan meredup agar
+            # tidak menyaingi nama dan tidak meninggalkan celah kosong lebar.
+            who = ctk.CTkFrame(row, fg_color="transparent")
+            who.pack(side="left", fill="x", expand=True)
+            ctk.CTkLabel(who, text=r["nama"], font=FONT_SMALL, text_color=COLOR_TEXT,
+                         anchor="w").pack(side="left")
             if r["dept"]:
-                ctk.CTkLabel(name, text=r["dept"], font=FONT_MONO_SMALL,
-                             text_color=COLOR_TEXT_DISABLED, anchor="w").pack(anchor="w")
-            self._num(row, r["dinas"],
-                      _TEAL if r["dinas"] else COLOR_TEXT_DISABLED, 38).pack(side="left")
-            self._num(row, r["paparan"],
-                      COLOR_SECONDARY if r["paparan"] else COLOR_TEXT_DISABLED, 38).pack(side="left")
-            self._num(row, r["total"], COLOR_TEXT, 38).pack(side="left")
-        sep = ctk.CTkFrame(self._month_list, fg_color=COLOR_BORDER, height=1)
-        sep.pack(fill="x", pady=(SPACE_XS, SPACE_XS))
-        tot = ctk.CTkFrame(self._month_list, fg_color="transparent")
-        tot.pack(fill="x")
-        ctk.CTkLabel(tot, text="TOTAL", font=FONT_BODY_BOLD, text_color=COLOR_TEXT,
+                ctk.CTkLabel(who, text=f"· {r['dept']}", font=FONT_MONO_SMALL,
+                             text_color=COLOR_TEXT_DISABLED,
+                             anchor="w").pack(side="left", padx=(SPACE_SM, 0))
+
+        ctk.CTkFrame(self._month_list, fg_color=COLOR_BORDER, height=1).pack(
+            fill="x", pady=SPACE_XS)
+        tot = self._line(self._month_list, _ROW_H)
+        ctk.CTkLabel(tot, text="TOTAL", font=FONT_LABEL, text_color=COLOR_TEXT,
                      anchor="w").pack(side="left", fill="x", expand=True)
-        self._num(tot, self._month_totals["dinas"], _TEAL, 38).pack(side="left")
-        self._num(tot, self._month_totals["paparan"], COLOR_SECONDARY, 38).pack(side="left")
-        self._num(tot, self._month_totals["total"], COLOR_TEXT, 38).pack(side="left")
+        self._num(tot, self._month_totals["total"], COLOR_TEXT, dim_zero=False).pack(side="right")
+        self._num(tot, self._month_totals["paparan"], COLOR_SECONDARY, dim_zero=False).pack(side="right")
+        self._num(tot, self._month_totals["dinas"], _TEAL, dim_zero=False).pack(side="right")
 
     def _render_rank(self):
         self._clear(self._rank_list)
         if not self._rank_rows:
-            ctk.CTkLabel(self._rank_list, text="Belum ada data pada rentang ini.",
-                         font=FONT_SMALL, text_color=COLOR_TEXT_MUTED).pack(pady=SPACE_LG)
+            self._empty(self._rank_list, "Belum ada pegawai aktif.")
             return
         for r in self._rank_rows:
-            accent = _RANK_ACCENTS.get(r["rank"], _ACCENT_REST)
-            wrap = ctk.CTkFrame(self._rank_list, fg_color="transparent")
-            wrap.pack(fill="x", pady=3)
-            # garis aksen tier di kiri (pilihan desain user — lihat spec §4.4)
-            ctk.CTkFrame(wrap, fg_color=accent, width=3, corner_radius=2).pack(
-                side="left", fill="y", padx=(0, SPACE_SM))
-            ctk.CTkLabel(wrap, text=str(r["rank"]), font=FONT_BODY_BOLD, width=18,
-                         text_color=_RANK_COLORS.get(r["rank"], COLOR_TEXT_MUTED)).pack(side="left")
+            ranked = r["total"] > 0          # nol tidak diberi warna tier
+            wrap = ctk.CTkFrame(self._rank_list, fg_color="transparent",
+                                height=_RANK_ROW_H)
+            wrap.pack(fill="x")
+            wrap.pack_propagate(False)
+            # Garis aksen tier di kiri (pilihan desain user — lihat spec §4.4).
+            # Tinggi eksplisit, BUKAN fill="y": fill akan mengunci diri ke tinggi
+            # default CTkFrame (200px) dan meregangkan seluruh baris.
+            ctk.CTkFrame(
+                wrap, width=3, height=_RANK_ROW_H - 8, corner_radius=2,
+                fg_color=(_RANK_ACCENTS.get(r["rank"], _ACCENT_REST)
+                          if ranked else _ACCENT_REST),
+            ).pack(side="left", padx=(0, SPACE_SM))
+            ctk.CTkLabel(
+                wrap, text=str(r["rank"]), font=FONT_MONO_SMALL, width=14, anchor="e",
+                text_color=(_RANK_COLORS.get(r["rank"], COLOR_TEXT_MUTED)
+                            if ranked else COLOR_TEXT_DISABLED),
+            ).pack(side="left")
+
             body = ctk.CTkFrame(wrap, fg_color="transparent")
-            body.pack(side="left", fill="x", expand=True, padx=(SPACE_XS, 0))
-            line = ctk.CTkFrame(body, fg_color="transparent")
-            line.pack(fill="x")
-            label = f"{r['nama']} {r['mark']}".strip()
-            ctk.CTkLabel(line, text=label, font=FONT_BODY, text_color=COLOR_TEXT,
+            body.pack(side="left", fill="both", expand=True, padx=(SPACE_SM, 0))
+            line = self._line(body, _ROW_H)
+            ctk.CTkLabel(line, text=f"{r['nama']} {r['mark']}".strip(), font=FONT_SMALL,
+                         text_color=(COLOR_TEXT if ranked else COLOR_TEXT_MUTED),
                          anchor="w").pack(side="left", fill="x", expand=True)
-            self._num(line, r["total"], COLOR_TEXT, 34).pack(side="right")
-            self._num(line, r["paparan"], COLOR_SECONDARY, 30).pack(side="right")
-            self._num(line, r["dinas"], _TEAL, 30).pack(side="right")
+            self._num(line, r["total"], COLOR_TEXT).pack(side="right")
+            self._num(line, r["paparan"], COLOR_SECONDARY).pack(side="right")
+            self._num(line, r["dinas"], _TEAL).pack(side="right")
             self._bar(body, r)
 
     def _bar(self, parent, r):
         """Bar bertumpuk: panjang ∝ total relatif pemuncak, isi = komposisi."""
         track = ctk.CTkFrame(parent, fg_color=_BAR_TRACK, height=_BAR_H,
-                             corner_radius=3)
-        track.pack(fill="x", pady=(3, 0))
+                             corner_radius=2)
+        track.pack(fill="x")
         track.pack_propagate(False)
+        if not r["total"]:
+            return          # tanpa tugas: hanya rel kosong
         fill = ctk.CTkFrame(track, fg_color="transparent")
         fill.place(relx=0, rely=0, relwidth=max(r["bar_pct"], 1) / 100, relheight=1)
         if r["dinas_pct"]:
-            ctk.CTkFrame(fill, fg_color=_TEAL, corner_radius=3).place(
+            ctk.CTkFrame(fill, fg_color=_TEAL, corner_radius=2).place(
                 relx=0, rely=0, relwidth=r["dinas_pct"] / 100, relheight=1)
         if r["paparan_pct"]:
-            ctk.CTkFrame(fill, fg_color=COLOR_SECONDARY, corner_radius=3).place(
+            ctk.CTkFrame(fill, fg_color=COLOR_SECONDARY, corner_radius=2).place(
                 relx=r["dinas_pct"] / 100, rely=0,
                 relwidth=r["paparan_pct"] / 100, relheight=1)
 

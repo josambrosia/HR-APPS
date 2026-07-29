@@ -58,19 +58,11 @@ def test_take_overwrites_and_clears_flag(tmp_path):
 
 
 # ---- conflict dialog smoke ----
-@pytest.fixture(scope="module")
-def root():
-    ctk = pytest.importorskip("customtkinter")
-    try:
-        r = ctk.CTk()
-    except Exception as exc:  # pragma: no cover
-        pytest.skip(f"no Tk display: {exc}")
-    r.withdraw()
-    yield r
-    try:
-        r.destroy()
-    except Exception:
-        pass
+# Root Tk sesi-tunggal dari conftest: root per-modul saling bertabrakan di
+# Windows dan membuat test ter-skip acak.
+@pytest.fixture
+def root(tk_root):
+    return tk_root
 
 
 def test_conflict_dialog_default_keep_and_bulk_take(root):

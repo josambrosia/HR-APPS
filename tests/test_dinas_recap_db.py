@@ -55,10 +55,15 @@ def test_counts_split_dinas_and_paparan(db):
     assert by_name["Budi"]["paparan"] == 3
 
 
-def test_excludes_employees_without_dinas_or_paparan(db):
+def test_includes_all_active_employees_even_with_zero(db):
+    """Semua pegawai aktif tampil, termasuk yang nol dinas & nol paparan."""
     with get_connection(db) as conn:
         rows = count_dinas_paparan_by_employee(conn, "2026-07-01", "2026-07-31")
-    assert "Cici" not in {r["nama"] for r in rows}
+    by_name = {r["nama"]: r for r in rows}
+    assert set(by_name) == {"Andi", "Budi", "Cici"}
+    assert by_name["Cici"]["dinas"] == 0
+    assert by_name["Cici"]["paparan"] == 0
+    assert by_name["Cici"]["total"] == 0
 
 
 def test_tugas_belajar_not_counted(db):
@@ -69,17 +74,18 @@ def test_tugas_belajar_not_counted(db):
 
 def test_date_bounds_are_inclusive_and_exclusive_outside(db):
     with get_connection(db) as conn:
-        juli = count_dinas_paparan_by_employee(conn, "2026-07-01", "2026-07-31")
         juni = count_dinas_paparan_by_employee(conn, "2026-06-01", "2026-06-30")
-    assert {r["nama"] for r in juli} == {"Andi", "Budi"}
-    assert [(r["nama"], r["total"]) for r in juni] == [("Andi", 1)]
+    totals = {r["nama"]: r["total"] for r in juni}
+    # hanya baris 30 Juni milik Andi yang masuk rentang Juni
+    assert totals == {"Andi": 1, "Budi": 0, "Cici": 0}
 
 
 def test_order_total_desc_then_dinas_desc_then_nama(db):
     with get_connection(db) as conn:
         rows = count_dinas_paparan_by_employee(conn, "2026-07-01", "2026-07-31")
-    # Andi & Budi sama-sama total 3; Andi punya dinas 2 -> di atas
-    assert [r["nama"] for r in rows] == ["Andi", "Budi"]
+    # Andi & Budi sama-sama total 3; Andi punya dinas 2 -> di atas.
+    # Cici (0) turun ke dasar.
+    assert [r["nama"] for r in rows] == ["Andi", "Budi", "Cici"]
 
 
 def test_includes_dept_and_employee_id(db):
@@ -89,6 +95,22 @@ def test_includes_dept_and_employee_id(db):
     assert isinstance(rows[0]["employee_id"], int)
 
 
-def test_empty_range_returns_empty_list(db):
+def test_range_without_activity_still_lists_everyone_at_zero(db):
     with get_connection(db) as conn:
-        assert count_dinas_paparan_by_employee(conn, "2030-01-01", "2030-12-31") == []
+        rows = count_dinas_paparan_by_employee(conn, "2030-01-01", "2030-12-31")
+    assert [r["nama"] for r in rows] == ["Andi", "Budi", "Cici"]
+    assert all(r["total"] == 0 for r in rows)
+
+
+def test_no_employees_returns_empty_list(tmp_path):
+    p = tmp_path / "empty.db"
+    init_db(p)
+    with get_connection(p) as conn:
+        assert count_dinas_paparan_by_employee(conn, "2026-01-01", "2026-12-31") == []
+
+
+def test_inactive_employee_excluded(db):
+    with get_connection(db) as conn:
+        conn.execute("UPDATE employees SET active = 0 WHERE nama = 'Cici'")
+        rows = count_dinas_paparan_by_employee(conn, "2026-07-01", "2026-07-31")
+    assert "Cici" not in {r["nama"] for r in rows}

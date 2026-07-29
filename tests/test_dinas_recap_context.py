@@ -68,10 +68,15 @@ def test_span_label_present(db):
     assert ctx["span"] == "6m"
 
 
-def test_champion_none_when_empty(db):
+def test_all_zero_range_lists_everyone_without_crowning_anyone(db):
+    """Rentang tanpa aktivitas: semua pegawai tetap tampil, tapi tak ada juara
+    dan tak ada penanda 👑/💎."""
     with get_connection(db) as conn:
         ctx = build_dinas_recap_context(conn, "2030-01", "year")
-    assert ctx["rank_rows"] == []
+    assert [r["nama"] for r in ctx["rank_rows"]] == ["Andi", "Budi"]
+    assert all(r["total"] == 0 for r in ctx["rank_rows"])
+    assert all(r["mark"] == "" for r in ctx["rank_rows"])
+    assert all(r["bar_pct"] == 0 for r in ctx["rank_rows"])
     assert ctx["champion"] is None
     assert ctx["month_totals"] == {"dinas": 0, "paparan": 0, "total": 0}
 

@@ -27,6 +27,7 @@ def dbp(tmp_path):
         set_setting(conn, "current_month", "2026-07")
         a = upsert_employee(conn, no_staff="S1", nama="Andi", dept="Ops")
         b = upsert_employee(conn, no_staff="S2", nama="Budi", dept="Sales")
+        upsert_employee(conn, no_staff="S3", nama="Cici", dept="HR")  # tanpa tugas
         _row(conn, a, "2026-07-01", "tugas_lapangan")
         _row(conn, a, "2026-07-02", "tugas_paparan")
         _row(conn, b, "2026-07-06", "tugas_paparan")
@@ -46,7 +47,9 @@ def test_screen_builds_and_loads_both_panels(tk_root, screen_mod):
     try:
         assert s._month == "2026-07"
         assert s._span == "year"
-        assert [r["nama"] for r in s._month_rows] == ["Andi", "Budi"]
+        # semua pegawai aktif tampil — Cici nol tetap muncul, di dasar
+        assert [r["nama"] for r in s._month_rows] == ["Andi", "Budi", "Cici"]
+        assert s._month_rows[-1]["total"] == 0
         assert s._rank_rows[0]["nama"] == "Andi"
         assert s._rank_rows[0]["rank"] == 1
     finally:
@@ -60,7 +63,7 @@ def test_changing_span_reloads_leaderboard_only(tk_root, screen_mod):
         s._on_span("3 bln")
         assert s._span == "3m"
         assert s._rank_rows[0]["total"] == 2      # Mei–Jul saja
-        assert [r["nama"] for r in s._month_rows] == ["Andi", "Budi"]
+        assert [r["nama"] for r in s._month_rows] == ["Andi", "Budi", "Cici"]
     finally:
         s.destroy()
 
@@ -72,7 +75,23 @@ def test_on_show_follows_active_month(tk_root, screen_mod, dbp):
             set_setting(conn, "current_month", "2026-03")
         s.on_show()
         assert s._month == "2026-03"
-        assert [r["nama"] for r in s._month_rows] == ["Andi"]
+        totals = {r["nama"]: r["total"] for r in s._month_rows}
+        assert totals == {"Andi": 1, "Budi": 0, "Cici": 0}
+    finally:
+        s.destroy()
+
+
+def test_rows_stay_compact(tk_root, screen_mod):
+    """Regresi v24: garis aksen ber-fill='y' membuat satu baris peringkat
+    setinggi ~250px. Tinggi baris harus tetap kecil & pasti."""
+    s = screen_mod.DinasRecapScreen(tk_root)
+    try:
+        s.update_idletasks()
+        rank_rows = s._rank_list.winfo_children()
+        assert rank_rows, "papan peringkat kosong"
+        for w in rank_rows:
+            assert w.cget("height") == screen_mod._RANK_ROW_H
+            assert w.cget("height") <= 40
     finally:
         s.destroy()
 

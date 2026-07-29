@@ -1,24 +1,15 @@
 """Smoke: the attendance edit dialog builds, previews live, and saves.
 
-Headless (root withdrawn, no mainloop). One shared CTk root for the module
-(creating multiple CTk roots per process is flaky). Skips if no Tk display.
+Headless (root withdrawn, no mainloop). Uses the session-wide `tk_root` fixture
+from conftest — Windows/Tkinter cannot create a fresh Tk() once an earlier root
+was destroyed, so per-module roots collide and make tests skip at random.
 """
 import pytest
 
 
-@pytest.fixture(scope="module")
-def root():
-    ctk = pytest.importorskip("customtkinter")
-    try:
-        r = ctk.CTk()
-    except Exception as exc:  # pragma: no cover - headless CI
-        pytest.skip(f"no Tk display: {exc}")
-    r.withdraw()
-    yield r
-    try:
-        r.destroy()
-    except Exception:
-        pass
+@pytest.fixture
+def root(tk_root):
+    return tk_root
 
 
 def _setup(tmp_path, monkeypatch):

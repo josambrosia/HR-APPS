@@ -473,7 +473,10 @@ def count_dinas_paparan_by_employee(
 ) -> list[dict]:
     """Jumlah hari dinas & paparan per pegawai dalam [start, end] (inklusif).
 
-    Hanya pegawai dengan minimal 1 dinas/paparan yang dikembalikan (spec D2).
+    SEMUA pegawai aktif dikembalikan — termasuk yang nol dinas & nol paparan
+    (LEFT JOIN), sehingga rekap menggambarkan seluruh tim, bukan hanya yang
+    pernah bertugas.
+
     Urutan: total DESC, dinas DESC, nama ASC — deterministik untuk peringkat.
 
     Returns list[dict] dengan kunci:
@@ -484,12 +487,13 @@ def count_dinas_paparan_by_employee(
         SELECT e.id AS employee_id, e.nama, e.dept,
                SUM(CASE WHEN ar.reason_category = ? THEN 1 ELSE 0 END) AS dinas,
                SUM(CASE WHEN ar.reason_category = ? THEN 1 ELSE 0 END) AS paparan
-          FROM attendance_records ar
-          JOIN employees e ON ar.employee_id = e.id
-         WHERE ar.tanggal BETWEEN ? AND ?
-           AND ar.reason_category IN (?, ?)
+          FROM employees e
+          LEFT JOIN attendance_records ar
+                 ON ar.employee_id = e.id
+                AND ar.tanggal BETWEEN ? AND ?
+                AND ar.reason_category IN (?, ?)
+         WHERE e.active = 1
          GROUP BY e.id
-        HAVING (dinas + paparan) >= 1
          ORDER BY (dinas + paparan) DESC, dinas DESC, e.nama ASC
         """,
         (DINAS_CATEGORY, PAPARAN_CATEGORY, start, end,

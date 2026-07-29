@@ -1,20 +1,15 @@
-"""Seksi 'Alasan / Keterangan' di editor absensi: opsi kontekstual + simpan."""
+"""Seksi 'Alasan / Keterangan' di editor absensi: opsi kontekstual + simpan.
+
+Memakai fixture `tk_root` sesi-tunggal dari conftest: Windows/Tkinter tidak bisa
+membuat Tk() baru setelah root sebelumnya di-destroy, sehingga root per-modul
+saling bertabrakan dan membuat test ter-skip acak.
+"""
 import pytest
 
 
-@pytest.fixture(scope="module")
-def root():
-    ctk = pytest.importorskip("customtkinter")
-    try:
-        r = ctk.CTk()
-    except Exception as exc:  # pragma: no cover - headless CI
-        pytest.skip(f"no Tk display: {exc}")
-    r.withdraw()
-    yield r
-    try:
-        r.destroy()
-    except Exception:
-        pass
+@pytest.fixture
+def root(tk_root):
+    return tk_root
 
 
 def _setup(tmp_path, monkeypatch):

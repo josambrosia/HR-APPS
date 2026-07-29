@@ -44,7 +44,13 @@ def build_dinas_recap_context(conn, year_month: str, span: str) -> dict:
         r["bar_pct"] = round(r["total"] / top * 100) if top else 0
         r["dinas_pct"] = round(r["dinas"] / r["total"] * 100) if r["total"] else 0
         r["paparan_pct"] = 100 - r["dinas_pct"] if r["total"] else 0
-        r["mark"] = "👑" if r["rank"] == 1 else ("💎" if r["rank"] in (2, 3) else "")
+        # Penanda hanya untuk yang benar-benar bertugas — daftar kini memuat
+        # seluruh pegawai aktif, termasuk yang nol.
+        if r["total"] > 0 and r["rank"] <= 3:
+            r["mark"] = "👑" if r["rank"] == 1 else "💎"
+        else:
+            r["mark"] = ""
+    champion = rank_rows[0] if rank_rows and rank_rows[0]["total"] > 0 else None
 
     return {
         "month": year_month,
@@ -54,7 +60,7 @@ def build_dinas_recap_context(conn, year_month: str, span: str) -> dict:
         "span": span,
         "span_label": span_label(year_month, span),
         "rank_rows": rank_rows,
-        "champion": rank_rows[0] if rank_rows else None,
+        "champion": champion,
         "generated_at": datetime.now().strftime("%d %b %Y"),
     }
 
