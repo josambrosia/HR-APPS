@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "23.0.0"
-APP_BUILD_DATE = "2026-07-16"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "24.0.0"
+APP_BUILD_DATE = "2026-07-30"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,27 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "24.0.0",
+        "date": "2026-07-30",
+        "changes": [
+            ("feat", "Alasan bisa diisi langsung dari jendela Edit Data di "
+                     "Heatmap — termasuk untuk hari yang absensinya sudah "
+                     "lengkap dan tepat waktu. Contoh: karyawan hadir pagi "
+                     "lalu berangkat tugas paparan/lapangan kini bisa ditandai "
+                     "tanpa lewat menu Issues."),
+            ("feat", "Pilihan alasan menyesuaikan kondisi baris: Tugas "
+                     "Lapangan, Tugas Paparan, Tugas Belajar, Izin Sakit, dan "
+                     "Cuti selalu tersedia; alasan keterlambatan hanya muncul "
+                     "bila hari itu memang tercatat telat — sehingga telat "
+                     "ringan pun kini bisa diberi alasan."),
+            ("feat", "Menu baru \"Rekap Dinas\": jumlah Dinas, Paparan, dan "
+                     "totalnya per karyawan untuk bulan aktif, ditemani papan "
+                     "peringkat sepanjang periode (Tahun ini, atau 3/6 bulan "
+                     "terakhir) lengkap dengan grafik komposisi dinas vs "
+                     "paparan. Bisa dicetak jadi PDF."),
+        ],
+    },
     {
         "version": "23.0.0",
         "date": "2026-07-16",
