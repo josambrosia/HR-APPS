@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Rekap Dinas &amp; Paparan — {{ month_label }}</title>
+<style>
+  @page { size: A4 portrait; margin: 14mm 13mm; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Segoe UI",-apple-system,sans-serif; color:#171717;
+         -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .kicker { font-family:Consolas,monospace; font-size:9pt; letter-spacing:2px;
+            color:#EC4899; font-weight:700; margin-bottom:4px; }
+  h1 { font-family:"Space Grotesk","Segoe UI",sans-serif; font-size:22pt;
+       font-weight:700; letter-spacing:-.5px; line-height:1.05; margin:0; }
+  .head { display:flex; justify-content:space-between; align-items:flex-start; }
+  .meta { text-align:right; font-family:Consolas,monospace; font-size:8.5pt;
+          color:#888; line-height:1.7; }
+  .chip { display:inline-block; background:#F5F3FF; color:#7C3AED; border-radius:5px;
+          padding:2px 9px; font-weight:700; margin-bottom:4px; }
+  .rule { display:flex; height:4px; border-radius:2px; overflow:hidden; margin:14px 0 16px; }
+  .rule i { display:block; height:100%; }
+  .cards { display:flex; gap:10px; margin-bottom:18px; }
+  .card { flex:1; border:1px solid #eee; border-radius:9px; padding:10px 12px; }
+  .card.champ { border-color:#EC489933; background:#FDF2F8; }
+  .card .cap { font-family:Consolas,monospace; font-size:8pt; letter-spacing:1px; font-weight:700; }
+  .card .val { font-family:"Space Grotesk","Segoe UI",sans-serif; font-size:20pt; font-weight:700; }
+  h2 { font-family:"Space Grotesk","Segoe UI",sans-serif; font-size:12pt; margin:0;
+       font-weight:700; letter-spacing:.3px; }
+  .sec { display:flex; align-items:center; justify-content:space-between; margin:0 0 8px; }
+  .sec .left { display:flex; align-items:center; gap:7px; }
+  .sec .bar { width:5px; height:15px; background:#EC4899; border-radius:2px; display:inline-block; }
+  .sec .note { font-family:Consolas,monospace; font-size:8.5pt; color:#999; }
+  table { width:100%; border-collapse:collapse; font-size:10pt; }
+  thead th { text-align:left; color:#555; font-size:8pt; text-transform:uppercase;
+             letter-spacing:.5px; background:#fafafa; padding:6px 8px; font-weight:600; }
+  tbody td { padding:6px 8px; border-bottom:1px solid #f0f0f0; }
+  tfoot td { padding:8px; font-weight:700; border-top:2px solid #333; }
+  .num { text-align:right; font-family:Consolas,monospace; font-variant-numeric:tabular-nums; }
+  .teal { color:#0D9488; } .violet { color:#7C3AED; } .zero { color:#bbb; }
+  .rank { margin-top:2px; }
+  .rrow { display:flex; align-items:center; gap:11px; margin-bottom:9px;
+          page-break-inside:avoid; }
+  .rno { width:20px; text-align:center; font-family:"Space Grotesk","Segoe UI",sans-serif;
+         font-weight:700; font-size:12pt; }
+  .rbody { flex:1; }
+  .rline { display:flex; justify-content:space-between; font-size:10pt; margin-bottom:3px; }
+  .rbar { height:7px; background:#f1f1f1; border-radius:4px; overflow:hidden; display:flex; }
+  .rbar i { display:block; height:100%; }
+  .legend { font-family:Consolas,monospace; font-size:8.5pt; color:#aaa;
+            margin-top:8px; text-align:right; }
+  .sign { margin-top:34px; display:flex; justify-content:space-between;
+          font-size:10pt; page-break-inside:avoid; }
+  .sign .who { text-align:center; }
+  .sign .line { border-top:1.5px solid #171717; padding-top:4px; min-width:190px;
+                font-weight:600; margin-top:48px; }
+  .tip { margin-top:18px; border-top:1px dashed #ddd; padding-top:7px;
+         font-family:Consolas,monospace; font-size:7.5pt; color:#bbb; }
+  .empty { color:#999; font-style:italic; padding:14px 0; }
+</style>
+</head>
+<body>
+
+  <div class="head">
+    <div>
+      <div class="kicker">LAPORAN KEHADIRAN</div>
+      <h1>Rekap Dinas<br>&amp; Paparan</h1>
+    </div>
+    <div class="meta">
+      <div class="chip">{{ month_label|upper }}</div>
+      <div>Dicetak {{ generated_at }}</div>
+      <div>Josaphat Tech Solution</div>
+    </div>
+  </div>
+  <div class="rule">
+    <i style="width:62%;background:#EC4899"></i>
+    <i style="width:22%;background:#0D9488"></i>
+    <i style="width:16%;background:#7C3AED"></i>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="cap teal">TOTAL DINAS</div>
+      <div class="val teal">{{ month_totals.dinas }}</div>
+    </div>
+    <div class="card">
+      <div class="cap violet">TOTAL PAPARAN</div>
+      <div class="val violet">{{ month_totals.paparan }}</div>
+    </div>
+    <div class="card champ">
+      <div class="cap" style="color:#EC4899">
+        {% if champion %}JUARA · {{ champion.nama|upper }}{% else %}JUARA{% endif %}
+      </div>
+      <div class="val">
+        {% if champion %}{{ champion.total }}{% else %}—{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="left"><span class="bar"></span><h2>Bulan Terpilih — {{ month_label }}</h2></div>
+  </div>
+  {% if month_rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>Nama</th><th>Dept</th>
+        <th class="num teal">Dinas</th><th class="num violet">Paparan</th><th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in month_rows %}
+      <tr>
+        <td>{{ r.nama }}</td><td style="color:#888">{{ r.dept }}</td>
+        <td class="num {% if r.dinas %}teal{% else %}zero{% endif %}">{{ r.dinas }}</td>
+        <td class="num {% if r.paparan %}violet{% else %}zero{% endif %}">{{ r.paparan }}</td>
+        <td class="num"><b>{{ r.total }}</b></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2">TOTAL</td>
+        <td class="num teal">{{ month_totals.dinas }}</td>
+        <td class="num violet">{{ month_totals.paparan }}</td>
+        <td class="num">{{ month_totals.total }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  {% else %}
+  <div class="empty">Belum ada dinas atau paparan pada bulan ini.</div>
+  {% endif %}
+
+  <div class="sec" style="margin-top:22px">
+    <div class="left"><span class="bar"></span><h2>Papan Peringkat</h2></div>
+    <span class="note">{{ span_label }} · Dinas + Paparan</span>
+  </div>
+  {% if rank_rows %}
+  <div class="rank">
+    {% for r in rank_rows %}
+    <div class="rrow">
+      <span class="rno" style="color:{% if r.rank == 1 %}#EC4899{% elif r.rank == 2 %}#F472B6{% elif r.rank == 3 %}#F9A8D4{% else %}#aaa{% endif %}">{{ r.rank }}</span>
+      <div class="rbody">
+        <div class="rline">
+          <span>{{ r.nama }} {{ r.mark }}</span>
+          <span class="num"><span class="teal">{{ r.dinas }}</span> · <span class="violet">{{ r.paparan }}</span> · <b>{{ r.total }}</b></span>
+        </div>
+        <div class="rbar" style="width:{{ r.bar_pct }}%">
+          <i style="width:{{ r.dinas_pct }}%;background:#0D9488"></i>
+          <i style="width:{{ r.paparan_pct }}%;background:#7C3AED"></i>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="legend"><span class="teal">■</span> dinas &nbsp; <span class="violet">■</span> paparan</div>
+  {% else %}
+  <div class="empty">Belum ada data pada rentang ini.</div>
+  {% endif %}
+
+  <div class="sign">
+    <div style="align-self:flex-end;font-family:Consolas,monospace;font-size:8pt;color:#ccc">
+      HR Absensi
+    </div>
+    <div class="who">
+      <div style="color:#666">Mengetahui,</div>
+      <div class="line">{{ hr_officer_name or "HR Officer in Charge" }}</div>
+    </div>
+  </div>
+
+  <div class="tip">
+    Tip cetak: aktifkan "Background graphics" dan matikan "Headers and footers"
+    di dialog cetak browser.
+  </div>
+
+</body>
+</html>
