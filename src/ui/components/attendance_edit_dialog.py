@@ -14,9 +14,11 @@ from src.config import DB_PATH
 from src.db.connection import get_connection
 from src.db.settings import get_setting
 from src.db.attendance import (
-    get_attendance, save_manual_attendance, delete_attendance)
+    get_attendance, save_manual_attendance, delete_attendance,
+    set_reason, unresolve_issue)
 from src.db import backup as backup_mod
 from src.core.attendance_calc import recompute, to_minutes
+from src.core.reason_mapper import REASON_LABELS, REASON_NEEDS_DETAIL
 from src.core.week_utils import hari_name, MONTH_NAMES_ID
 from src.core.session_state import notify_data_changed
 from src.ui import feedback
@@ -33,6 +35,14 @@ from src.ui.theme import (
 
 _TIPE_OPTIONS = ["Hari Kerja", "Hari Libur", "Istirahat"]
 DIALOG_W = 440
+
+# Alasan yang selalu tersedia di editor (spec A1) — hari apa pun, termasuk
+# hari bersih (punch lengkap & tepat waktu).
+_BASE_REASONS = ("tugas_lapangan", "tugas_paparan", "tugas_belajar",
+                 "izin_sakit", "cuti")
+# Alasan pembenar keterlambatan — HANYA muncul saat baris memang telat (A2).
+_LATE_REASONS = ("terlambat_kerja", "terlambat_lain")
+NO_REASON = "— (tidak ada)"
 
 
 def _fmt_tanggal(iso: str) -> str:
@@ -74,6 +84,8 @@ class AttendanceEditDialog(ctk.CTkToplevel):
             self._sched_start = get_setting(conn, "schedule_start", default="08.00")
             self._sched_end = get_setting(conn, "schedule_end", default="16.00")
             self._existing = get_attendance(conn, employee_id=employee_id, tanggal=tanggal)
+
+        self._reason_cat = (self._existing or {}).get("reason_category")
 
         self.title("Edit Absensi" if self._existing else "Tambah Absensi")
         self.configure(fg_color=COLOR_BG)
@@ -162,6 +174,22 @@ class AttendanceEditDialog(ctk.CTkToplevel):
         self._kerja_lbl = self._metric(grid, 1, 0, "Kerja", "—")
         self._lembur_lbl = self._metric(grid, 1, 1, "Lembur", "—")
 
+        # Alasan / keterangan — opsi kontekstual (lihat _refresh_reason_options)
+        self._reason_box = ctk.CTkFrame(self, fg_color="transparent")
+        self._reason_box.pack(fill="x", padx=SPACE_LG, pady=(SPACE_MD, 0))
+        ctk.CTkLabel(self._reason_box, text="ALASAN / KETERANGAN", font=FONT_LABEL,
+                     text_color=COLOR_TEXT_MUTED, anchor="w").pack(fill="x", pady=(0, 2))
+        self._reason_var = ctk.StringVar(
+            value=REASON_LABELS.get(self._reason_cat, NO_REASON))
+        self._reason_menu = ctk.CTkOptionMenu(
+            self._reason_box, values=[NO_REASON], variable=self._reason_var,
+            command=lambda _v: self._on_reason_change(),
+            fg_color=COLOR_SURFACE_HIGH, button_color=COLOR_ACCENT,
+            button_hover_color=COLOR_ACCENT_HOVER, text_color=COLOR_TEXT,
+            font=FONT_BODY)
+        self._reason_menu.pack(fill="x")
+        self._detail = self._entry(self._reason_box, ex.get("reason_detail") or "")
+
         # Override (collapsible)
         self._ov_toggle = ctk.CTkLabel(
             self, text="▸ Angka manual (override)", font=FONT_SMALL,
@@ -204,6 +232,7 @@ class AttendanceEditDialog(ctk.CTkToplevel):
         ).pack(side="right", padx=(0, SPACE_SM))
 
         self._recompute_preview()
+        self._on_reason_change()
 
     def _metric(self, parent, r, c, cap, val):
         cell = ctk.CTkFrame(parent, fg_color="transparent")
@@ -228,7 +257,46 @@ class AttendanceEditDialog(ctk.CTkToplevel):
         self._telat_lbl.configure(text=f"{d['terlambat_menit']} mnt")
         self._kerja_lbl.configure(text=f"{d['kerja_jam']} jam")
         self._lembur_lbl.configure(text=f"{d['lembur_jam']} jam")
+        if hasattr(self, "_reason_menu"):
+            self._refresh_reason_options(d["terlambat_menit"])
         return d
+
+    def _selected_reason_id(self):
+        """Label terpilih -> id kategori, atau None bila '— (tidak ada)'."""
+        label = self._reason_var.get()
+        for cat, lbl in REASON_LABELS.items():
+            if lbl == label:
+                return cat
+        return None
+
+    def _refresh_reason_options(self, terlambat):
+        """Susun ulang daftar opsi alasan sesuai konteks baris.
+
+        Alasan telat hanya ditawarkan saat baris memang telat (>0 menit).
+        Kategori yang sedang terpilih selalu dipertahankan di daftar agar
+        nilai lama tidak hilang diam-diam saat jam diedit."""
+        cats = list(_BASE_REASONS)
+        if terlambat > 0:
+            cats += list(_LATE_REASONS)
+        cur = self._selected_reason_id()
+        if cur and cur not in cats:
+            cats.append(cur)
+        self._reason_menu.configure(
+            values=[NO_REASON] + [REASON_LABELS[c] for c in cats])
+
+    def _on_reason_change(self):
+        """Tampilkan field detail hanya untuk kategori yang membutuhkannya."""
+        cat = self._selected_reason_id()
+        if cat in REASON_NEEDS_DETAIL:
+            if self._detail.winfo_manager() == "":
+                self._detail.pack(fill="x", pady=(SPACE_XS, 0))
+        else:
+            self._detail.pack_forget()
+        try:
+            self.update_idletasks()
+            self.geometry(f"{DIALOG_W}x{self.winfo_reqheight()}")
+        except Exception:
+            pass
 
     def _toggle_override(self):
         self._override_open = not self._override_open
@@ -273,6 +341,8 @@ class AttendanceEditDialog(ctk.CTkToplevel):
             terlambat = _parse_int(self._ov_telat.get(), terlambat)
             kerja = _parse_float(self._ov_kerja.get(), kerja)
             lembur = _parse_float(self._ov_lembur.get(), lembur)
+        cat = self._selected_reason_id()
+        detail = self._detail.get().strip() or None
         with get_connection(DB_PATH) as conn:
             save_manual_attendance(
                 conn, employee_id=self._eid, tanggal=self._tanggal,
@@ -280,6 +350,15 @@ class AttendanceEditDialog(ctk.CTkToplevel):
                 jadwal=self._jadwal.get().strip() or None,
                 masuk=masuk, keluar=keluar, kerja_jam=kerja, lembur_jam=lembur,
                 terlambat_menit=terlambat, has_issue=calc["has_issue"])
+            # Alasan disimpan terpisah: save_manual_attendance sengaja
+            # mempertahankan reason_* (aturan kepemilikan v23).
+            row = get_attendance(conn, employee_id=self._eid, tanggal=self._tanggal)
+            if row is not None:
+                if cat is None:
+                    unresolve_issue(conn, attendance_id=row["id"])
+                else:
+                    set_reason(conn, attendance_id=row["id"],
+                               category=cat, detail=detail)
         notify_data_changed()
         self._close()
         self._on_saved()
