@@ -150,6 +150,7 @@ class HRApp(ctk.CTk):
             ("INSIGHT", [
                 ("📊", "Dashboard", "Dashboard"),
                 ("⊞", "Heatmap", "Heatmap"),
+                ("▤", "Rekap Dinas", "DinasRecap"),
             ]),
             ("DATA MANAGEMENT", [
                 ("📥", "Import", "Import"),
@@ -408,6 +409,9 @@ class HRApp(ctk.CTk):
         elif name == "Heatmap":
             from src.ui.screens.heatmap import HeatmapScreen
             return HeatmapScreen(self.content)
+        elif name == "DinasRecap":
+            from src.ui.screens.dinas_recap import DinasRecapScreen
+            return DinasRecapScreen(self.content)
         elif name == "Import":
             from src.ui.screens.import_screen import ImportScreen
             return ImportScreen(self.content)
