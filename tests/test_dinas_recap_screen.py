@@ -87,11 +87,54 @@ def test_rows_stay_compact(tk_root, screen_mod):
     s = screen_mod.DinasRecapScreen(tk_root)
     try:
         s.update_idletasks()
-        rank_rows = s._rank_list.winfo_children()
-        assert rank_rows, "papan peringkat kosong"
-        for w in rank_rows:
-            assert w.cget("height") == screen_mod._RANK_ROW_H
-            assert w.cget("height") <= 40
+        assert s._rank_pool, "papan peringkat kosong"
+        for e in s._rank_pool:
+            assert e["frame"].cget("height") == screen_mod._RANK_ROW_H
+            assert e["frame"].cget("height") <= 40
+    finally:
+        s.destroy()
+
+
+def test_span_change_reuses_widgets_and_skips_month_panel(tk_root, screen_mod):
+    """Regresi performa: dulu satu pergantian rentang menghancurkan lalu
+    membangun ulang ±660 widget di KEDUA panel (±9 detik pada 33 pegawai).
+
+    Dua jaminan sekaligus, tanpa mengukur waktu (bebas flaky):
+      1. panel bulan tidak tersentuh — rentang tak mempengaruhinya;
+      2. baris peringkat dipakai ulang (objek widget sama, hanya isinya berubah).
+    """
+    s = screen_mod.DinasRecapScreen(tk_root)
+    try:
+        month_ids = [id(e["frame"]) for e in s._month_pool]
+        month_names = [e["nama"].cget("text") for e in s._month_pool]
+        rank_ids = [id(e["frame"]) for e in s._rank_pool]
+        before_total = s._rank_pool[0]["tot"].cget("text")
+
+        s._on_span("3 bln")
+
+        assert [id(e["frame"]) for e in s._month_pool] == month_ids
+        assert [e["nama"].cget("text") for e in s._month_pool] == month_names
+        assert [id(e["frame"]) for e in s._rank_pool] == rank_ids
+        # isinya memang diperbarui, bukan sekadar tidak berubah
+        assert s._rank_pool[0]["tot"].cget("text") != before_total
+    finally:
+        s.destroy()
+
+
+def test_pool_shrinks_without_leaving_stale_rows(tk_root, screen_mod, dbp):
+    """Baris berlebih disembunyikan lewat grid_remove() — tidak boleh ada sisa
+    baris lama yang masih tampak saat jumlah data menyusut."""
+    from src.db.employees import upsert_employee
+    s = screen_mod.DinasRecapScreen(tk_root)
+    try:
+        grown = len(s._month_pool)
+        with get_connection(dbp) as conn:
+            conn.execute("UPDATE employees SET active = 0 WHERE nama != 'Andi'")
+        s.on_show()
+        assert len(s._month_rows) == 1
+        assert len(s._month_pool) == grown          # pool tidak menyusut...
+        visible = [e for e in s._month_pool if e["frame"].winfo_manager()]
+        assert len(visible) == 1                    # ...tapi yang tampil hanya 1
     finally:
         s.destroy()
 

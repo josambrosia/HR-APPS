@@ -55,3 +55,32 @@ def rank(rows: List[dict]) -> List[dict]:
     """Beri nomor peringkat 1..N pada baris yang SUDAH terurut dari SQL.
     Mengembalikan salinan dangkal — input tidak dimutasi."""
     return [{**r, "rank": i} for i, r in enumerate(rows, start=1)]
+
+
+def decorate_ranks(rows: List[dict]) -> List[dict]:
+    """rank() + bidang tampilan papan peringkat. Dipakai layar DAN cetakan agar
+    keduanya tak pernah berbeda.
+
+    Menambahkan:
+      bar_pct     — panjang bar relatif terhadap pemuncak
+      dinas_pct   — porsi dinas DI DALAM bar (dinas+paparan = 100)
+      paparan_pct — sisanya
+      mark        — 👑 juara, 💎 peringkat 2-3; kosong bila total 0, sebab
+                    daftar memuat seluruh pegawai aktif termasuk yang nol.
+    """
+    ranked = rank(rows)
+    top = ranked[0]["total"] if ranked else 0
+    for r in ranked:
+        r["bar_pct"] = round(r["total"] / top * 100) if top else 0
+        r["dinas_pct"] = round(r["dinas"] / r["total"] * 100) if r["total"] else 0
+        r["paparan_pct"] = 100 - r["dinas_pct"] if r["total"] else 0
+        if r["total"] > 0 and r["rank"] <= 3:
+            r["mark"] = "👑" if r["rank"] == 1 else "💎"
+        else:
+            r["mark"] = ""
+    return ranked
+
+
+def champion_of(ranked: List[dict]):
+    """Pemuncak yang benar-benar bertugas, atau None."""
+    return ranked[0] if ranked and ranked[0]["total"] > 0 else None

@@ -6,7 +6,8 @@ Konteksnya juga dipakai layar in-app supaya angka di layar & cetak identik.
 """
 from datetime import datetime
 
-from src.core.dinas_recap import rank, resolve_range, span_label
+from src.core.dinas_recap import (
+    champion_of, decorate_ranks, resolve_range, span_label)
 from src.core.week_utils import MONTH_NAMES_ID, full_month_range
 from src.db.attendance import count_dinas_paparan_by_employee
 from src.db.settings import get_setting
@@ -39,19 +40,8 @@ def build_dinas_recap_context(conn, year_month: str, span: str) -> dict:
     }
 
     r_start, r_end = resolve_range(year_month, span)
-    rank_rows = rank(count_dinas_paparan_by_employee(conn, r_start, r_end))
-    top = rank_rows[0]["total"] if rank_rows else 0
-    for r in rank_rows:
-        r["bar_pct"] = round(r["total"] / top * 100) if top else 0
-        r["dinas_pct"] = round(r["dinas"] / r["total"] * 100) if r["total"] else 0
-        r["paparan_pct"] = 100 - r["dinas_pct"] if r["total"] else 0
-        # Penanda hanya untuk yang benar-benar bertugas — daftar kini memuat
-        # seluruh pegawai aktif, termasuk yang nol.
-        if r["total"] > 0 and r["rank"] <= 3:
-            r["mark"] = "👑" if r["rank"] == 1 else "💎"
-        else:
-            r["mark"] = ""
-    champion = rank_rows[0] if rank_rows and rank_rows[0]["total"] > 0 else None
+    rank_rows = decorate_ranks(count_dinas_paparan_by_employee(conn, r_start, r_end))
+    champion = champion_of(rank_rows)
 
     return {
         "month": year_month,
