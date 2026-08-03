@@ -11,6 +11,7 @@ from src.core.week_utils import MONTH_NAMES_ID, full_month_range
 from src.db.attendance import count_dinas_paparan_by_employee
 from src.db.settings import get_setting
 from src.reports.html_renderer import _build_env
+from src.reports.report_fonts import display_font_face_css
 
 TEMPLATE_FILE = "dinas_recap_print.html.j2"
 
@@ -69,4 +70,7 @@ def render_dinas_recap_html(conn, year_month: str, span: str) -> str:
     """Render lembar cetak Rekap Dinas menjadi string HTML."""
     ctx = build_dinas_recap_context(conn, year_month, span)
     ctx["hr_officer_name"] = get_setting(conn, "hr_officer_name", default="")
+    # Space Grotesk ditanam sebagai @font-face base64 — sama seperti laporan
+    # per-pegawai, supaya PDF memakai typeface milik aplikasi, bukan fallback.
+    ctx["font_face_css"] = display_font_face_css()
     return _build_env().get_template(TEMPLATE_FILE).render(**ctx)

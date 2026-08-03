@@ -41,6 +41,9 @@ _ROW_H = 21
 _RANK_ROW_H = 34
 _NUM_W = 34
 _DEPT_W = 78
+# Jarak aman di kanan isi panel supaya kolom angka tidak tertutup / mepet
+# scrollbar CTkScrollableFrame.
+_SCROLL_PAD = 14
 # Warna angka peringkat: magenta memudar sesuai tier, abu untuk sisanya.
 _RANK_COLORS = {1: COLOR_ACCENT, 2: COLOR_ACCENT_HOVER, 3: "#F9A8D4"}
 _RANK_ACCENTS = {1: COLOR_ACCENT, 2: "#8E2C58", 3: "#5A1E3A"}
@@ -170,11 +173,14 @@ class DinasRecapScreen(ctk.CTkFrame):
             parent, text=str(value), font=FONT_MONO_SMALL, width=_NUM_W, anchor="e",
             text_color=(COLOR_TEXT_DISABLED if (dim_zero and not value) else color))
 
-    def _line(self, parent, height):
+    def _line(self, parent, height, *, scroll_pad=False):
         """Baris berketinggian tetap — propagate dimatikan supaya ukuran default
-        CTkFrame (200px) tidak pernah menaikkan tinggi baris."""
+        CTkFrame (200px) tidak pernah menaikkan tinggi baris.
+
+        scroll_pad=True menyisakan ruang di kanan agar isi tidak mepet scrollbar
+        (dipakai untuk baris yang menempel langsung pada CTkScrollableFrame)."""
         f = ctk.CTkFrame(parent, fg_color="transparent", height=height)
-        f.pack(fill="x")
+        f.pack(fill="x", padx=(0, _SCROLL_PAD) if scroll_pad else 0)
         f.pack_propagate(False)
         return f
 
@@ -187,7 +193,7 @@ class DinasRecapScreen(ctk.CTkFrame):
         if not self._month_rows:
             self._empty(self._month_list, "Belum ada pegawai aktif.")
             return
-        hdr = self._line(self._month_list, _HDR_H)
+        hdr = self._line(self._month_list, _HDR_H, scroll_pad=True)
         ctk.CTkLabel(hdr, text="NAMA", font=FONT_LABEL, text_color=COLOR_TEXT_DISABLED,
                      anchor="w").pack(side="left", fill="x", expand=True)
         for cap, col in (("TOT", COLOR_TEXT_DIM), ("PAP", COLOR_SECONDARY),
@@ -196,7 +202,7 @@ class DinasRecapScreen(ctk.CTkFrame):
                          width=_NUM_W, anchor="e").pack(side="right")
 
         for r in self._month_rows:
-            row = self._line(self._month_list, _ROW_H)
+            row = self._line(self._month_list, _ROW_H, scroll_pad=True)
             self._num(row, r["total"], COLOR_TEXT).pack(side="right")
             self._num(row, r["paparan"], COLOR_SECONDARY).pack(side="right")
             self._num(row, r["dinas"], _TEAL).pack(side="right")
@@ -212,8 +218,8 @@ class DinasRecapScreen(ctk.CTkFrame):
                              anchor="w").pack(side="left", padx=(SPACE_SM, 0))
 
         ctk.CTkFrame(self._month_list, fg_color=COLOR_BORDER, height=1).pack(
-            fill="x", pady=SPACE_XS)
-        tot = self._line(self._month_list, _ROW_H)
+            fill="x", padx=(0, _SCROLL_PAD), pady=SPACE_XS)
+        tot = self._line(self._month_list, _ROW_H, scroll_pad=True)
         ctk.CTkLabel(tot, text="TOTAL", font=FONT_LABEL, text_color=COLOR_TEXT,
                      anchor="w").pack(side="left", fill="x", expand=True)
         self._num(tot, self._month_totals["total"], COLOR_TEXT, dim_zero=False).pack(side="right")
@@ -229,7 +235,7 @@ class DinasRecapScreen(ctk.CTkFrame):
             ranked = r["total"] > 0          # nol tidak diberi warna tier
             wrap = ctk.CTkFrame(self._rank_list, fg_color="transparent",
                                 height=_RANK_ROW_H)
-            wrap.pack(fill="x")
+            wrap.pack(fill="x", padx=(0, _SCROLL_PAD))
             wrap.pack_propagate(False)
             # Garis aksen tier di kiri (pilihan desain user — lihat spec §4.4).
             # Tinggi eksplisit, BUKAN fill="y": fill akan mengunci diri ke tinggi

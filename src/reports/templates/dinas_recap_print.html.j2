@@ -1,197 +1,253 @@
 <!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="utf-8">
+<html lang="id"><head><meta charset="utf-8"/>
 <title>Rekap Dinas &amp; Paparan — {{ month_label }}</title>
 <style>
-  /* Margin kertas SENGAJA nol dan diganti padding <body>. Saat pengguna memilih
-     "Minimum" di dialog cetak, browser menimpa margin @page sehingga konten
-     menempel — dan terpotong — di tepi kanan. Padding body selalu dihormati,
-     apa pun setelan margin browser. */
-  @page { size: A4 portrait; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { width:100%; overflow-x:hidden; }
-  body { margin:0; padding:13mm 12mm; font-family:"Segoe UI",-apple-system,sans-serif;
-         color:#171717; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .kicker { font-family:Consolas,monospace; font-size:9pt; letter-spacing:2px;
-            color:#EC4899; font-weight:700; margin-bottom:4px; }
-  h1 { font-family:"Space Grotesk","Segoe UI",sans-serif; font-size:22pt;
-       font-weight:700; letter-spacing:-.5px; line-height:1.05; margin:0; }
-  .head { display:flex; justify-content:space-between; align-items:flex-start; gap:10mm; }
-  .head > div { min-width:0; }
-  .meta { text-align:right; font-family:Consolas,monospace; font-size:8.5pt;
-          color:#888; line-height:1.7; white-space:nowrap; }
-  .chip { display:inline-block; background:#F5F3FF; color:#7C3AED; border-radius:5px;
-          padding:2px 9px; font-weight:700; margin-bottom:4px; }
-  .rule { display:flex; height:4px; border-radius:2px; overflow:hidden; margin:14px 0 16px; }
-  .rule i { display:block; height:100%; }
-  .cards { display:flex; gap:10px; margin-bottom:18px; }
-  .card { flex:1; border:1px solid #eee; border-radius:9px; padding:10px 12px; }
-  .card.champ { border-color:#EC489933; background:#FDF2F8; }
-  .card .cap { font-family:Consolas,monospace; font-size:8pt; letter-spacing:1px;
-               font-weight:700; white-space:nowrap; overflow:hidden;
-               text-overflow:ellipsis; }
-  .card .val { font-family:"Space Grotesk","Segoe UI",sans-serif; font-size:20pt; font-weight:700; }
-  h2 { font-family:"Space Grotesk","Segoe UI",sans-serif; font-size:12pt; margin:0;
-       font-weight:700; letter-spacing:.3px; }
-  .sec { display:flex; align-items:center; justify-content:space-between; margin:0 0 8px; }
-  .sec .left { display:flex; align-items:center; gap:7px; }
-  .sec .bar { width:5px; height:15px; background:#EC4899; border-radius:2px; display:inline-block; }
-  .sec .note { font-family:Consolas,monospace; font-size:8.5pt; color:#999; }
-  /* table-layout:fixed + lebar kolom eksplisit — nama panjang membungkus,
-     tidak mendorong kolom angka keluar halaman. */
-  table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:9.5pt; }
-  col.c-nama { width:auto; } col.c-dept { width:22%; }
-  col.c-num { width:15%; }
-  thead th { text-align:left; color:#555; font-size:8pt; text-transform:uppercase;
-             letter-spacing:.5px; background:#fafafa; padding:5px 7px; font-weight:600; }
-  tbody td { padding:4px 7px; border-bottom:1px solid #f0f0f0; overflow-wrap:anywhere; }
-  tfoot td { padding:6px 7px; font-weight:700; border-top:2px solid #333; }
-  tbody tr { page-break-inside:avoid; }
-  .num { text-align:right; font-family:Consolas,monospace; font-variant-numeric:tabular-nums; }
-  .teal { color:#0D9488; } .violet { color:#7C3AED; } .zero { color:#bbb; }
-  .rank { margin-top:2px; }
-  .rrow { display:flex; align-items:center; gap:9px; margin-bottom:6px;
-          page-break-inside:avoid; }
-  .rno { width:18px; flex:none; text-align:right;
-         font-family:"Space Grotesk","Segoe UI",sans-serif;
-         font-weight:700; font-size:10.5pt; }
-  .rbody { flex:1; min-width:0; }
-  .rline { display:flex; justify-content:space-between; gap:8px;
-           font-size:9.5pt; margin-bottom:2px; }
-  .rline .who { overflow-wrap:anywhere; min-width:0; }
-  .rline .num { flex:none; white-space:nowrap; }
-  .rbar { height:7px; background:#f1f1f1; border-radius:4px; overflow:hidden; display:flex; }
-  .rbar i { display:block; height:100%; }
-  .legend { font-family:Consolas,monospace; font-size:8.5pt; color:#aaa;
-            margin-top:8px; text-align:right; }
-  .sign { margin-top:34px; display:flex; justify-content:space-between;
-          font-size:10pt; page-break-inside:avoid; }
-  .sign .who { text-align:center; }
-  .sign .line { border-top:1.5px solid #171717; padding-top:4px; min-width:190px;
-                font-weight:600; margin-top:48px; }
-  .tip { margin-top:18px; border-top:1px dashed #ddd; padding-top:7px;
-         font-family:Consolas,monospace; font-size:7.5pt; color:#bbb; }
-  .empty { color:#999; font-style:italic; padding:14px 0; }
-</style>
-</head>
-<body>
+{{ font_face_css | safe }}
+  :root{
+    --ink:#16161A; --mute:#6B7280; --faint:#9AA0AA; --line:#E9E9EE; --tint:#FAFAFB;
+    --brand:#DB2777; --cyan:#0E7490;
+    /* Dinas teal / Paparan violet — dua nada per warna: nada teks lebih dalam
+       agar lolos kontras 4.5:1 di atas kertas putih, nada isi untuk blok bar. */
+    --dinas:#0F766E; --dinas-fill:#0D9488;
+    --papar:#6D28D9; --papar-fill:#7C3AED;
+    --disp:"Space Grotesk","Segoe UI",sans-serif;
+    --body:"Segoe UI",Arial,sans-serif;
+    --mono:"Consolas","SF Mono",monospace;
+  }
+  /* Margin kertas nol, jarak tepi dipegang padding <body>: saat pengguna memilih
+     "Minimum" di dialog cetak browser, margin @page ditimpa dan konten terpotong
+     di tepi kanan. Padding body selalu dihormati. Geometri hasil cetak sama
+     persis dengan laporan lain (14mm 14mm 12mm). */
+  @page{ size:A4 portrait; margin:0; }
+  *{box-sizing:border-box}
+  html,body{width:100%}
+  body{margin:0;padding:14mm 14mm 12mm;color:var(--ink);font-family:var(--body);
+       font-size:10.5px;line-height:1.5;
+       -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rule{height:3px;background:var(--brand);border-radius:2px}
 
-  <div class="head">
-    <div>
-      <div class="kicker">LAPORAN KEHADIRAN</div>
-      <h1>Rekap Dinas<br>&amp; Paparan</h1>
-    </div>
-    <div class="meta">
-      <div class="chip">{{ month_label|upper }}</div>
-      <div>Dicetak {{ generated_at }}</div>
-      <div>Josaphat Tech Solution</div>
+  /* Masthead */
+  .mast{padding-top:11px}
+  .eyebrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+           font-family:var(--mono);font-size:8.5px;letter-spacing:1.6px;color:var(--mute);
+           text-transform:uppercase}
+  .mast .kicker{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.2px;
+                color:var(--brand);margin:9px 0 1px}
+  .mast .kicker b{color:var(--ink);font-weight:700}
+  .mast h1{font-family:var(--disp);font-weight:700;font-size:30px;line-height:1.05;
+           letter-spacing:-.5px;margin:1px 0 2px}
+  .mast .who{font-size:11px;color:var(--mute)}
+  .mast .who .span{font-family:var(--mono);color:var(--faint)}
+
+  /* Hero band */
+  .hero{display:flex;align-items:stretch;gap:20px;margin:16px 0 4px;padding:14px 0;
+        border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .hero .lead{min-width:172px}
+  .hero .lead .big{font-family:var(--disp);font-weight:700;font-size:52px;line-height:.9;
+                   letter-spacing:-1px}
+  .hero .lead .lbl{font-family:var(--mono);font-size:8.5px;letter-spacing:2px;color:var(--mute);
+                   text-transform:uppercase;margin-top:4px}
+  .hero .lead .track{display:flex;height:5px;border-radius:3px;background:var(--line);
+                     margin-top:8px;overflow:hidden}
+  .hero .lead .track i{display:block;height:100%}
+  /* Kolom ketiga lebih lebar: memuat nama orang, bukan angka. */
+  .hero .grid{flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.8fr);
+              align-self:center}
+  .hero .grid .c{padding:2px 16px;border-left:1px solid var(--line);min-width:0}
+  .hero .grid .c .n{font-family:var(--disp);font-weight:700;font-size:19px;line-height:1.1}
+  .hero .grid .c .n.nm{font-size:13.5px;line-height:1.2}
+  .hero .grid .c .k{font-family:var(--mono);font-size:8px;letter-spacing:1.2px;color:var(--mute);
+                    text-transform:uppercase;margin-top:2px}
+
+  /* Section heading */
+  h2.sec{font-family:var(--mono);font-size:9px;letter-spacing:2.4px;text-transform:uppercase;
+         color:var(--ink);margin:20px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--line);
+         display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  h2.sec::before{content:"";display:inline-block;width:14px;height:2px;background:var(--brand);
+                 margin-right:8px;vertical-align:middle}
+  /* margin-right:auto menahan judul di kiri bersama garis aksen; tanpa ini
+     space-between mendorong teks ke tengah baris. */
+  h2.sec .t{margin-right:auto}
+  h2.sec .hint{color:var(--faint);letter-spacing:.6px;text-transform:none;font-size:8.5px;
+               font-weight:400;white-space:nowrap}
+
+  /* Tables — shared ledger styling */
+  table.det{width:100%;table-layout:fixed;border-collapse:collapse;font-size:9.5px}
+  table.det thead th{font-family:var(--mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;
+       color:var(--mute);text-align:left;padding:6px 8px;border-bottom:1.5px solid var(--brand);
+       font-weight:600}
+  table.det tbody td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:middle;
+       overflow-wrap:anywhere}
+  table.det tbody tr:nth-child(even){background:var(--tint)}
+  table.det tr{break-inside:avoid;page-break-inside:avoid}
+  table.det thead{display:table-header-group}
+  table.det .num{font-family:var(--mono);text-align:right}
+  table.det .nm{font-weight:600}
+  table.det .dept{color:var(--mute)}
+  table.det .zero{color:var(--faint)}
+  table.det tfoot td{padding:7px 8px;font-family:var(--mono);font-weight:700;
+       border-top:1.5px solid var(--ink);text-align:right}
+  table.det tfoot td.lbl{font-family:var(--body);letter-spacing:1px;text-transform:uppercase;
+       text-align:left;font-size:8.5px}
+
+  /* Leaderboard */
+  .rk .pos{font-family:var(--mono);font-weight:700;color:var(--faint);text-align:right}
+  .rk tr.top .pos{color:var(--brand)}
+  .rk .mk{width:11px;height:11px;vertical-align:-1.5px;margin-left:5px;color:var(--brand)}
+  .rk .bar{display:flex;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+  .rk .bar i{display:block;height:100%}
+  .rk tr.idle .nm{color:var(--mute);font-weight:400}
+
+  .legend{margin-top:8px;display:flex;justify-content:flex-end;gap:16px;
+          font-family:var(--mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;
+          color:var(--mute)}
+  .legend .it{display:flex;align-items:center;gap:5px}
+  .legend .sw{width:12px;height:6px;border-radius:3px}
+
+  .none{color:var(--mute);padding:10px 8px;font-style:italic}
+
+  /* Sign-off + footer */
+  .signoff{margin-top:26px;display:flex;justify-content:flex-end;break-inside:avoid}
+  .signoff .so{text-align:center;font-size:10px;min-width:230px}
+  .signoff .so .role{color:var(--mute);font-family:var(--mono);font-size:8.5px;letter-spacing:1px;
+       text-transform:uppercase}
+  .signoff .so .gap{height:48px}
+  .signoff .so .name{font-weight:700;border-top:1px solid var(--ink);padding-top:5px}
+  .foot{margin-top:14px;padding-top:8px;border-top:1px solid var(--line);
+        display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:8px;
+        letter-spacing:.8px;color:var(--faint);text-transform:uppercase}
+
+  /* On-screen preview only — frame the document as a sheet of A4 paper on a
+     neutral backdrop with the same padding the printout uses. Never printed. */
+  @media screen{
+    html{background:#E7E7EC}
+    body{max-width:210mm;margin:24px auto 48px;background:#fff;border-radius:3px;
+         box-shadow:0 1px 2px rgba(18,18,28,.10),0 14px 40px rgba(18,18,28,.16)}
+  }
+</style></head><body>
+  <div class="rule"></div>
+
+  <div class="mast">
+    <div class="eyebrow"><span>Josaphat Tech Solution · HR Absensi</span><span>Confidential</span></div>
+    <div class="kicker">Rekap Penugasan &middot; <b>{{ month_label }}</b></div>
+    <h1>Dinas &amp; Paparan</h1>
+    <div class="who">
+      {{ month_rows|length }} pegawai aktif ·
+      <span class="span">peringkat {{ span_label }}</span>
     </div>
   </div>
-  <div class="rule">
-    <i style="width:62%;background:#EC4899"></i>
-    <i style="width:22%;background:#0D9488"></i>
-    <i style="width:16%;background:#7C3AED"></i>
-  </div>
 
-  <div class="cards">
-    <div class="card">
-      <div class="cap teal">TOTAL DINAS</div>
-      <div class="val teal">{{ month_totals.dinas }}</div>
-    </div>
-    <div class="card">
-      <div class="cap violet">TOTAL PAPARAN</div>
-      <div class="val violet">{{ month_totals.paparan }}</div>
-    </div>
-    <div class="card champ">
-      <div class="cap" style="color:#EC4899">
-        {% if champion %}JUARA · {{ champion.nama|upper|truncate(18, True, '…') }}{% else %}JUARA{% endif %}
+  <div class="hero">
+    <div class="lead">
+      <div class="big">{{ month_totals.total }}</div>
+      <div class="lbl">Penugasan {{ month_label }}</div>
+      <div class="track">
+        {% if month_totals.total %}
+        <i style="width:{{ (month_totals.dinas / month_totals.total * 100)|round|int }}%;background:var(--dinas-fill)"></i>
+        <i style="width:{{ 100 - (month_totals.dinas / month_totals.total * 100)|round|int }}%;background:var(--papar-fill)"></i>
+        {% endif %}
       </div>
-      <div class="val">
-        {% if champion %}{{ champion.total }}{% else %}—{% endif %}
+    </div>
+    <div class="grid">
+      <div class="c">
+        <div class="n" style="color:var(--dinas)">{{ month_totals.dinas }}</div>
+        <div class="k">Dinas lapangan</div>
+      </div>
+      <div class="c">
+        <div class="n" style="color:var(--papar)">{{ month_totals.paparan }}</div>
+        <div class="k">Paparan</div>
+      </div>
+      <div class="c">
+        {% if champion %}
+        <div class="n nm">{{ champion.nama }}</div>
+        <div class="k">Terbanyak · {{ champion.total }}</div>
+        {% else %}
+        <div class="n" style="color:var(--faint)">—</div>
+        <div class="k">Belum ada penugasan</div>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <div class="sec">
-    <div class="left"><span class="bar"></span><h2>Bulan Terpilih — {{ month_label }}</h2></div>
-  </div>
+  <h2 class="sec"><span class="t">Rincian Bulan</span><span class="hint">{{ month_label }}</span></h2>
   {% if month_rows %}
-  <table>
-    <colgroup>
-      <col class="c-nama"><col class="c-dept">
-      <col class="c-num"><col class="c-num"><col class="c-num">
-    </colgroup>
-    <thead>
-      <tr>
-        <th>Nama</th><th>Dept</th>
-        <th class="num teal">Dinas</th><th class="num violet">Paparan</th><th class="num">Total</th>
-      </tr>
-    </thead>
+  <table class="det">
+    <colgroup><col style="width:34%"><col style="width:28%"><col style="width:12%">
+      <col style="width:13%"><col style="width:13%"></colgroup>
+    <thead><tr>
+      <th>Nama</th><th>Dept</th>
+      <th class="num">Dinas</th><th class="num">Paparan</th><th class="num">Total</th>
+    </tr></thead>
     <tbody>
       {% for r in month_rows %}
       <tr>
-        <td>{{ r.nama }}</td><td style="color:#888">{{ r.dept }}</td>
-        <td class="num {% if r.dinas %}teal{% else %}zero{% endif %}">{{ r.dinas }}</td>
-        <td class="num {% if r.paparan %}violet{% else %}zero{% endif %}">{{ r.paparan }}</td>
-        <td class="num"><b>{{ r.total }}</b></td>
+        <td class="nm">{{ r.nama }}</td>
+        <td class="dept">{{ r.dept or "—" }}</td>
+        <td class="num{% if not r.dinas %} zero{% endif %}"
+            {% if r.dinas %}style="color:var(--dinas)"{% endif %}>{{ r.dinas }}</td>
+        <td class="num{% if not r.paparan %} zero{% endif %}"
+            {% if r.paparan %}style="color:var(--papar)"{% endif %}>{{ r.paparan }}</td>
+        <td class="num{% if not r.total %} zero{% endif %}"><b>{{ r.total }}</b></td>
       </tr>
       {% endfor %}
     </tbody>
-    <tfoot>
-      <tr>
-        <td colspan="2">TOTAL</td>
-        <td class="num teal">{{ month_totals.dinas }}</td>
-        <td class="num violet">{{ month_totals.paparan }}</td>
-        <td class="num">{{ month_totals.total }}</td>
-      </tr>
-    </tfoot>
+    <tfoot><tr>
+      <td class="lbl" colspan="2">Total {{ month_label }}</td>
+      <td style="color:var(--dinas)">{{ month_totals.dinas }}</td>
+      <td style="color:var(--papar)">{{ month_totals.paparan }}</td>
+      <td>{{ month_totals.total }}</td>
+    </tr></tfoot>
   </table>
   {% else %}
-  <div class="empty">Belum ada pegawai aktif.</div>
+  <div class="none">Belum ada pegawai aktif.</div>
   {% endif %}
 
-  <div class="sec" style="margin-top:22px">
-    <div class="left"><span class="bar"></span><h2>Papan Peringkat</h2></div>
-    <span class="note">{{ span_label }} · Dinas + Paparan</span>
-  </div>
+  <h2 class="sec"><span class="t">Papan Peringkat</span><span class="hint">{{ span_label }}</span></h2>
   {% if rank_rows %}
-  <div class="rank">
-    {% for r in rank_rows %}
-    <div class="rrow">
-      <span class="rno" style="color:{% if r.total == 0 %}#ccc{% elif r.rank == 1 %}#EC4899{% elif r.rank == 2 %}#F472B6{% elif r.rank == 3 %}#F9A8D4{% else %}#aaa{% endif %}">{{ r.rank }}</span>
-      <div class="rbody">
-        <div class="rline">
-          <span class="who">{{ r.nama }} {{ r.mark }}</span>
-          <span class="num"><span class="teal">{{ r.dinas }}</span> · <span class="violet">{{ r.paparan }}</span> · <b>{{ r.total }}</b></span>
-        </div>
-        <div class="rbar" style="width:{{ r.bar_pct }}%">
-          <i style="width:{{ r.dinas_pct }}%;background:#0D9488"></i>
-          <i style="width:{{ r.paparan_pct }}%;background:#7C3AED"></i>
-        </div>
-      </div>
-    </div>
-    {% endfor %}
+  <table class="det rk">
+    <colgroup><col style="width:6%"><col style="width:32%"><col style="width:30%">
+      <col style="width:10%"><col style="width:11%"><col style="width:11%"></colgroup>
+    <thead><tr>
+      <th class="num">#</th><th>Nama</th><th>Komposisi</th>
+      <th class="num">Dinas</th><th class="num">Paparan</th><th class="num">Total</th>
+    </tr></thead>
+    <tbody>
+      {% for r in rank_rows %}
+      <tr class="{% if r.total and r.rank <= 3 %}top{% endif %}{% if not r.total %} idle{% endif %}">
+        <td class="pos">{{ r.rank }}</td>
+        <td class="nm">{{ r.nama }}{% if r.rank == 1 and r.total %}<svg class="mk" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 8.2 7.4 11 12 3.8 16.6 11 21 8.2l-1.7 10.4H4.7z"/></svg>{% elif r.total and r.rank <= 3 %}<svg class="mk" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.2 2.6h11.6l4.1 6.2L12 21.4 2.1 8.8z"/></svg>{% endif %}</td>
+        <td>
+          <div class="bar">
+            {% if r.total %}
+            <i style="width:{{ (r.bar_pct * r.dinas_pct / 100)|round|int }}%;background:var(--dinas-fill)"></i>
+            <i style="width:{{ (r.bar_pct * r.paparan_pct / 100)|round|int }}%;background:var(--papar-fill)"></i>
+            {% endif %}
+          </div>
+        </td>
+        <td class="num{% if not r.dinas %} zero{% endif %}"
+            {% if r.dinas %}style="color:var(--dinas)"{% endif %}>{{ r.dinas }}</td>
+        <td class="num{% if not r.paparan %} zero{% endif %}"
+            {% if r.paparan %}style="color:var(--papar)"{% endif %}>{{ r.paparan }}</td>
+        <td class="num{% if not r.total %} zero{% endif %}"><b>{{ r.total }}</b></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="legend">
+    <span class="it"><span class="sw" style="background:var(--dinas-fill)"></span>Dinas</span>
+    <span class="it"><span class="sw" style="background:var(--papar-fill)"></span>Paparan</span>
+    <span class="it">Bar relatif ke pemuncak</span>
   </div>
-  <div class="legend"><span class="teal">■</span> dinas &nbsp; <span class="violet">■</span> paparan</div>
   {% else %}
-  <div class="empty">Belum ada pegawai aktif.</div>
+  <div class="none">Belum ada pegawai aktif.</div>
   {% endif %}
 
-  <div class="sign">
-    <div style="align-self:flex-end;font-family:Consolas,monospace;font-size:8pt;color:#ccc">
-      HR Absensi
-    </div>
-    <div class="who">
-      <div style="color:#666">Mengetahui,</div>
-      <div class="line">{{ hr_officer_name or "HR Officer in Charge" }}</div>
-    </div>
+  <div class="signoff"><div class="so">
+    <div class="role">HR Officer in Charge</div><div class="gap"></div>
+    <div class="name">{{ hr_officer_name if hr_officer_name else "____________" }}</div>
+  </div></div>
+  <div class="foot">
+    <span>Josaphat Tech Solution · From Concept to Code</span>
+    <span>Confidential · <b>{{ month_label }}</b></span>
   </div>
-
-  <div class="tip">
-    Tip cetak: aktifkan "Background graphics" dan matikan "Headers and footers"
-    di dialog cetak browser.
-  </div>
-
-</body>
-</html>
+</body></html>
