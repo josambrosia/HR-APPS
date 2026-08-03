@@ -83,6 +83,14 @@ CREATE TABLE IF NOT EXISTS holidays (
     created_at TEXT NOT NULL
 );
 
+-- v24.0.1: pegawai yang disembunyikan dari layar Rekap Dinas Paparan saja.
+-- Sengaja TERPISAH dari outlier_exclusions: yang itu berbasis periode dan
+-- dipakai Dashboard/Heatmap, sedangkan ini permanen dan khusus satu layar.
+CREATE TABLE IF NOT EXISTS dinas_recap_exclusions (
+    employee_id INTEGER PRIMARY KEY REFERENCES employees(id) ON DELETE CASCADE,
+    created_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS wa_contacts (
     employee_id  INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
     year_month   TEXT    NOT NULL,

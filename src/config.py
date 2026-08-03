@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "24.0.0"
-APP_BUILD_DATE = "2026-07-30"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "24.0.1"
+APP_BUILD_DATE = "2026-08-03"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,27 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "24.0.1",
+        "date": "2026-08-03",
+        "changes": [
+            ("change", "Menu \"Rekap Dinas\" berganti nama jadi \"Rekap Dinas "
+                       "Paparan\" dan kini punya TIGA panel: rincian bulan "
+                       "terpilih, papan peringkat Dinas, dan papan peringkat "
+                       "Paparan yang berdiri sendiri."),
+            ("feat", "Papan Dinas dan papan Paparan masing-masing punya pilihan "
+                     "rentang sendiri (3 bulan / 6 bulan / Tahun ini), jadi "
+                     "keduanya bisa dilihat pada periode yang berbeda."),
+            ("feat", "Panel bulan bisa diurutkan — klik judul kolom NAMA, DIN, "
+                     "PAP, atau TOT; klik lagi untuk membalik arah urutan."),
+            ("feat", "Tombol \"Kecualikan…\" untuk menyembunyikan pegawai "
+                     "tertentu dari menu ini saja. Menu lain (Dashboard, "
+                     "Heatmap, Coaching) sama sekali tidak terpengaruh."),
+            ("change", "Hasil cetak mengikuti bentuk baru: satu tabel bulan "
+                       "plus dua papan peringkat terpisah, masing-masing "
+                       "dengan periodenya sendiri."),
+        ],
+    },
     {
         "version": "24.0.0",
         "date": "2026-07-30",

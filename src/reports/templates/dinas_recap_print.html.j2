@@ -132,8 +132,10 @@
     <div class="kicker">Rekap Penugasan &middot; <b>{{ month_label }}</b></div>
     <h1>Dinas &amp; Paparan</h1>
     <div class="who">
-      {{ month_rows|length }} pegawai aktif ·
-      <span class="span">peringkat {{ span_label }}</span>
+      {{ month_rows|length }} pegawai aktif{% if excluded_count %} ·
+      <span class="span">{{ excluded_count }} disembunyikan</span>{% endif %}
+      {#- Periode TIDAK ditulis di sini: kedua papan punya rentangnya
+          masing-masing dan menampilkannya di judul seksi. -#}
     </div>
   </div>
 
@@ -158,13 +160,8 @@
         <div class="k">Paparan</div>
       </div>
       <div class="c">
-        {% if champion %}
-        <div class="n nm">{{ champion.nama }}</div>
-        <div class="k">Terbanyak · {{ champion.total }}</div>
-        {% else %}
-        <div class="n" style="color:var(--faint)">—</div>
-        <div class="k">Belum ada penugasan</div>
-        {% endif %}
+        <div class="n nm">{{ month_rows|length }}</div>
+        <div class="k">Pegawai{% if excluded_count %} · {{ excluded_count }} disembunyikan{% endif %}</div>
       </div>
     </div>
   </div>
@@ -202,45 +199,41 @@
   <div class="none">Belum ada pegawai aktif.</div>
   {% endif %}
 
-  <h2 class="sec"><span class="t">Papan Peringkat</span><span class="hint">{{ span_label }}</span></h2>
-  {% if rank_rows %}
+  {%- macro board(rows, heading, hint, tone) %}
+  <h2 class="sec"><span class="t">{{ heading }}</span><span class="hint">{{ hint }}</span></h2>
+  {% if rows %}
   <table class="det rk">
-    <colgroup><col style="width:6%"><col style="width:32%"><col style="width:30%">
-      <col style="width:10%"><col style="width:11%"><col style="width:11%"></colgroup>
+    <colgroup><col style="width:7%"><col style="width:44%"><col style="width:35%">
+      <col style="width:14%"></colgroup>
     <thead><tr>
-      <th class="num">#</th><th>Nama</th><th>Komposisi</th>
-      <th class="num">Dinas</th><th class="num">Paparan</th><th class="num">Total</th>
+      <th class="num">#</th><th>Nama</th><th>Sebaran</th><th class="num">Jumlah</th>
     </tr></thead>
     <tbody>
-      {% for r in rank_rows %}
-      <tr class="{% if r.total and r.rank <= 3 %}top{% endif %}{% if not r.total %} idle{% endif %}">
+      {% for r in rows %}
+      <tr class="{% if r.value and r.rank <= 3 %}top{% endif %}{% if not r.value %} idle{% endif %}">
         <td class="pos">{{ r.rank }}</td>
-        <td class="nm">{{ r.nama }}{% if r.rank == 1 and r.total %}<svg class="mk" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 8.2 7.4 11 12 3.8 16.6 11 21 8.2l-1.7 10.4H4.7z"/></svg>{% elif r.total and r.rank <= 3 %}<svg class="mk" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.2 2.6h11.6l4.1 6.2L12 21.4 2.1 8.8z"/></svg>{% endif %}</td>
+        <td class="nm">{{ r.nama }}{% if r.rank == 1 and r.value %}<svg class="mk" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 8.2 7.4 11 12 3.8 16.6 11 21 8.2l-1.7 10.4H4.7z"/></svg>{% elif r.value and r.rank <= 3 %}<svg class="mk" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.2 2.6h11.6l4.1 6.2L12 21.4 2.1 8.8z"/></svg>{% endif %}</td>
         <td>
           <div class="bar">
-            {% if r.total %}
-            <i style="width:{{ (r.bar_pct * r.dinas_pct / 100)|round|int }}%;background:var(--dinas-fill)"></i>
-            <i style="width:{{ (r.bar_pct * r.paparan_pct / 100)|round|int }}%;background:var(--papar-fill)"></i>
-            {% endif %}
+            {% if r.value %}<i style="width:{{ r.bar_pct }}%;background:var(--{{ tone }}-fill)"></i>{% endif %}
           </div>
         </td>
-        <td class="num{% if not r.dinas %} zero{% endif %}"
-            {% if r.dinas %}style="color:var(--dinas)"{% endif %}>{{ r.dinas }}</td>
-        <td class="num{% if not r.paparan %} zero{% endif %}"
-            {% if r.paparan %}style="color:var(--papar)"{% endif %}>{{ r.paparan }}</td>
-        <td class="num{% if not r.total %} zero{% endif %}"><b>{{ r.total }}</b></td>
+        <td class="num{% if not r.value %} zero{% endif %}"
+            {% if r.value %}style="color:var(--{{ tone }})"{% endif %}><b>{{ r.value }}</b></td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  <div class="legend">
-    <span class="it"><span class="sw" style="background:var(--dinas-fill)"></span>Dinas</span>
-    <span class="it"><span class="sw" style="background:var(--papar-fill)"></span>Paparan</span>
-    <span class="it">Bar relatif ke pemuncak</span>
-  </div>
   {% else %}
   <div class="none">Belum ada pegawai aktif.</div>
   {% endif %}
+  {%- endmacro %}
+
+  {{ board(dinas_rank, "Papan Peringkat Dinas", span_label, "dinas") }}
+  {{ board(paparan_rank, "Papan Peringkat Paparan", paparan_span_label, "papar") }}
+  <div class="legend">
+    <span class="it">Panjang bar relatif terhadap pemuncak masing-masing papan</span>
+  </div>
 
   <div class="signoff"><div class="so">
     <div class="role">HR Officer in Charge</div><div class="gap"></div>

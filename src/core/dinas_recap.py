@@ -57,6 +57,43 @@ def rank(rows: List[dict]) -> List[dict]:
     return [{**r, "rank": i} for i, r in enumerate(rows, start=1)]
 
 
+def rank_by(rows: List[dict], metric: str) -> List[dict]:
+    """Papan peringkat SATU metrik ('dinas' atau 'paparan').
+
+    Mengurutkan sendiri (metrik menurun, lalu nama) — jadi tidak bergantung
+    pada urutan SQL yang dipakai panel bulanan.
+
+    Menambahkan:
+      value    — nilai metrik yang diperingkat (menyeragamkan render panel)
+      bar_pct  — panjang bar relatif terhadap pemuncak METRIK ITU
+      mark     — 👑 juara, 💎 peringkat 2-3; kosong bila nilainya 0, sebab
+                 daftar memuat seluruh pegawai aktif termasuk yang nol.
+    """
+    ordered = sorted(rows, key=lambda r: (-r[metric], r["nama"]))
+    ranked = rank(ordered)
+    top = ranked[0][metric] if ranked else 0
+    for r in ranked:
+        r["value"] = r[metric]
+        r["bar_pct"] = round(r[metric] / top * 100) if top else 0
+        if r[metric] > 0 and r["rank"] <= 3:
+            r["mark"] = "👑" if r["rank"] == 1 else "💎"
+        else:
+            r["mark"] = ""
+    return ranked
+
+
+def sort_month_rows(rows: List[dict], key: str, *, descending: bool = True) -> List[dict]:
+    """Urutkan panel bulanan menurut kolom yang diklik.
+
+    key 'nama' selalu alfabetis; kolom angka ('dinas'/'paparan'/'total')
+    memakai nama sebagai pemecah seri agar urutannya deterministik.
+    """
+    if key == "nama":
+        return sorted(rows, key=lambda r: r["nama"].lower(), reverse=descending)
+    sign = -1 if descending else 1
+    return sorted(rows, key=lambda r: (sign * r[key], r["nama"].lower()))
+
+
 def decorate_ranks(rows: List[dict]) -> List[dict]:
     """rank() + bidang tampilan papan peringkat. Dipakai layar DAN cetakan agar
     keduanya tak pernah berbeda.

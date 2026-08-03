@@ -5,9 +5,9 @@ def test_nav_item_registered_in_insight_group():
     import inspect
     import src.ui.app as app_mod
     src = inspect.getsource(app_mod.HRApp._build_sidebar)
-    assert '"Rekap Dinas", "DinasRecap"' in src
+    assert '"Rekap Dinas Paparan", "DinasRecap"' in src
     # harus berada di grup INSIGHT (muncul sebelum label DATA MANAGEMENT)
-    assert src.index("Rekap Dinas") < src.index("DATA MANAGEMENT")
+    assert src.index("Rekap Dinas Paparan") < src.index("DATA MANAGEMENT")
 
 
 def test_create_screen_returns_dinas_recap(tk_root, monkeypatch, tmp_path):

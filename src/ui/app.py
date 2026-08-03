@@ -150,7 +150,7 @@ class HRApp(ctk.CTk):
             ("INSIGHT", [
                 ("📊", "Dashboard", "Dashboard"),
                 ("⊞", "Heatmap", "Heatmap"),
-                ("▤", "Rekap Dinas", "DinasRecap"),
+                ("▤", "Rekap Dinas Paparan", "DinasRecap"),
             ]),
             ("DATA MANAGEMENT", [
                 ("📥", "Import", "Import"),
