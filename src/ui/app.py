@@ -1,5 +1,4 @@
 import customtkinter as ctk
-from time import perf_counter
 from typing import Dict
 
 from src.ui.theme import (
@@ -18,67 +17,6 @@ from src.ui.icons import glyph, icon_font
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
-
-# ── Overlay "Memuat…" saat berpindah layar ────────────────────────────────
-# Nama layar yang ramah untuk teks overlay.
-SCREEN_LABELS: Dict[str, str] = {
-    "Dashboard": "Dashboard", "Heatmap": "Heatmap", "DinasRecap": "Rekap Dinas",
-    "Import": "Import", "Export": "Export", "ActiveMonth": "Active Month",
-    "Issues": "Issues", "SevereLateness": "Severe Lateness",
-    "WhatsAppAssistant": "WhatsApp Assistant", "Coaching": "Coaching",
-    "Outlier": "Outlier", "Holiday": "Hari Libur", "Settings": "Settings",
-}
-
-# Di atas ambang ini perpindahan terasa menggantung bagi manusia.
-SLOW_SCREEN_MS = 300
-
-# Bibit hasil pengukuran pada data nyata (33 pegawai, 1505 baris): waktu
-# membangun kunjungan pertama — Rekap Dinas 3767ms, Dashboard 2260ms,
-# Outlier 1641ms, WhatsApp 1025ms, Heatmap 624ms, Hari Libur 324ms.
-# Tanpa bibit ini justru kunjungan PERTAMA — yang paling lambat — tidak
-# akan dapat indikator.
-_SEED_SLOW = {"Dashboard", "Heatmap", "DinasRecap", "Outlier",
-              "WhatsAppAssistant", "Holiday"}
-
-# State di level modul, bukan atribut instance: _show() dipinjam apa adanya
-# oleh harness test, jadi kontrak atributnya sengaja tidak ditambah.
-_slow_screens = set(_SEED_SLOW)
-
-
-def _is_slow_screen(name: str) -> bool:
-    return name in _slow_screens
-
-
-def _open_loading(content, name: str, *, first_visit: bool):
-    """Overlay untuk layar yang diketahui lambat; None untuk yang cepat.
-
-    Fungsi level modul (bukan method) supaya kontrak atribut _show() tetap
-    sama — harness test meminjam _show apa adanya.
-
-    Sengaja TIDAK ditampilkan pada layar ringan: kedipan overlay 100 ms
-    justru terasa lebih kacau daripada tanpa indikator sama sekali."""
-    if not _is_slow_screen(name):
-        return None
-    try:
-        from src.ui.components.loading_overlay import LoadingOverlay
-        label = SCREEN_LABELS.get(name, name)
-        return LoadingOverlay(
-            content,
-            text=f"Memuat {label}…",
-            detail="menyiapkan data" if first_visit else "memperbarui data",
-        ).show()
-    except Exception:
-        return None      # indikator tidak boleh menggagalkan navigasi
-
-
-def _record_screen_timing(name: str, elapsed_ms: float) -> None:
-    """Belajar dari waktu sesungguhnya di mesin ini — daftar bibit hanya
-    tebakan awal. Layar yang ternyata cepat berhenti memicu overlay, yang
-    ternyata lambat mulai memicunya."""
-    if elapsed_ms >= SLOW_SCREEN_MS:
-        _slow_screens.add(name)
-    else:
-        _slow_screens.discard(name)
 
 
 class HRApp(ctk.CTk):
@@ -531,30 +469,21 @@ class HRApp(ctk.CTk):
         if prev is not None and prev is not screen and prev.winfo_exists():
             prev.grid_remove()
 
-        # Layar berat menahan main loop selama dibangun/di-refresh; tampilkan
-        # overlay lebih dulu supaya jendela tidak terlihat menggantung.
-        overlay = _open_loading(self.content, name, first_visit=screen is None)
-        started = perf_counter()
-        try:
-            if screen is None:
-                # First visit — build fresh. __init__ already renders current
-                # data, so on_show() is NOT called here (see contract below).
-                screen = self._create_screen(name)
-                self._screens[name] = screen
-                screen.grid(row=0, column=0, sticky="nsew")
-            else:
-                # Cached — re-show, then let the screen re-read volatile data.
-                # on_show() contract: fast + idempotent; re-reads current_month/
-                # settings/period_state and refreshes rows WITHOUT rebuilding
-                # its chrome, so user state (search, scroll, picks) survives.
-                screen.grid()
-                on_show = getattr(screen, "on_show", None)
-                if callable(on_show):
-                    on_show()
-        finally:
-            _record_screen_timing(name, (perf_counter() - started) * 1000)
-            if overlay is not None:
-                overlay.hide()
+        if screen is None:
+            # First visit — build fresh. __init__ already renders current
+            # data, so on_show() is NOT called here (see contract below).
+            screen = self._create_screen(name)
+            self._screens[name] = screen
+            screen.grid(row=0, column=0, sticky="nsew")
+        else:
+            # Cached — re-show, then let the screen re-read volatile data.
+            # on_show() contract: fast + idempotent; re-reads current_month/
+            # settings/period_state and refreshes rows WITHOUT rebuilding
+            # its chrome, so user state (search, scroll, picks) survives.
+            screen.grid()
+            on_show = getattr(screen, "on_show", None)
+            if callable(on_show):
+                on_show()
         self._visible_name = name
 
     def _show_about(self):

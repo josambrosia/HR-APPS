@@ -36,11 +36,6 @@ APP_CHANGELOG = [
                      "peringkat sepanjang periode (Tahun ini, atau 3/6 bulan "
                      "terakhir) lengkap dengan grafik komposisi dinas vs "
                      "paparan. Bisa dicetak jadi PDF."),
-            ("feat", "Indikator \"Memuat…\" saat membuka menu yang berat "
-                     "(Dashboard, Heatmap, Rekap Dinas, Outlier, WhatsApp "
-                     "Assistant, Hari Libur) — jendela tidak lagi terlihat "
-                     "menggantung tanpa penjelasan. Menu yang ringan tetap "
-                     "berpindah langsung tanpa kedipan indikator."),
             ("fix", "Berpindah antar rentang di Rekap Dinas (3 bulan / 6 bulan "
                     "/ Tahun ini) kini nyaris seketika — sebelumnya menahan "
                     "aplikasi sekitar 9 detik tiap kali ditekan."),
