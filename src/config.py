@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "24.0.2"
-APP_BUILD_DATE = "2026-08-04"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "25.0.0"
+APP_BUILD_DATE = "2026-08-21"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,48 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "25.0.0",
+        "date": "2026-08-21",
+        "changes": [
+            ("feat", "Menu, papan peringkat, dan dashboard kini terasa hidup: "
+                     "hover item menu mengalir dan ikonnya bergeser, garis "
+                     "magenta penanda menu aktif meluncur berpindah antar "
+                     "menu, dan angka-angka KPI Dashboard berhitung naik "
+                     "alih-alih langsung muncul."),
+            ("feat", "Heatmap kehadiran menyala menyapu dari kiri saat "
+                     "dibuka, dan sel yang disorot kini mendapat garis "
+                     "outline serta tooltip yang memudar, bukan muncul-"
+                     "hilang mendadak."),
+            ("feat", "Bar papan peringkat Rekap Dinas Paparan tumbuh dari "
+                     "nol, dan pil pemilih periode/rentang meluncur "
+                     "berpindah alih-alih melompat."),
+            ("feat", "Toast dan dialog kini memudar naik, dan jendela "
+                     "utama memudar masuk saat aplikasi dibuka."),
+            ("feat", "Baris yang baru diselesaikan di Issues dan Severe "
+                     "Lateness kini berkilat hijau sebentar dan daftar "
+                     "otomatis di-scroll ke baris tersebut; baris teratas "
+                     "Riwayat juga berkilat setelah import/export selesai."),
+            ("feat", "Tombol yang sedang bekerja menampilkan titik "
+                     "bergerak, dan proses Export dry-run serta "
+                     "Backup/Restore/Hapus Settings kini punya indikator "
+                     "sibuk sendiri — jadi proses panjang tidak lagi "
+                     "tampak seperti aplikasi yang hang."),
+            ("feat", "Sakelar baru \"Animasi antarmuka\" di Settings untuk "
+                     "mematikan seluruh animasi ini, misalnya di laptop "
+                     "yang lebih tua."),
+            ("fix", "Chip \"Bulan Aktif\" di sidebar sebelumnya bisa "
+                    "disorot kursor tanpa tanda apa pun — sekarang "
+                    "bereaksi saat disorot."),
+            ("fix", "Baris tabel di Coaching dan Settings kini menyorot "
+                    "saat dilewati kursor."),
+            ("fix", "Mengecualikan atau membatalkan pengecualian Outlier "
+                    "sebelumnya tidak memberi umpan balik apa pun — "
+                    "sekarang aksinya dikonfirmasi secara visual."),
+            ("fix", "Kartu ringkasan Coaching berhenti berkedip setiap "
+                    "kali status coaching pegawai diubah."),
+        ],
+    },
     {
         "version": "24.0.2",
         "date": "2026-08-04",

@@ -7,7 +7,7 @@ from src.db.connection import get_connection
 from src.db.settings import get_setting, set_setting
 from src.db.employees import list_employees, toggle_employee_active
 from src.db import backup as backup_mod
-from src.ui import feedback
+from src.ui import feedback, motion
 from src.ui.tasks import BusyGuard
 from src.ui.components.tree_style import style_treeview, RowHover
 from src.ui.theme import (
@@ -188,6 +188,24 @@ class SettingsScreen(ctk.CTkFrame):
             font=FONT_BODY,
             placeholder_text_color=COLOR_TEXT_MUTED,
         ).pack(side="left")
+
+        row7 = ctk.CTkFrame(
+            parent, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER,
+            corner_radius=RADIUS_MD,
+        )
+        row7.pack(fill="x", pady=SPACE_SM)
+        self._motion_switch = ctk.CTkSwitch(
+            row7, text="Animasi antarmuka",
+            command=lambda: self._on_motion_toggle(bool(self._motion_switch.get())),
+            progress_color=COLOR_ACCENT,
+            font=FONT_BODY, text_color=COLOR_TEXT,
+        )
+        self._motion_switch.pack(anchor="w", padx=SPACE_MD, pady=SPACE_SM + 2)
+        if motion.enabled():
+            self._motion_switch.select()
+        else:
+            self._motion_switch.deselect()
 
         # Save = magenta primary CTA (JTS brand action color).
         ctk.CTkButton(
@@ -539,6 +557,14 @@ class SettingsScreen(ctk.CTkFrame):
         # per data_version) — bump so cached screens refetch on next show.
         notify_data_changed()
         feedback.show_info(self, "Tersimpan", "Pengaturan disimpan.")
+
+    def _on_motion_toggle(self, value: bool) -> None:
+        """Sakelar animasi. Berlaku seketika untuk animasi berikutnya;
+        tween yang sedang berjalan dibiarkan selesai."""
+        with get_connection(DB_PATH) as conn:
+            set_setting(conn, motion.SETTING_KEY, "1" if value else "0")
+            conn.commit()
+        motion.set_enabled(value)
 
     def _save_profil(self):
         with get_connection(DB_PATH) as conn:
