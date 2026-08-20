@@ -186,3 +186,53 @@ class TestRenderSignature:
         assert sig.changed(data_version, month, sort_key) is True
         # user mengetik di kotak cari — tidak ada bagian sidik jari yang berubah
         assert sig.changed(data_version, month, sort_key) is False
+
+
+class TestHoverJobsTidakBocor:
+    """hover_tint menyimpan timer di _hover_jobs berkunci id(widget). Entri itu
+    semula hanya dibuang saat animasi selesai wajar — kalau widget dihancurkan
+    di tengah animasi, entrinya tertinggal selamanya. Dict-nya tumbuh sepanjang
+    sesi, dan karena Python memakai ulang id() setelah GC, widget baru bisa
+    mewarisi id timer milik widget yang sudah mati."""
+
+    def test_widget_dihancurkan_membersihkan_hover_jobs(self, tk_root):
+        import customtkinter as ctk
+        motion._hover_jobs.clear()
+        f = ctk.CTkFrame(tk_root, fg_color="#0A0A0A")
+        f.pack()
+        tk_root.update()
+        motion.hover_tint(f, "#0A0A0A", "#1F1F1F", duration_ms=5000)
+        tk_root.update()
+        assert len(motion._hover_jobs) == 1, "prasyarat: tween panjang harus tercatat"
+        f.destroy()
+        tk_root.update()
+        assert motion._hover_jobs == {}, "entri basi tertinggal setelah widget mati"
+        assert motion.active_count() == 0
+
+    def test_cancel_for_juga_membersihkan_hover_jobs(self, tk_root):
+        import customtkinter as ctk
+        motion._hover_jobs.clear()
+        f = ctk.CTkFrame(tk_root, fg_color="#0A0A0A")
+        f.pack()
+        tk_root.update()
+        motion.hover_tint(f, "#0A0A0A", "#1F1F1F", duration_ms=5000)
+        motion.cancel_for(f)
+        assert motion._hover_jobs == {}
+        f.destroy()
+
+    def test_membatalkan_satu_properti_tidak_menyentuh_properti_lain(self, tk_root):
+        """Chip bulan aktif menganimasikan fg_color dan border_color sekaligus;
+        keduanya harus hidup berdampingan."""
+        import customtkinter as ctk
+        motion._hover_jobs.clear()
+        f = ctk.CTkFrame(tk_root, fg_color="#0A0A0A", border_width=1,
+                         border_color="#262626")
+        f.pack()
+        tk_root.update()
+        motion.hover_tint(f, "#0A0A0A", "#1F1F1F", duration_ms=5000)
+        motion.hover_tint(f, "#262626", "#EC4899", duration_ms=5000,
+                          option="border_color")
+        assert len(motion._hover_jobs) == 2, "dua properti harus tercatat terpisah"
+        f.destroy()
+        tk_root.update()
+        assert motion._hover_jobs == {}

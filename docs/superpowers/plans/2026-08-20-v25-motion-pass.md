@@ -1276,118 +1276,251 @@ git commit -m "feat(v25): item 02 — garis nav aktif meluncur antar menu"
 
 ---
 
-## Task 10: Item 13 — pil geser pada WeekNavBar
-
-`WeekNavBar._refresh_styles` (`week_nav.py:84`) mengganti `fg_color` tombol
-seketika. Karena tombolnya `CTkButton` dengan lebar berbeda-beda, pil geser
-sungguhan butuh satu overlay ber-`place()`. Pendekatan yang lebih murah dan
-tidak mengubah tata letak: **alirkan warnanya**, bukan menggeser pil.
-
-Keputusan ini menyimpang dari mockup (yang memperagakan pil geser) dan
-alasannya harus dicatat: tombol WeekNavBar lebarnya dinamis (`Minggu 1 (01-07)`),
-sehingga pil geser butuh pengukuran ulang tiap perubahan bulan. Aliran warna
-memberi 90% rasanya dengan 10% risikonya.
+## Task 10: Item 13 — pil geser pada WeekNavBar + segmented button
 
 **Files:**
-- Modify: `src/ui/components/week_nav.py:80-98`
+- Modify: `src/ui/motion.py` (penolong `slide_pill`)
+- Modify: `src/ui/components/week_nav.py`
+- Modify: `src/ui/screens/dinas_recap.py`
 - Test: `tests/test_motion_week_nav.py`
+
+### Kenapa rencana ini direvisi
+
+Versi pertama rencana ini menurunkan item 13 dari pil geser jadi sekadar
+"warna mengalir", dengan alasan lebar tombol WeekNavBar dinamis. **Premis itu
+salah.** Pengukuran di mesin target:
+
+| | lebar tombol |
+|---|---|
+| WeekNavBar | 175, 175, 175, 175, 175, 175 — seragam, jarak 185px teratur |
+| CTkSegmentedButton | 53, 53, 85 — justru yang ini tidak seragam |
+
+Jadi terbalik: WeekNavBar adalah kasus mudah. Keduanya tetap dikerjakan lewat
+pengukuran `winfo_x()`/`winfo_width()` sehingga tidak ada asumsi lebar yang
+ditanam di kode.
+
+Tanpa pil geser, janji "konsistensi dengan garis sidebar" — alasan item 13
+dipilih — tidak terpenuhi.
+
+### Pelajaran DPI dari Task 9 berlaku di sini
+
+Pil-nya WAJIB `tk.Frame`, bukan `CTkFrame`. `CTkFrame.place(y=...)`
+menskalakan koordinat mengikuti DPI sementara `place_configure(y=...)` tidak;
+campuran itu membuat elemen meleset ~76px pada penempatan pertama di layar
+125%, dan tampak normal di layar 100%.
 
 - [ ] **Step 1: Tulis tes yang gagal**
 
 ```python
 # tests/test_motion_week_nav.py
-"""Item 13 — perpindahan pil periode mengalir, bukan menjeplak."""
+"""Item 13 — pil aktif meluncur di WeekNavBar dan segmented button."""
+import tkinter as tk
+
+import customtkinter as ctk
+
 from src.ui import motion
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.theme import COLOR_ACCENT, COLOR_BG
 
 
-def test_keadaan_akhir_identik_dengan_v24_saat_motion_mati(tk_root):
-    motion.set_enabled(False)
-    calls = []
-    bar = WeekNavBar(tk_root, current_month="2026-07",
-                     on_change=calls.append, initial="semua")
+def _bar(tk_root, initial="semua"):
+    return WeekNavBar(tk_root, current_month="2026-07",
+                      on_change=lambda k: None, initial=initial)
+
+
+def test_pilnya_tk_frame_bukan_ctk(tk_root):
+    """tk.Frame, bukan CTkFrame — lihat pelajaran DPI item 02."""
+    bar = _bar(tk_root)
     try:
-        bar.set_active("minggu_2")
-        btn = bar._buttons["minggu_2"]
-        assert btn.cget("fg_color") == COLOR_ACCENT
-        assert btn.cget("text_color") == COLOR_BG
+        assert isinstance(bar._pill, tk.Frame)
+        assert not isinstance(bar._pill, ctk.CTkFrame)
     finally:
         bar.destroy()
 
 
-def test_tombol_tak_aktif_kembali_ke_transparan(tk_root):
+def test_pil_mendarat_tepat_di_tombol_aktif(tk_root):
     motion.set_enabled(False)
-    bar = WeekNavBar(tk_root, current_month="2026-07",
-                     on_change=lambda k: None, initial="minggu_2")
+    bar = _bar(tk_root)
+    bar.pack()
+    tk_root.deiconify()
+    tk_root.update()
     try:
+        bar.set_active("minggu_2")
+        tk_root.update()
+        btn = bar._buttons["minggu_2"]
+        assert bar._pill.winfo_x() == btn.winfo_x()
+        assert bar._pill.winfo_width() == btn.winfo_width()
+    finally:
+        tk_root.withdraw()
+        bar.destroy()
+
+
+def test_pil_ikut_berpindah_saat_ganti_tombol(tk_root):
+    motion.set_enabled(False)
+    bar = _bar(tk_root)
+    bar.pack()
+    tk_root.deiconify()
+    tk_root.update()
+    try:
+        bar.set_active("minggu_1")
+        tk_root.update()
+        x1 = bar._pill.winfo_x()
+        bar.set_active("minggu_4")
+        tk_root.update()
+        x2 = bar._pill.winfo_x()
+        assert x2 != x1
+        assert x2 == bar._buttons["minggu_4"].winfo_x()
+    finally:
+        tk_root.withdraw()
+        bar.destroy()
+
+
+def test_penempatan_PERTAMA_juga_tepat(tk_root):
+    """Regresi DPI item 02: penempatan pertama memakai place(), bukan
+    place_configure(). Kalau pil-nya CTkFrame, yang ini meleset."""
+    motion.set_enabled(False)
+    bar = _bar(tk_root)
+    bar.pack()
+    tk_root.deiconify()
+    tk_root.update()
+    try:
+        assert not bar._pill.winfo_ismapped(), "prasyarat: pil belum tampil"
+        bar.set_active("minggu_3")
+        tk_root.update()
+        assert bar._pill.winfo_x() == bar._buttons["minggu_3"].winfo_x()
+    finally:
+        tk_root.withdraw()
+        bar.destroy()
+
+
+def test_lebar_pil_menyesuaikan_tombol_yang_lebarnya_beda(tk_root):
+    """Segmented button Rekap Dinas lebarnya 53/53/85 — pil harus ikut
+    melebar, bukan memakai lebar tetap."""
+    motion.set_enabled(False)
+    host = ctk.CTkFrame(tk_root)
+    host.pack()
+    pill = tk.Frame(host, bg=COLOR_ACCENT)
+    a = ctk.CTkButton(host, text="3 bln", width=53)
+    b = ctk.CTkButton(host, text="Tahun ini", width=85)
+    a.place(x=0, y=0)
+    b.place(x=53, y=0)
+    tk_root.deiconify()
+    tk_root.update()
+    try:
+        motion.slide_pill(pill, b)
+        tk_root.update()
+        assert pill.winfo_width() == b.winfo_width()
+        assert pill.winfo_x() == b.winfo_x()
+    finally:
+        tk_root.withdraw()
+        host.destroy()
+
+
+def test_keadaan_akhir_warna_identik_dengan_v24(tk_root):
+    """Pil-nya tambahan; warna tombol aktif/tak-aktif tidak boleh bergeser."""
+    motion.set_enabled(False)
+    bar = _bar(tk_root)
+    try:
+        bar.set_active("minggu_2")
+        assert bar._buttons["minggu_2"].cget("text_color") == COLOR_BG
         bar.set_active("semua")
         assert bar._buttons["minggu_2"].cget("fg_color") == "transparent"
     finally:
         bar.destroy()
 ```
 
-- [ ] **Step 2: Jalankan tes, pastikan LULUS lebih dulu**
+- [ ] **Step 2: Jalankan tes, pastikan GAGAL**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_motion_week_nav.py -v`
-Expected: PASS — ini tes **karakterisasi**: mengunci keadaan akhir v24
-SEBELUM disentuh, supaya perubahan berikutnya terbukti tidak menggesernya.
+Expected: FAIL — `AttributeError: 'WeekNavBar' object has no attribute '_pill'`
 
-- [ ] **Step 3: Ganti `_refresh_styles`**
-
-```python
-    def _refresh_styles(self):
-        """Alirkan warna tombol ke keadaan barunya (v25 item 13).
-
-        Kenapa aliran warna, bukan pil geser seperti sidebar: lebar tombol di
-        sini dinamis ("Minggu 1 (01-07)"), sehingga pil ber-place() harus
-        diukur ulang tiap ganti bulan. Aliran warna memberi hampir seluruh
-        rasanya tanpa risiko itu.
-        """
-        for key, btn in self._buttons.items():
-            active = key == self._active
-            to_fg = COLOR_ACCENT if active else COLOR_SURFACE
-            to_text = COLOR_BG if active else COLOR_TEXT_DIM
-            to_border = COLOR_ACCENT if active else COLOR_BORDER
-            from_fg = btn.cget("fg_color")
-            if from_fg == "transparent":
-                from_fg = COLOR_SURFACE
-            motion.tween(
-                btn, MOTION_BASE,
-                lambda t, b=btn, f=from_fg, g=to_fg: b.configure(
-                    fg_color=lerp_hex(f, g, t)),
-                on_done=lambda b=btn, a=active, g=to_fg, x=to_text, r=to_border: b.configure(
-                    fg_color=g if a else "transparent",
-                    text_color=x, border_color=r),
-            )
-```
-
-Tambahkan impor di `week_nav.py`:
+- [ ] **Step 3: Tambahkan penolong ke `src/ui/motion.py`**
 
 ```python
-from src.ui import motion
-from src.ui.motion import lerp_hex
-from src.ui.theme import MOTION_BASE, COLOR_SURFACE
+# ─────────────────────────────────────────────── penolong: pil geser
+
+def slide_pill(pill, target_widget, duration_ms: int = None) -> None:
+    """Geser + ubah lebar `pill` supaya menutupi `target_widget`.
+
+    Posisi dan lebar DIUKUR dari widget tujuan (`winfo_x`/`winfo_width`),
+    tidak diasumsikan: WeekNavBar kebetulan seragam 175px, tapi segmented
+    button Rekap Dinas lebarnya 53/53/85.
+
+    `pill` WAJIB `tk.Frame`, bukan `CTkFrame` — CTkFrame menskalakan koordinat
+    di place() tapi tidak di place_configure(), sehingga penempatan pertama
+    meleset di layar ber-DPI tinggi (lihat item 02).
+    """
+    from src.ui.theme import MOTION_BASE
+    if duration_ms is None:
+        duration_ms = MOTION_BASE
+    target_widget.update_idletasks()
+    to_x, to_w = target_widget.winfo_x(), target_widget.winfo_width()
+    to_y, to_h = target_widget.winfo_y(), target_widget.winfo_height()
+
+    if not pill.winfo_ismapped():
+        # Penempatan pertama: langsung, tanpa meluncur dari posisi nol.
+        pill.place(x=to_x, y=to_y, width=to_w, height=to_h)
+        pill.lower(target_widget)
+        return
+
+    cancel_for(pill)
+    from_x, from_w = pill.winfo_x(), pill.winfo_width()
+    tween(pill, duration_ms,
+          lambda t: pill.place_configure(
+              x=int(from_x + (to_x - from_x) * t),
+              width=int(from_w + (to_w - from_w) * t),
+              y=to_y, height=to_h),
+          on_done=lambda: pill.place_configure(x=to_x, y=to_y,
+                                               width=to_w, height=to_h))
 ```
 
-> Perhatikan `on_done`: nilai akhir dipasang eksplisit termasuk
-> `"transparent"` untuk tombol tak aktif. Ini yang menjaga keadaan akhir
-> identik dengan v24 dan membuat tes karakterisasi di Step 2 tetap lulus.
+- [ ] **Step 4: Pasang di `week_nav.py`**
 
-- [ ] **Step 4: Jalankan tes, pastikan MASIH LULUS**
+Buat pil sekali di `__init__` (setelah tombol dibuat):
 
-Run: `.venv/Scripts/python.exe -m pytest tests/test_motion_week_nav.py -v`
-Expected: PASS (2 tes) — keadaan akhir tidak bergeser
-
-- [ ] **Step 5: Suite penuh + commit**
-
-```bash
-.venv/Scripts/python.exe -m pytest -q
-git add src/ui/components/week_nav.py tests/test_motion_week_nav.py
-git commit -m "feat(v25): item 13 — perpindahan pil periode mengalir"
+```python
+        # Pil aktif — satu tk.Frame untuk seluruh bar (v25 item 13).
+        self._pill = tk.Frame(self, bg=COLOR_ACCENT)
 ```
 
----
+Di `_refresh_styles`, PERTAHANKAN seluruh pemasangan warna yang sudah ada
+(supaya keadaan akhir identik dengan v24), lalu tambahkan di akhir:
+
+```python
+        active_btn = self._buttons.get(self._active)
+        if active_btn is not None:
+            motion.slide_pill(self._pill, active_btn)
+```
+
+> Tombol aktif tetap diberi `fg_color=COLOR_ACCENT` seperti sebelumnya. Pil
+> berada DI BAWAH tombol (`lower`), jadi ia hanya terlihat saat meluncur di
+> antara dua tombol. Inilah yang membuat keadaan akhir tidak bergeser sedikit
+> pun dari v24, sehingga `test_keadaan_akhir_warna_identik_dengan_v24` lulus.
+
+Impor yang dibutuhkan di `week_nav.py`: `import tkinter as tk`,
+`from src.ui import motion`, dan `COLOR_ACCENT` (kemungkinan sudah ada).
+
+- [ ] **Step 5: Pasang di segmented button Rekap Dinas**
+
+Di `src/ui/screens/dinas_recap.py`, `self.span_ctl` adalah `CTkSegmentedButton`.
+Tombol-tombolnya ada di `span_ctl._buttons_dict` (dict nilai -> CTkButton).
+Buat satu `tk.Frame` pil di dalam `span_ctl` dan geser ke tombol terpilih tiap
+kali span berubah, memakai `motion.slide_pill` yang sama.
+
+Kalau struktur internal `CTkSegmentedButton` ternyata tidak memungkinkan
+menempatkan child (mis. `place` tidak berlaku di dalamnya), LAPORKAN sebagai
+DONE_WITH_CONCERNS dan tinggalkan segmented button apa adanya — WeekNavBar
+tetap dikerjakan. Jangan memaksa dengan meretas internal customtkinter.
+
+- [ ] **Step 6: Jalankan tes bertarget**
+
+```
+.venv/Scripts/python.exe -m pytest tests/test_motion_week_nav.py tests/test_dinas_recap_screen.py -v
+```
+
+- [ ] **Step 7: JANGAN commit, JANGAN jalankan suite penuh**
+
+Controller yang menjalankan suite penuh dan melakukan commit.
 
 ## Task 11: `count_up()` + item 03 (KPI Dashboard)
 

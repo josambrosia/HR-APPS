@@ -129,7 +129,8 @@ def _on_destroy(widget) -> None:
 def cancel_for(widget) -> None:
     """Batalkan seluruh tween milik `widget`. Frame akhir TIDAK dipaksakan —
     pembatalan berarti berhenti di tempat, bukan melompat ke ujung."""
-    for job_id in _jobs.pop(id(widget), set()):
+    key = id(widget)
+    for job_id in _jobs.pop(key, set()):
         try:
             widget.after_cancel(job_id)
         except tk.TclError:
@@ -138,6 +139,12 @@ def cancel_for(widget) -> None:
             # `except Exception`. Di v24 penangkap selebar itu menyembunyikan
             # tabrakan nama _draw pada CTkFrame selama berjam-jam.
             pass
+    # Indeks per-properti milik hover_tint ikut dibersihkan. Tanpa ini entrinya
+    # tertinggal saat widget dihancurkan di tengah animasi: dict tumbuh sepanjang
+    # sesi, dan karena Python memakai ulang id() setelah GC, widget baru bisa
+    # mewarisi id timer milik widget yang sudah mati.
+    for hover_key in [k for k in _hover_jobs if k[0] == key]:
+        _hover_jobs.pop(hover_key, None)
 
 
 # ─────────────────────────────────────────────── tween
