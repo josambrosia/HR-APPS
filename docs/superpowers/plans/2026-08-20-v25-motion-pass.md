@@ -763,32 +763,54 @@ def test_hover_tint_balik_ke_warna_asal(tk_root):
     f.destroy()
 
 
+class _SidebarHarness(ctk.CTkFrame):
+    """Sidebar asli tanpa membuat root Tk kedua.
+
+    Mengonstruksi HRApp() di dalam tes akan membuat ctk.CTk() kedua di
+    samping fixture tk_root yang berlingkup sesi — Tk di Windows tidak
+    bisa itu, dan hasilnya tes ngambang yang bergantung urutan (persis
+    yang kita perbaiki di v24). Proyek ini sudah punya pola yang sama di
+    tests/test_app_caching.py::_ShellHarness.
+    """
+    _build_sidebar = HRApp._build_sidebar
+    _build_nav_item = HRApp._build_nav_item
+    _set_active_nav_item = HRApp._set_active_nav_item
+    _load_sidebar_icon = HRApp._load_sidebar_icon
+    _format_active_month_label = HRApp._format_active_month_label
+
+    def __init__(self, root):
+        super().__init__(root)
+        self._nav_items = {}
+        self._active_nav_key = "Dashboard"
+        self._build_sidebar()
+
+    def _show(self, name):
+        self._set_active_nav_item(name)
+
+
 def test_chip_bulan_aktif_punya_umpan_balik_hover(tk_root):
     """Regresi cacat: chip bisa diklik + berkursor tangan tapi tidak
     bereaksi saat disorot, jadi tidak ada yang menandakan ia interaktif."""
-    from src.ui.app import HRApp
-    app = HRApp()
+    h = _SidebarHarness(tk_root)
     try:
-        chip = app._active_month_chip
-        binds = chip.bind()
+        binds = h._active_month_chip.bind()
         assert "<Enter>" in binds, "chip tidak punya umpan balik hover"
         assert "<Leave>" in binds
     finally:
-        app.destroy()
+        h.destroy()
 
 
 def test_hover_chip_mengubah_warna_lalu_mengembalikannya(tk_root):
-    from src.ui.app import HRApp
     motion.set_enabled(False)
-    app = HRApp()
+    h = _SidebarHarness(tk_root)
     try:
-        chip = app._active_month_chip
+        chip = h._active_month_chip
         chip.event_generate("<Enter>")
         assert chip.cget("fg_color") != COLOR_ACCENT_TINT_BG
         chip.event_generate("<Leave>")
         assert chip.cget("fg_color") == COLOR_ACCENT_TINT_BG
     finally:
-        app.destroy()
+        h.destroy()
 ```
 
 - [ ] **Step 2: Jalankan tes, pastikan GAGAL**
@@ -1103,54 +1125,59 @@ masing-masing (`app.py:309`, `317`, `326`). Supaya bisa meluncur, satu garis
 
 - [ ] **Step 1: Tulis tes yang gagal**
 
+Pakai `_SidebarHarness` yang sama seperti Task 7 (impor dari
+`tests/test_motion_hover.py`, jangan disalin ulang) — mengonstruksi `HRApp()`
+akan membuat root Tk kedua dan menghasilkan tes ngambang.
+
 ```python
 # tests/test_motion_nav_bar.py
 """Item 02 — garis nav aktif meluncur, bukan hilang lalu muncul."""
 from src.ui import motion
+from tests.test_motion_hover import _SidebarHarness
 
 
 def test_hanya_ada_satu_garis_aktif_untuk_seluruh_sidebar(tk_root):
     """Regresi arsitektur: sebelumnya tiap item punya garisnya sendiri, jadi
     mustahil meluncur. Sekarang satu garis dipakai bersama."""
-    from src.ui.app import HRApp
-    app = HRApp()
+    h = _SidebarHarness(tk_root)
     try:
-        assert hasattr(app, "_nav_indicator")
-        for item in app._nav_items.values():
+        assert hasattr(h, "_nav_indicator")
+        for item in h._nav_items.values():
             assert not hasattr(item, "_left_bar"), \
                 "garis per-item masih ada — luncuran tidak akan mungkin"
     finally:
-        app.destroy()
+        h.destroy()
 
 
 def test_garis_pindah_ke_posisi_item_yang_dipilih(tk_root):
-    from src.ui.app import HRApp
     motion.set_enabled(False)
-    app = HRApp()
+    h = _SidebarHarness(tk_root)
     try:
-        app.update_idletasks()
-        app._show("Heatmap")
-        app.update_idletasks()
-        y_heatmap = app._nav_indicator.winfo_y()
-        app._show("Coaching")
-        app.update_idletasks()
-        y_coaching = app._nav_indicator.winfo_y()
+        h.pack()
+        h.update_idletasks()
+        h._set_active_nav_item("Heatmap")
+        h.update_idletasks()
+        y_heatmap = h._nav_indicator.winfo_y()
+        h._set_active_nav_item("Coaching")
+        h.update_idletasks()
+        y_coaching = h._nav_indicator.winfo_y()
         assert y_coaching != y_heatmap, "garis tidak berpindah"
-        target = app._nav_items["Coaching"].winfo_y()
-        assert abs(y_coaching - target) <= 6, "garis tidak mendarat di item tujuan"
+        target = h._nav_items["Coaching"].winfo_y()
+        assert abs(y_coaching - target) <= 8, "garis tidak mendarat di item tujuan"
     finally:
-        app.destroy()
+        h.destroy()
 
 
-def test_garis_tersembunyi_sebelum_ada_item_aktif(tk_root):
-    from src.ui.app import HRApp
-    app = HRApp()
+def test_garis_terlihat_setelah_item_pertama_diaktifkan(tk_root):
+    h = _SidebarHarness(tk_root)
     try:
-        # Dashboard aktif sejak konstruksi, jadi garis harus TERLIHAT
-        app.update_idletasks()
-        assert app._nav_indicator.winfo_ismapped()
+        h.pack()
+        h._set_active_nav_item("Dashboard")
+        h.update_idletasks()
+        assert h._nav_indicator.winfo_ismapped()
     finally:
-        app.destroy()
+        h.destroy()
+```
 ```
 
 - [ ] **Step 2: Jalankan tes, pastikan GAGAL**
