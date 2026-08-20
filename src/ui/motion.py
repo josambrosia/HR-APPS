@@ -58,3 +58,28 @@ def ease_out_cubic(t: float) -> float:
 def ease_out_quint(t: float) -> float:
     """Lebih tegas daripada cubic — untuk gerakan yang harus terasa 'mendarat'."""
     return 1.0 - (1.0 - t) ** 5
+
+
+# ─────────────────────────────────────────────── sakelar aktif/mati
+
+SETTING_KEY = "motion_enabled"
+
+_enabled: bool = True
+
+
+def enabled() -> bool:
+    return _enabled
+
+
+def set_enabled(value: bool) -> None:
+    """Dipakai layar Settings dan fixture test. Berlaku seketika untuk
+    animasi BERIKUTNYA; tween yang sedang jalan dibiarkan selesai."""
+    global _enabled
+    _enabled = bool(value)
+
+
+def load_enabled_from_db(conn) -> None:
+    """Baca preferensi dari tabel settings. Nilai selain '0' berarti aktif,
+    termasuk saat key-nya belum pernah ditulis."""
+    from src.db.settings import get_setting
+    set_enabled(get_setting(conn, SETTING_KEY, default="1") != "0")

@@ -43,3 +43,39 @@ class TestEasing:
     def test_semua_easing_monoton_naik(self, fn):
         vals = [fn(i / 20) for i in range(21)]
         assert all(b >= a for a, b in zip(vals, vals[1:]))
+
+
+class TestEnabledFlag:
+    def test_default_aktif(self):
+        motion.set_enabled(True)
+        assert motion.enabled() is True
+
+    def test_bisa_dimatikan_dan_dinyalakan(self):
+        motion.set_enabled(False)
+        assert motion.enabled() is False
+        motion.set_enabled(True)
+        assert motion.enabled() is True
+
+    def test_memuat_dari_setting_string(self, tmp_path):
+        from src.db.schema import init_db
+        from src.db.connection import get_connection
+        from src.db.settings import set_setting
+
+        p = tmp_path / "hr.db"
+        init_db(p)
+        with get_connection(p) as conn:
+            set_setting(conn, "motion_enabled", "0")
+        with get_connection(p) as conn:
+            motion.load_enabled_from_db(conn)
+        assert motion.enabled() is False
+
+    def test_setting_belum_ada_berarti_aktif(self, tmp_path):
+        from src.db.schema import init_db
+        from src.db.connection import get_connection
+
+        p = tmp_path / "hr.db"
+        init_db(p)
+        motion.set_enabled(False)          # pastikan benar-benar berubah
+        with get_connection(p) as conn:
+            motion.load_enabled_from_db(conn)
+        assert motion.enabled() is True
