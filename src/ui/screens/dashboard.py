@@ -580,11 +580,24 @@ class DashboardScreen(ctk.CTkFrame):
             statuses = smap.get(r["id"], [])
             photo = ImageTk.PhotoImage(render_strip(statuses)) if statuses else None
             self._strip_imgs.append(photo)
-            self.rank_tree.insert("", "end", image=photo, values=(
-                r["nama"], r["dept"] or "-",
-                f"{r['total_terlambat']} mnt",
-                r["hari_telat"], r["tidak_hadir"],
-            ), tags=("evenrow",) if i % 2 == 0 else ("oddrow",))
+            # `image` HANYA dikirim bila ada gambarnya. tkinter._format_optdict
+            # membuang nilai None tapi tetap menulis nama opsinya, sehingga
+            # image=None mengubah panggilan Tcl jadi `-image -values {...}`:
+            # `-values` termakan sebagai nilai `-image`, lalu daftar nilai
+            # dibaca sebagai nama opsi dan Tk melempar
+            # `unknown option "<nama> {<dept>} {<n> mnt} ..."`. Karena Dashboard
+            # adalah layar pertama, itu mematikan aplikasi sejak startup.
+            opts = {
+                "values": (
+                    r["nama"], r["dept"] or "-",
+                    f"{r['total_terlambat']} mnt",
+                    r["hari_telat"], r["tidak_hadir"],
+                ),
+                "tags": ("evenrow",) if i % 2 == 0 else ("oddrow",),
+            }
+            if photo is not None:
+                opts["image"] = photo
+            self.rank_tree.insert("", "end", **opts)
 
     # ─────────────────────────────────────────────────────────── Print
 

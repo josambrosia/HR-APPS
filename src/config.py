@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "24.0.1"
-APP_BUILD_DATE = "2026-08-03"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "24.0.2"
+APP_BUILD_DATE = "2026-08-04"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,17 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "24.0.2",
+        "date": "2026-08-04",
+        "changes": [
+            ("fix", "Aplikasi gagal terbuka sama sekali pada sebagian data — "
+                    "layar Dashboard berhenti dengan pesan teknis "
+                    "'unknown option' begitu jendela dimuat. Penyebabnya baris "
+                    "Ranking Lengkap yang strip kehadirannya tidak tergambar; "
+                    "kini baris seperti itu tetap tampil, hanya tanpa strip."),
+        ],
+    },
     {
         "version": "24.0.1",
         "date": "2026-08-03",
