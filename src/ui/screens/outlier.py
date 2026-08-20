@@ -17,6 +17,7 @@ from src.db.outlier import (
 from src.ui.components.active_month_banner import ActiveMonthBanner
 from src.ui.components.empty_state import EmptyStateCard
 from src.ui.components.search_bar import SearchBar
+from src.ui.components.toast import show_success_toast
 from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
     COLOR_BORDER, COLOR_BORDER_STRONG,
@@ -263,16 +264,29 @@ class OutlierScreen(ctk.CTkFrame):
     def _on_exclude(self, employee_id: int):
         with get_connection(DB_PATH) as conn:
             exclude_employee(conn, employee_id, self._month)
+            nama = conn.execute(
+                "SELECT nama FROM employees WHERE id=?", (employee_id,)
+            ).fetchone()["nama"]
             conn.commit()
         notify_data_changed()
         self._render()
+        # v25 item 16 — sebelumnya layar ini tidak memanggil toast maupun
+        # feedback SATU KALI PUN. Kartu melompat ke seksi lain yang sering
+        # di luar viewport, jadi tombolnya terasa rusak di roster panjang.
+        show_success_toast(self, "Dikecualikan",
+                           f"{nama} tidak lagi dihitung di bulan ini.")
 
     def _on_revert(self, employee_id: int):
         with get_connection(DB_PATH) as conn:
             revert_employee(conn, employee_id, self._month)
+            nama = conn.execute(
+                "SELECT nama FROM employees WHERE id=?", (employee_id,)
+            ).fetchone()["nama"]
             conn.commit()
         notify_data_changed()
         self._render()
+        show_success_toast(self, "Disertakan kembali",
+                           f"{nama} kembali dihitung di bulan ini.")
 
     def _on_revert_all(self):
         with get_connection(DB_PATH) as conn:
@@ -280,6 +294,8 @@ class OutlierScreen(ctk.CTkFrame):
             conn.commit()
         notify_data_changed()
         self._render()
+        show_success_toast(self, "Semua disertakan",
+                           "Seluruh pengecualian bulan ini dibatalkan.")
 
     def on_show(self):
         """Shell hook — called on every re-display of the cached screen.

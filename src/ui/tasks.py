@@ -34,6 +34,8 @@ import threading
 import tkinter as tk
 from typing import Callable, Optional
 
+from src.ui import motion
+
 
 def run_bg(
     widget,
@@ -178,7 +180,8 @@ class BusyGuard:
             try:
                 self._saved.append((btn, btn.cget("text"), btn.cget("state")))
                 if self._busy_text is not None and i == 0:
-                    btn.configure(state="disabled", text=self._busy_text)
+                    btn.configure(state="disabled")
+                    motion.busy_pulse(btn, self._busy_text)     # v25 item 11
                 else:
                     btn.configure(state="disabled")
             except tk.TclError:
@@ -191,6 +194,7 @@ class BusyGuard:
             return
         for btn, text, state in self._saved:
             try:
+                motion.stop_busy_pulse(btn)                     # v25 item 11
                 btn.configure(text=text, state=state)
             except tk.TclError:
                 continue  # button destroyed during the operation

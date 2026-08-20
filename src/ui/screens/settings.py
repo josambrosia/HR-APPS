@@ -8,6 +8,7 @@ from src.db.settings import get_setting, set_setting
 from src.db.employees import list_employees, toggle_employee_active
 from src.db import backup as backup_mod
 from src.ui import feedback
+from src.ui.tasks import BusyGuard
 from src.ui.components.tree_style import style_treeview, RowHover
 from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
@@ -247,12 +248,13 @@ class SettingsScreen(ctk.CTkFrame):
     def _build_backup(self, parent):
         bar = ctk.CTkFrame(parent, fg_color="transparent")
         bar.pack(fill="x", pady=(SPACE_SM, SPACE_XS))
-        ctk.CTkButton(
+        self._backup_btn = ctk.CTkButton(
             bar, text="＋ Backup sekarang", command=self._do_manual_backup,
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
             text_color=COLOR_BG, font=FONT_BODY_BOLD, corner_radius=RADIUS_MD,
             width=150,
-        ).pack(side="left")
+        )
+        self._backup_btn.pack(side="left")
         ctk.CTkButton(
             bar, text="📂 Buka folder", command=self._open_backup_folder,
             fg_color="transparent", border_width=1, border_color=COLOR_INFO,
@@ -312,27 +314,41 @@ class SettingsScreen(ctk.CTkFrame):
                 text_color=self._BADGE_COLOR.get(it["reason"], COLOR_TEXT_MUTED),
             ).pack(side="left", padx=SPACE_SM)
 
-            ctk.CTkButton(
+            delete_btn = ctk.CTkButton(
                 row, text="Hapus", width=64,
-                command=lambda p=it["path"]: self._delete_backup(p),
                 fg_color="transparent", border_width=1, border_color=COLOR_ERROR,
                 text_color=COLOR_ERROR, hover_color=COLOR_SURFACE_HIGH,
                 font=FONT_SMALL, corner_radius=RADIUS_MD,
-            ).pack(side="right", padx=(0, SPACE_SM), pady=SPACE_SM)
-            ctk.CTkButton(
+            )
+            delete_btn.configure(
+                command=lambda p=it["path"], b=delete_btn: self._delete_backup(p, b))
+            delete_btn.pack(side="right", padx=(0, SPACE_SM), pady=SPACE_SM)
+
+            restore_btn = ctk.CTkButton(
                 row, text="Restore", width=72,
-                command=lambda p=it["path"]: self._restore(p),
                 fg_color="transparent", border_width=1, border_color=COLOR_INFO,
                 text_color=COLOR_INFO, hover_color=COLOR_SURFACE_HIGH,
                 font=FONT_SMALL, corner_radius=RADIUS_MD,
-            ).pack(side="right", padx=(0, SPACE_XS), pady=SPACE_SM)
+            )
+            restore_btn.configure(
+                command=lambda p=it["path"], b=restore_btn: self._restore(p, b))
+            restore_btn.pack(side="right", padx=(0, SPACE_XS), pady=SPACE_SM)
 
     def _do_manual_backup(self):
+        # v25 item 18 — settings.py sebelumnya tidak punya run_bg, BusyGuard,
+        # maupun ProgressModal sama sekali. Backup pada database produksi
+        # 84 KB praktis instan; BusyGuard di sini murni mencegah klik-ganda
+        # + memberi indikator sibuk — SENGAJA tanpa run_bg/ProgressModal.
+        guard = BusyGuard(self._backup_btn, busy_text="Memproses")
+        if not guard.acquire():
+            return
         try:
             backup_mod.create_backup(DB_PATH, reason="manual")
         except Exception as exc:  # noqa: BLE001 — surface any copy failure
             feedback.show_error(self, "Backup gagal", str(exc))
             return
+        finally:
+            guard.release()
         self._render_backups()
         feedback.show_info(self, "Backup dibuat",
                            "Snapshot database berhasil dibuat.")
@@ -346,18 +362,24 @@ class SettingsScreen(ctk.CTkFrame):
         except Exception as exc:  # noqa: BLE001
             feedback.show_error(self, "Tidak bisa membuka folder", str(exc))
 
-    def _restore(self, path):
+    def _restore(self, path, btn=None):
         if not feedback.ask_yes_no(
             self, "Restore data?",
             "Seluruh data akan diganti dengan snapshot ini.\n"
             "Data saat ini otomatis di-backup dulu (bisa dikembalikan).\n\nLanjut?",
         ):
             return
+        guard = BusyGuard(btn, busy_text="Memproses") if btn is not None else None
+        if guard is not None and not guard.acquire():
+            return
         try:
             backup_mod.restore_backup(DB_PATH, path)
         except Exception as exc:  # noqa: BLE001
             feedback.show_error(self, "Restore gagal", str(exc))
             return
+        finally:
+            if guard is not None:
+                guard.release()
         notify_data_changed()
         self._render_backups()
         self._reload_pegawai()
@@ -365,15 +387,21 @@ class SettingsScreen(ctk.CTkFrame):
             self, "Restore selesai",
             "Data dipulihkan. Disarankan menutup & membuka ulang aplikasi.")
 
-    def _delete_backup(self, path):
+    def _delete_backup(self, path, btn=None):
         if not feedback.ask_yes_no(self, "Hapus backup?",
                                    f"Hapus snapshot ini permanen?\n{path.name}"):
+            return
+        guard = BusyGuard(btn, busy_text="Memproses") if btn is not None else None
+        if guard is not None and not guard.acquire():
             return
         try:
             path.unlink(missing_ok=True)
         except Exception as exc:  # noqa: BLE001
             feedback.show_error(self, "Gagal hapus", str(exc))
             return
+        finally:
+            if guard is not None:
+                guard.release()
         self._render_backups()
 
     def _build_pegawai(self, parent):

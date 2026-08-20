@@ -27,6 +27,7 @@ Knobs (hook methods — see each docstring):
     _extra_row_values                — cell values for EXTRA_COLUMNS.
     _build_panel_empty               — right-panel empty state.
 """
+import tkinter as tk
 from tkinter import ttk
 import customtkinter as ctk
 
@@ -38,6 +39,7 @@ from src.core.session_state import period_state
 from src.core.reason_mapper import REASON_LABELS, REASON_NEEDS_DETAIL, render_alasan_ijin
 from src.core.week_utils import resolve_period
 from src.ui import feedback
+from src.ui import motion
 from src.ui.components.kpi_card import KPICard
 from src.ui.components.search_bar import SearchBar
 from src.ui.components.tree_style import style_treeview, CellTooltip
@@ -457,13 +459,29 @@ class ResolveScreenBase(ctk.CTkFrame):
             return
         detail = (self.detail_entry.get().strip()
                   if cat in REASON_NEEDS_DETAIL else None) or None
+        flashed_id = str(self.selected_id)
         with get_connection(self._db_path()) as conn:
             set_reason(conn, attendance_id=self.selected_id,
                        category=cat, detail=detail)
         self._notify_data_changed()
         self._reload()
+        self._flash_after_reload(flashed_id)
         self._build_panel_empty()
         self.selected_id = None
+
+    def _flash_after_reload(self, iid: str) -> None:
+        """Tandai baris yang barusan berubah (v25 item 10).
+
+        `_render_rows` menyusun ulang resolved_tree mengikuti urutan query,
+        BUKAN "baru diselesaikan duluan" — baris ini bisa mendarat di mana
+        saja, sering di luar viewport pada daftar panjang. Kilat warna saja
+        tidak berguna kalau barisnya tidak terlihat, jadi scroll ke sana dulu.
+        """
+        try:
+            self.resolved_tree.see(iid)
+        except tk.TclError:
+            pass
+        motion.flash_row(self.resolved_tree, iid, COLOR_SUCCESS, COLOR_ROW_TINT_RESOLVED)
 
     def _on_unresolve(self):
         if self.selected_id is None:

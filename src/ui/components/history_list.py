@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 import customtkinter as ctk
 
+from src.ui import motion
 from src.ui.theme import (
     COLOR_SURFACE, COLOR_BORDER,
     COLOR_SUCCESS_TINT_BG,
@@ -60,12 +61,20 @@ class HistoryList(ctk.CTkFrame):
         self._header = header
         self._empty_text = empty_text
         self._tag_width = tag_width
+        self._first_row = None
         self.set_rows([])
 
-    def set_rows(self, rows: list) -> None:
-        """Clear and re-render the whole list (rows: list[HistoryRow])."""
+    def set_rows(self, rows: list, *, flash_first: bool = False) -> None:
+        """Clear and re-render the whole list (rows: list[HistoryRow]).
+
+        `flash_first=True` mengilatkan baris teratas — dipakai saat rebuild
+        dipicu oleh aksi user (import/export baru selesai), supaya hasil
+        kerjanya tidak muncul sebagai baris yang tampak identik dengan yang
+        lama. JANGAN dinyalakan saat rebuild dipicu on_show/inisialisasi.
+        """
         for w in self.winfo_children():
             w.destroy()
+        self._first_row = None
 
         ctk.CTkLabel(
             self, text=self._header,
@@ -81,11 +90,16 @@ class HistoryList(ctk.CTkFrame):
             ).pack(fill="x", padx=SPACE_MD, pady=(0, SPACE_SM))
             return
 
-        for r in rows:
-            self._render_row(r)
+        for i, r in enumerate(rows):
+            row = self._render_row(r)
+            if i == 0:
+                self._first_row = row
         ctk.CTkFrame(self, fg_color="transparent", height=SPACE_SM).pack()
 
-    def _render_row(self, r: HistoryRow) -> None:
+        if flash_first and self._first_row is not None:
+            motion.flash_widget(self._first_row, COLOR_SUCCESS_TINT_BG, COLOR_SURFACE)
+
+    def _render_row(self, r: HistoryRow) -> ctk.CTkFrame:
         row = ctk.CTkFrame(self, fg_color="transparent")
         row.pack(fill="x", padx=SPACE_MD, pady=2)
         ctk.CTkLabel(
@@ -111,3 +125,4 @@ class HistoryList(ctk.CTkFrame):
                 fg_color=r.badge_bg, corner_radius=RADIUS_SM,
                 anchor="e", width=r.badge_width,
             ).pack(side="right")
+        return row

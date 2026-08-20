@@ -396,8 +396,12 @@ class ImportScreen(ctk.CTkFrame):
             f"File baru akan auto-detect bulan dan update jika berbeda."
         )
 
-    def _render_history(self):
-        """Refresh the 'Riwayat Import Terakhir' list at the bottom."""
+    def _render_history(self, flash_first: bool = False):
+        """Refresh the 'Riwayat Import Terakhir' list at the bottom.
+
+        `flash_first=True` hanya dipakai dari jalur yang dipicu aksi user
+        (import baru selesai) — bukan dari `__init__`/`on_show` (v25 item 17).
+        """
         with get_connection(DB_PATH) as conn:
             items = list_recent_imports(conn, limit=5)
         self.history.set_rows([
@@ -407,7 +411,7 @@ class ImportScreen(ctk.CTkFrame):
                 badge_text=f"✓ {it['emp_count']} emp",
             )
             for it in items
-        ])
+        ], flash_first=flash_first)
 
     def _render_preview_placeholder(self):
         """Empty-state placeholder before file selection."""
@@ -645,7 +649,7 @@ class ImportScreen(ctk.CTkFrame):
         self._hide_chip()
         self._render_preview_placeholder()
         self._update_banner()
-        self._render_history()
+        self._render_history(flash_first=True)
 
         show_success_toast(
             self.winfo_toplevel(),

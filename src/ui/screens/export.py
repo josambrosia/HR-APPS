@@ -247,7 +247,7 @@ class ExportScreen(ctk.CTkFrame):
             font=FONT_MONO_DATA, text_color=COLOR_TEXT_MUTED,
             anchor="w",
         ).pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(
+        self._browse_btn = ctk.CTkButton(
             row, text="📁 Browse",
             command=self._pick,
             fg_color="transparent",
@@ -256,7 +256,8 @@ class ExportScreen(ctk.CTkFrame):
             hover_color=COLOR_SURFACE_HIGH,
             font=FONT_BODY_BOLD,
             width=120,
-        ).pack(side="right", padx=(SPACE_SM, 0))
+        )
+        self._browse_btn.pack(side="right", padx=(SPACE_SM, 0))
         return zone
 
     def _show_chip(self, template_path: Path, predicted_out_name: str = None):
@@ -425,8 +426,13 @@ class ExportScreen(ctk.CTkFrame):
         except Exception as e:
             feedback.show_warning(self, "Tidak bisa buka file", str(e))
 
-    def _refresh_history(self):
-        """Reload 'Riwayat Export Terakhir' rows from the DB."""
+    def _refresh_history(self, flash_first: bool = False):
+        """Reload 'Riwayat Export Terakhir' rows from the DB.
+
+        `flash_first=True` hanya dipakai dari jalur yang dipicu aksi user
+        (export/generate baru selesai) — bukan dari `on_show`/`__init__`
+        (v25 item 17).
+        """
         with get_connection(DB_PATH) as conn:
             items = list_recent_exports(conn, limit=5)
 
@@ -444,7 +450,7 @@ class ExportScreen(ctk.CTkFrame):
                 badge_bg=COLOR_SUCCESS_TINT_BG if is_full else COLOR_WARN_TINT_BADGE_BG,
                 badge_width=80,
             ))
-        self.history.set_rows(rows)
+        self.history.set_rows(rows, flash_first=flash_first)
 
     def _build_save_destination(self, parent):
         """R8 — dropdown to choose where exported file is saved."""
@@ -619,50 +625,61 @@ class ExportScreen(ctk.CTkFrame):
         if self._busy_guard is not None and self._busy_guard.busy:
             return  # an export/generate is running — don't rebuild the chip mid-flight
 
-        # Reset state from any previous selection
-        self._filename_mismatch = False
-        self._detected_ym = None
-
-        with get_connection(DB_PATH) as conn:
-            initialdir = get_setting(conn, "last_export_template_folder") or str(Path.home() / "Documents")
-
-        path = filedialog.askopenfilename(
-            title="Pilih Laporan Bulanan",
-            initialdir=initialdir,
-            filetypes=[("Excel", "*.xlsx")],
-        )
-        if not path:
+        # v25 item 18 — pasang BusyGuard di sekitar dry-run (`fill_monthly_report`
+        # dengan dry_run=True). Tetap SINKRON dengan sengaja: dry-run di atas
+        # database produksi 84 KB praktis instan, jadi run_bg/ProgressModal
+        # tidak dibutuhkan — cukup mencegah klik-ganda + kasih indikator sibuk.
+        primary = getattr(self, "_chip_ganti_btn", None) or self._browse_btn
+        guard = self._acquire_busy(primary)
+        if guard is None:
             return
-        self._selected = Path(path)
-
-        # R2 — smart filename detection: warn if file mentions different month
-        detected_ym = detect_year_month_from_filename(self._selected)
-        with get_connection(DB_PATH) as conn:
-            current_ym = get_setting(conn, "current_month") or ""
-        self._filename_mismatch = bool(detected_ym and current_ym and detected_ym != current_ym)
-        self._detected_ym = detected_ym
-
-        with get_connection(DB_PATH) as conn:
-            set_setting(conn, "last_export_template_folder", str(self._selected.parent))
-
-        # Run dry-run preview
         try:
-            with get_connection(DB_PATH) as conn:
-                out_path, summary = fill_monthly_report(
-                    self._selected, conn, dry_run=True,
-                )
-        except Exception as e:
-            feedback.show_error(self, "Error preview", str(e))
-            self._selected = None
-            return
+            # Reset state from any previous selection
+            self._filename_mismatch = False
+            self._detected_ym = None
 
-        self._show_chip(self._selected, predicted_out_name=out_path.name)
-        self._render_preview_cards(
-            filled=summary.filled_count,
-            na=summary.na_count,
-            not_found=summary.not_found_count,
-        )
-        self._update_banner()
+            with get_connection(DB_PATH) as conn:
+                initialdir = get_setting(conn, "last_export_template_folder") or str(Path.home() / "Documents")
+
+            path = filedialog.askopenfilename(
+                title="Pilih Laporan Bulanan",
+                initialdir=initialdir,
+                filetypes=[("Excel", "*.xlsx")],
+            )
+            if not path:
+                return
+            self._selected = Path(path)
+
+            # R2 — smart filename detection: warn if file mentions different month
+            detected_ym = detect_year_month_from_filename(self._selected)
+            with get_connection(DB_PATH) as conn:
+                current_ym = get_setting(conn, "current_month") or ""
+            self._filename_mismatch = bool(detected_ym and current_ym and detected_ym != current_ym)
+            self._detected_ym = detected_ym
+
+            with get_connection(DB_PATH) as conn:
+                set_setting(conn, "last_export_template_folder", str(self._selected.parent))
+
+            # Run dry-run preview
+            try:
+                with get_connection(DB_PATH) as conn:
+                    out_path, summary = fill_monthly_report(
+                        self._selected, conn, dry_run=True,
+                    )
+            except Exception as e:
+                feedback.show_error(self, "Error preview", str(e))
+                self._selected = None
+                return
+
+            self._show_chip(self._selected, predicted_out_name=out_path.name)
+            self._render_preview_cards(
+                filled=summary.filled_count,
+                na=summary.na_count,
+                not_found=summary.not_found_count,
+            )
+            self._update_banner()
+        finally:
+            guard.release()
 
     def _do_export(self):
         if not self._selected:
@@ -684,7 +701,7 @@ class ExportScreen(ctk.CTkFrame):
         out_path, summary = result
         try:
             self._render_result_strip(out_path, summary)
-            self._refresh_history()
+            self._refresh_history(flash_first=True)
             # Reset mismatch flag — action already done, banner shouldn't say "akan dimasukkan"
             self._filename_mismatch = False
             self._detected_ym = None
@@ -865,7 +882,7 @@ class ExportScreen(ctk.CTkFrame):
 
     def _on_generate_mingguan_done(self, guard: BusyGuard, n, start, end, summary):
         try:
-            self._refresh_history()
+            self._refresh_history(flash_first=True)
             show_success_toast(
                 self.winfo_toplevel(), title="Laporan Mingguan Dibuat",
                 message=(
@@ -906,7 +923,7 @@ class ExportScreen(ctk.CTkFrame):
 
     def _on_generate_bulanan_done(self, guard: BusyGuard, year_month: str, summary):
         try:
-            self._refresh_history()
+            self._refresh_history(flash_first=True)
             show_success_toast(
                 self.winfo_toplevel(), title="Laporan Berhasil Dibuat",
                 message=(

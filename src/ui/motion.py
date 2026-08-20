@@ -437,3 +437,116 @@ def fade_window(window, duration_ms: int = None) -> None:
         return
     tween(window, duration_ms, lambda t: _set(t), on_done=lambda: _set(1.0),
           easing=linear)
+
+
+# ─────────────────────────────────────────────── penolong: kilat
+
+FLASH_TAG = "rowflash"
+
+
+def flash_row(tree, iid: str, from_color: str, to_color: str,
+              duration_ms: int = None) -> None:
+    """Kilatkan satu baris Treeview lalu pudarkan kembali ke warna biasa.
+
+    Setelah aksi resolve, daftar tersusun ulang dan tidak ada apa pun yang
+    memberi tahu baris mana yang barusan berubah — pada daftar panjang user
+    harus mencarinya sendiri.
+
+    Men-tween tag_configure memakan 9,83 ms per frame. Mahal untuk hover,
+    tapi ini hanya berjalan sekali per aksi.
+    """
+    from src.ui.theme import MOTION_FLASH
+    if duration_ms is None:
+        duration_ms = MOTION_FLASH
+
+    tree.tag_configure(FLASH_TAG, background=from_color)
+    try:
+        tags = [t for t in tree.item(iid, "tags") if t != FLASH_TAG]
+        tree.item(iid, tags=tuple(tags) + (FLASH_TAG,))
+    except tk.TclError:
+        return
+
+    def restore():
+        try:
+            keep = [t for t in tree.item(iid, "tags") if t != FLASH_TAG]
+            tree.item(iid, tags=tuple(keep))
+        except tk.TclError:
+            pass
+
+    tween(tree, duration_ms,
+          lambda t: tree.tag_configure(FLASH_TAG,
+                                       background=lerp_hex(from_color, to_color, t)),
+          on_done=restore, easing=linear)
+
+
+def flash_widget(widget, from_color: str, to_color: str,
+                 duration_ms: int = None) -> None:
+    """Versi kilat untuk widget CTk (kartu, baris riwayat)."""
+    from src.ui.theme import MOTION_FLASH
+    if duration_ms is None:
+        duration_ms = MOTION_FLASH
+    cancel_for(widget)
+    tween(widget, duration_ms,
+          lambda t: widget.configure(fg_color=lerp_hex(from_color, to_color, t)),
+          on_done=lambda: widget.configure(fg_color=to_color), easing=linear)
+
+
+# ─────────────────────────────────────────────── penolong: denyut sibuk
+
+_BUSY_FRAMES = ("·  ", "·· ", "···", " ··", "  ·")
+_BUSY_MS = 130
+
+
+def busy_pulse(widget, base_text: str) -> Optional[str]:
+    """Animasikan titik pada teks widget selama operasi panjang berjalan.
+
+    Teks diam "Memproses…" membuat aplikasi tidak bisa dibedakan dari
+    aplikasi yang hang — dan user baru tahu bedanya setelah menunggu terlalu
+    lama. Titik yang bergerak membuktikan proses masih hidup.
+
+    Ini yang termurah dari seluruh animasi (0,36 ms per frame) dan mungkin
+    yang paling berguna. Mengembalikan id timer; hentikan dengan
+    `stop_busy_pulse(widget)`.
+
+    Berjalan juga saat motion dimatikan? TIDAK — saat mati, teks diam saja
+    dipasang. Sakelar itu ada untuk mesin bermasalah, dan denyut ini bukan
+    pengecualian.
+
+    `base_text` boleh datang dengan atau tanpa elipsis mengekor (pemanggil
+    lama seperti Export memakai "Memproses…"; pemanggil baru seperti
+    Settings memakai "Memproses" polos) — dinormalisasi di sini supaya
+    tidak pernah dobel jadi "Memproses……".
+    """
+    base_text = base_text.rstrip(".…").rstrip()
+    if not _enabled:
+        widget.configure(text=f"{base_text}…")
+        return None
+
+    state = {"i": 0, "job": None}
+
+    def tick():
+        try:
+            widget.configure(text=f"{base_text} {_BUSY_FRAMES[state['i'] % len(_BUSY_FRAMES)]}")
+        except tk.TclError:
+            return                  # widget lenyap saat operasi masih jalan
+        state["i"] += 1
+        job = widget.after(_BUSY_MS, tick)
+        state["job"] = job
+        _register(widget, job)
+        widget._busy_job = job
+
+    tick()
+    return state["job"]
+
+
+def stop_busy_pulse(widget) -> None:
+    """Hentikan denyut. Aman dipanggil walau denyutnya tidak pernah mulai."""
+    job = getattr(widget, "_busy_job", None)
+    if job is None:
+        return
+    try:
+        widget.after_cancel(job)
+    except tk.TclError:
+        pass
+    _forget(widget, job)
+    widget._busy_job = None
