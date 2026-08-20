@@ -37,6 +37,7 @@ from src.db.dinas_exclusions import list_excluded_ids
 from src.db.settings import get_setting
 from src.reports.dinas_recap_print import render_dinas_recap_html
 from src.ui.browser_launcher import open_html_in_browser
+from src.ui import motion
 from src.ui.theme import (
     COLOR_SURFACE, COLOR_SURFACE_HIGH, COLOR_BORDER,
     COLOR_ACCENT, COLOR_ACCENT_HOVER, COLOR_SECONDARY,
@@ -129,6 +130,7 @@ class _MetricPanel:
     def __init__(self, parent, *, title, color, on_span):
         self.color = color
         self._pool = []
+        self._on_span_cb = on_span
 
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(1, weight=1)
@@ -138,13 +140,23 @@ class _MetricPanel:
         ctk.CTkLabel(head, text=title, font=FONT_MONO_SMALL,
                      text_color=COLOR_TEXT_DIM).pack(side="left")
         self.span_ctl = ctk.CTkSegmentedButton(
-            head, values=[label for _sid, label in SPANS], command=on_span,
+            head, values=[label for _sid, label in SPANS], command=self._handle_span,
             fg_color=COLOR_SURFACE_HIGH, selected_color=COLOR_ACCENT,
             selected_hover_color=COLOR_ACCENT_HOVER, unselected_color=COLOR_SURFACE_HIGH,
             unselected_hover_color=COLOR_BORDER, text_color=COLOR_TEXT,
             font=FONT_SMALL, corner_radius=RADIUS_MD)
         self.span_ctl.set(dict(SPANS)[DEFAULT_SPAN])
         self.span_ctl.pack(side="right")
+
+        # Pil geser di belakang tombol span terpilih (v25 item 13). tk.Frame,
+        # bukan CTkFrame — lihat pelajaran DPI item 02 di motion.slide_pill.
+        # Sinkronisasi pertamanya SENGAJA ditunda sampai transisi eksplisit
+        # pertama (_handle_span), bukan di sini: sebelum panel ini dipasang
+        # ke jendela yang masih withdrawn, pill.place() yang telanjur
+        # dipanggil tetap membuat pil ter-map begitu jendela dimunculkan,
+        # padahal tombolnya belum ter-layout (lebar 0). Sama seperti
+        # WeekNavBar._sync_pill.
+        self._pill = tk.Frame(self.span_ctl, bg=COLOR_ACCENT)
 
         self.span_lbl = ctk.CTkLabel(parent, text="", font=FONT_MONO_SMALL,
                                      text_color=COLOR_TEXT_DISABLED, anchor="w")
@@ -187,6 +199,16 @@ class _MetricPanel:
         bar.pack(fill="x")
         return {"frame": wrap, "accent": accent, "pos": pos, "nama": nama,
                 "val": val, "bar": bar}
+
+    # ---------- span (segmented button) ----------
+    def _handle_span(self, label):
+        self._on_span_cb(label)
+        self._sync_pill()
+
+    def _sync_pill(self):
+        btn = self.span_ctl._buttons_dict.get(self.span_ctl.get())
+        if btn is not None:
+            motion.slide_pill(self._pill, btn)
 
     # ---------- render ----------
     def render(self, rows, span_text):

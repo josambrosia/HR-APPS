@@ -5,11 +5,13 @@ Renders pills: [Semua] [Minggu 1 (01-07)] [Minggu 2 (08-14)] ...
 Active pill uses magenta fill; inactive pills have a subtle border
 on a transparent background. Calls back when user clicks a different pill.
 """
+import tkinter as tk
 from typing import Callable, Dict, Optional
 
 import customtkinter as ctk
 
 from src.core.week_utils import weeks_in_month
+from src.ui import motion
 from src.ui.theme import (
     COLOR_ACCENT, COLOR_BG, COLOR_BORDER, COLOR_SURFACE_HIGH,
     COLOR_TEXT_DIM, FONT_SMALL,
@@ -46,7 +48,22 @@ class WeekNavBar(ctk.CTkFrame):
         if self._active not in self._buttons and self._buttons:
             self._active = next(iter(self._buttons.keys()))
 
+        # Pil aktif — satu tk.Frame untuk seluruh bar (v25 item 13).
+        self._pill = tk.Frame(self, bg=COLOR_ACCENT)
+
         self._refresh_styles()
+        # Penempatan awal ditunda ke idle berikutnya: saat konstruksi tombolnya
+        # belum di-layout, jadi winfo_x() masih 0 dan pil akan mendarat di
+        # koordinat yang tidak berarti. Setelah idle, geometri sudah dihitung.
+        #
+        # Ini SENGAJA tetap dilakukan di konstruksi (bukan ditunda sampai klik
+        # pertama): kalau pil baru muncul saat transisi pertama, transisi itu
+        # memakai jalur "belum ter-map -> place() langsung" sehingga perpindahan
+        # periode PERTAMA tidak meluncur. Itu persis ketidakkonsistenan yang
+        # item 13 ada untuk menghilangkannya — pil harus berperilaku sama
+        # dengan garis sidebar: terpasang saat startup, meluncur sejak
+        # perpindahan pertama.
+        self.after_idle(self._sync_pill)
 
     def _build_pills(self):
         if self._include_all:
@@ -76,6 +93,7 @@ class WeekNavBar(ctk.CTkFrame):
             return
         self._active = key
         self._refresh_styles()
+        self._sync_pill()
         self._on_change(key)
 
     def _refresh_styles(self):
@@ -93,11 +111,25 @@ class WeekNavBar(ctk.CTkFrame):
                     border_color=COLOR_BORDER,
                 )
 
+    def _sync_pill(self):
+        """Geser pil aktif ke tombol yang sedang aktif (v25 item 13).
+
+        Terpisah dari `_refresh_styles` supaya urusan warna dan urusan
+        geometri tidak saling mengunci. Dipanggil dari konstruksi (lewat
+        `after_idle`, setelah tombol punya geometri) dan dari tiap transisi.
+        """
+        if not self.winfo_exists():
+            return              # bar sudah dihancurkan sebelum idle sempat jalan
+        active_btn = self._buttons.get(self._active)
+        if active_btn is not None:
+            motion.slide_pill(self._pill, active_btn)
+
     def set_active(self, key: str):
         if key not in self._buttons:
             return
         self._active = key
         self._refresh_styles()
+        self._sync_pill()
 
     def sync(self, current_month: str, active: Optional[str] = None):
         """Re-sync a persistent (cached-screen) bar without firing on_change.
@@ -120,6 +152,7 @@ class WeekNavBar(ctk.CTkFrame):
         if self._active not in self._buttons and self._buttons:
             self._active = next(iter(self._buttons.keys()))
         self._refresh_styles()
+        self._sync_pill()
 
     @property
     def active(self) -> str:

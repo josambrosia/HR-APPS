@@ -282,3 +282,57 @@ def slide_to_y(widget, from_y: int, to_y: int, duration_ms: int = None) -> None:
     cancel_for(widget)
     tween(widget, duration_ms,
           lambda t: widget.place_configure(y=int(from_y + (to_y - from_y) * t)))
+
+
+# ─────────────────────────────────────────────── penolong: pil geser
+
+def slide_pill(pill, target_widget, duration_ms: int = None) -> None:
+    """Geser + ubah lebar `pill` supaya menutupi `target_widget`.
+
+    Posisi dan lebar DIUKUR dari widget tujuan (`winfo_x`/`winfo_width`),
+    tidak diasumsikan: WeekNavBar kebetulan seragam 175px, tapi segmented
+    button Rekap Dinas lebarnya 53/53/85.
+
+    `pill` WAJIB `tk.Frame`, bukan `CTkFrame` — CTkFrame menskalakan koordinat
+    di place() tapi tidak di place_configure(), sehingga penempatan pertama
+    meleset di layar ber-DPI tinggi (lihat item 02).
+    """
+    from src.ui.theme import MOTION_BASE
+    if duration_ms is None:
+        duration_ms = MOTION_BASE
+    target_widget.update_idletasks()
+    to_x, to_w = target_widget.winfo_x(), target_widget.winfo_width()
+    to_y, to_h = target_widget.winfo_y(), target_widget.winfo_height()
+
+    if not pill.winfo_ismapped():
+        # Penempatan pertama: langsung, tanpa meluncur dari posisi nol.
+        pill.place(x=to_x, y=to_y, width=to_w, height=to_h)
+        pill.lower(target_widget)
+        return
+
+    cancel_for(pill)
+    from_x, from_w = pill.winfo_x(), pill.winfo_width()
+    tween(pill, duration_ms,
+          lambda t: pill.place_configure(
+              x=int(from_x + (to_x - from_x) * t),
+              width=int(from_w + (to_w - from_w) * t),
+              y=to_y, height=to_h),
+          on_done=lambda: pill.place_configure(x=to_x, y=to_y,
+                                               width=to_w, height=to_h))
+
+
+# ─────────────────────────────────────────────── penolong: hitung-naik
+
+def count_up(label, to_value: int, fmt: Callable[[int], str] = str,
+             duration_ms: int = None) -> None:
+    """Naikkan teks angka sebuah label dari 0 ke `to_value`.
+
+    Hanya mengganti teks — 0,36 ms per frame, salah satu yang termurah.
+    Selalu mendarat tepat di `to_value`, tidak pernah di angka pembulatan.
+    """
+    from src.ui.theme import MOTION_SLOW
+    if duration_ms is None:
+        duration_ms = MOTION_SLOW
+    cancel_for(label)
+    tween(label, duration_ms,
+          lambda t: label.configure(text=fmt(int(round(to_value * t)))))

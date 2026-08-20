@@ -19,7 +19,7 @@ from PIL import ImageTk
 from src.ui.components.attendance_strip import render_strip, month_status_map
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.components.tree_style import style_treeview, apply_zebra_tags
-from src.ui import feedback
+from src.ui import feedback, motion
 from src.core.session_state import period_state, data_version
 from src.ui.theme import (
     FONT_FAMILY, FONT_MONO,
@@ -83,7 +83,17 @@ class DashboardScreen(ctk.CTkFrame):
         self.body = ctk.CTkFrame(self, fg_color="transparent")
         self.body.grid(row=1, column=0, sticky="nsew")
         self._build_static_widgets()
+
+        # Sidik jari render — animasi masuk hanya main saat datanya berubah
+        # (v25 item 03). Tuple-nya sama persis dengan kunci memoisasi query
+        # di _update_data, jadi "animasikan" setara dengan "cache meleset".
+        self._anim_sig = motion.RenderSignature()
+
         self._update_data()
+
+    def _anim_parts(self):
+        """Bagian-bagian yang menentukan apakah tampilan benar-benar berubah."""
+        return (data_version.get(), self._current_month, period_state.get())
 
     def _setup_treeview_style(self):
         style_treeview("Ranking.Treeview")
@@ -515,10 +525,20 @@ class DashboardScreen(ctk.CTkFrame):
             self._set_delta("total_terlambat", total_late, prev_total, period_word)
             self._set_delta("coaching_count", len(data["coaching"]), prev_coaching, period_word)
 
-        # KPI updates (just text — labels are reused)
+        # KPI updates (just text — labels are reused). Angka berhitung naik
+        # hanya saat datanya benar-benar berubah (v25 item 03) — sidik jari
+        # sama dengan kunci memoisasi _query, jadi kunjungan ulang tanpa
+        # perubahan (layar di-cache sejak v22) tidak memicu animasi ulang.
+        animate = self._anim_sig.changed(*self._anim_parts())
+        coaching_count = len(data["coaching"])
         self._kpi_labels["periode"].configure(text=label)
-        self._kpi_labels["total_terlambat"].configure(text=f"{total_late} mnt")
-        self._kpi_labels["coaching_count"].configure(text=str(len(data["coaching"])))
+        if animate:
+            motion.count_up(self._kpi_labels["total_terlambat"], total_late,
+                            fmt=lambda v: f"{v} mnt")
+            motion.count_up(self._kpi_labels["coaching_count"], coaching_count)
+        else:
+            self._kpi_labels["total_terlambat"].configure(text=f"{total_late} mnt")
+            self._kpi_labels["coaching_count"].configure(text=str(coaching_count))
 
         # Coaching panel title + subtitle with dynamic threshold
         if threshold["working_days"] > 0:
