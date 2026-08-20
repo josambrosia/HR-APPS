@@ -101,6 +101,17 @@ COLOR_VIOLET_TINT_BORDER  = "#3A2348"   # violet tint border
 
 COLOR_ACCENT_TINT_BG      = "#27101C"   # magenta 10% — sidebar active-month chip bg
 COLOR_ACCENT_TINT_BORDER  = "#5A1E3A"   # magenta 25% — sidebar active-month chip border
+COLOR_ACCENT_TINT_HOVER   = "#3A1628"   # magenta 15% — chip bulan aktif saat disorot
 
 # === TEXT TIER (extension) ===
 COLOR_TEXT_SOFT           = "#C0C0C0"   # Nav item resting text — between TEXT and TEXT_DIM
+
+# === MOTION (v25) — durasi dalam milidetik ===
+# Dipusatkan supaya rasa gerak seluruh aplikasi bisa disetel di satu tempat.
+# Nilai dipilih dari hasil ukur di mesin target; lihat docstring src/ui/motion.py.
+MOTION_FAST      = 120   # hover, tint — harus lebih cepat dari niat sadar
+MOTION_BASE      = 180   # garis nav meluncur, pil segmented
+MOTION_SLOW      = 420   # hitung-naik angka KPI
+MOTION_FLASH     = 900   # kilat baris yang baru berubah
+MOTION_FADE      = 170   # -alpha jendela (toast, dialog, jendela utama)
+MOTION_WIPE_STEP = 4     # ms per kolom sapuan heatmap (31 kolom -> ~135 ms)
