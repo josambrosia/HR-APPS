@@ -77,3 +77,83 @@ def test_tooltip_benar_benar_memudar_saat_motion_menyala(tk_root, monkeypatch, t
             s.destroy()
     finally:
         motion.set_enabled(False)
+
+
+def _seeded_screen(tk_root, monkeypatch, tmp_path):
+    """Heatmap dengan data nyata, supaya kanvasnya benar-benar terisi item."""
+    from datetime import date, timedelta
+    from src.db.schema import init_db
+    from src.db.connection import get_connection
+    from src.db.settings import set_setting
+    from src.db.employees import upsert_employee
+    from src.db.attendance import save_manual_attendance
+    from src.ui.screens import heatmap as M
+
+    p = tmp_path / "hr.db"
+    init_db(p)
+    with get_connection(p) as conn:
+        set_setting(conn, "current_month", "2026-07")
+        eid = upsert_employee(conn, no_staff="S1", nama="Andi", dept="Ops")
+        d = date(2026, 7, 1)
+        while d.month == 7:
+            if d.weekday() < 5:
+                telat = 60 if d.day % 5 == 0 else (10 if d.day % 3 == 0 else 0)
+                save_manual_attendance(
+                    conn, employee_id=eid, tanggal=d.isoformat(), hari="Senin",
+                    tipe="Hari Kerja", jadwal="08.00 - 16.00",
+                    masuk="08:00", keluar="16:00", kerja_jam=8.0,
+                    lembur_jam=0.0, terlambat_menit=telat, has_issue=0)
+            d += timedelta(days=1)
+    monkeypatch.setattr(M, "DB_PATH", p)
+    s = M.HeatmapScreen(tk_root)
+    s.pack()
+    tk_root.update()
+    return s
+
+
+def test_menyorot_SETIAP_item_yang_bisa_disorot_tidak_melempar(tk_root, monkeypatch, tmp_path):
+    """Regresi yang ditemukan smoke, bukan oleh 743 tes.
+
+    _cell_by_item memetakan kotak sel DAN teks angka tanggalnya ke sel yang
+    sama. Item teks di Canvas tidak punya opsi -outline sama sekali, jadi
+    begitu kursor lewat di atas angka tanggal — bukan kotaknya — handler
+    melempar TclError: unknown option "-outline". Hal yang sama berlaku untuk
+    label menit di grafik keterlambatan.
+
+    Aplikasi tidak mati (Tkinter menelan error callback) sehingga tes "apakah
+    masih hidup" pun lolos — tapi sorotannya rusak dan konsol dibanjiri
+    traceback. Tes ini menelusuri SETIAP item bertag 'cell' yang benar-benar
+    tergambar, bukan hanya kotak yang dibuat tes secara manual.
+    """
+    s = _seeded_screen(tk_root, monkeypatch, tmp_path)
+    try:
+        items = s._canvas.find_withtag("cell")
+        assert len(items) > 20, f"kanvas nyaris kosong ({len(items)} item) — tes tidak berarti"
+
+        jenis = {s._canvas.type(i) for i in items}
+        assert "text" in jenis, "tidak ada item teks — justru itu yang dulu melempar"
+
+        for item in items:
+            target = s._hover_rect_by_item.get(item)
+            s._highlight_cell(target)      # tidak boleh melempar untuk item apa pun
+        s._highlight_cell(None)
+    finally:
+        s.destroy()
+
+
+def test_menyorot_angka_tanggal_menandai_kotaknya(tk_root, monkeypatch, tmp_path):
+    """Bukan sekadar tidak melempar: menyorot teks harus menandai KOTAKNYA,
+    supaya sorotannya tetap terlihat."""
+    s = _seeded_screen(tk_root, monkeypatch, tmp_path)
+    try:
+        teks = [i for i in s._canvas.find_withtag("cell")
+                if s._canvas.type(i) == "text"]
+        assert teks, "prasyarat: ada item teks"
+        item = teks[0]
+        target = s._hover_rect_by_item.get(item)
+        assert target is not None and s._canvas.type(target) == "rectangle", \
+            "angka tanggal tidak dipetakan ke kotaknya"
+        s._highlight_cell(target)
+        assert s._canvas.itemcget(target, "outline") != ""
+    finally:
+        s.destroy()

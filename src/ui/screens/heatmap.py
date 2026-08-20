@@ -80,6 +80,10 @@ class HeatmapScreen(ctk.CTkFrame):
         self._sortkey = "nama"
         self._ctx = None
         self._cell_by_item = {}
+        # Item mana yang harus DIBERI outline saat item ini disorot.
+        # Tidak semua item bisa: teks di Canvas tidak punya opsi -outline sama
+        # sekali. Peta ini mengarahkan teks ke bentuk pasangannya.
+        self._hover_rect_by_item = {}
         self._edit_by_item = {}   # canvas item -> {employee_id, tanggal, nama} for click-to-edit
         self._visible_employees = []
         self._painted_ids = None       # ordered employee-id tuple of the last repaint
@@ -318,6 +322,10 @@ class HeatmapScreen(ctk.CTkFrame):
         c = self._canvas
         c.delete("all")
         self._cell_by_item = {}
+        # Item mana yang harus DIBERI outline saat item ini disorot.
+        # Tidak semua item bisa: teks di Canvas tidak punya opsi -outline sama
+        # sekali. Peta ini mengarahkan teks ke bentuk pasangannya.
+        self._hover_rect_by_item = {}
         self._edit_by_item = {}
         self._cetak_hover = None
         total = len(self._ctx["employees"]) if self._ctx else 0
@@ -435,6 +443,8 @@ class HeatmapScreen(ctk.CTkFrame):
                                         font=(FONT_FAMILY, 10, "bold"), text=str(day), tags=("cell",))
                 self._cell_by_item[rid] = cell
                 self._cell_by_item[tid] = cell
+                self._hover_rect_by_item[rid] = rid
+                self._hover_rect_by_item[tid] = rid      # angka tanggal -> kotaknya
                 edit_t = {"employee_id": e["employee_id"],
                           "tanggal": f"{self._month}-{day:02d}", "nama": e["nama"]}
                 self._edit_by_item[rid] = edit_t
@@ -569,6 +579,8 @@ class HeatmapScreen(ctk.CTkFrame):
                                     font=(FONT_FAMILY, 8, "bold"), text=str(m), tags=("cell",))
                 self._cell_by_item[did] = cell
                 self._cell_by_item[lid] = cell
+                self._hover_rect_by_item[did] = did
+                self._hover_rect_by_item[lid] = did      # label menit -> titiknya
         # day-of-month axis
         for d in sorted({1, 8, 15, 22, n_days}):
             if 1 <= d <= n_days:
@@ -628,7 +640,7 @@ class HeatmapScreen(ctk.CTkFrame):
         item_id = item[0] if item else None
         cell = self._cell_by_item.get(item_id) if item_id else None
         if cell:
-            self._highlight_cell(item_id)
+            self._highlight_cell(self._hover_rect_by_item.get(item_id))
             self._show_tip(event, cell)
         else:
             self._highlight_cell(None)
