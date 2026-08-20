@@ -14,7 +14,7 @@ from src.db.connection import get_connection
 from src.db.holidays import working_days_count
 from src.db.settings import get_setting
 from src.ui.components.kpi_card import KPICard
-from src.ui.components.tree_style import style_treeview
+from src.ui.components.tree_style import style_treeview, RowHover
 from src.ui.components.week_nav import WeekNavBar
 from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
@@ -162,6 +162,7 @@ class CoachingScreen(ctk.CTkFrame):
         self.tree.tag_configure("sudah", background=COLOR_ROW_TINT_SUDAH, foreground=COLOR_SUCCESS)
         self.tree.tag_configure("belum", background=COLOR_ROW_TINT_BELUM, foreground=COLOR_WARN)
         self.tree.grid(row=0, column=0, sticky="nsew")
+        RowHover(self.tree)     # v25 item 15
         # Selection event drives the right-panel; toggle is done via the
         # big button in the panel (inline AKSI column was too small/cramped).
         self.tree.bind("<<TreeviewSelect>>", self._on_select)

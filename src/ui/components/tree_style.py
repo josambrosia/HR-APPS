@@ -41,6 +41,53 @@ def apply_zebra_tags(tree: ttk.Treeview) -> None:
     tree.tag_configure("oddrow", background=ZEBRA_ODD)
 
 
+HOVER_TAG = "rowhover"
+
+
+class RowHover:
+    """Menyorot baris di bawah kursor.
+
+    ttk.Treeview tidak punya state hover di style.map (style_treeview hanya
+    memetakan 'selected'), jadi tabel yang jelas interaktif tidak bereaksi
+    sama sekali terhadap kursor. Ini menambalnya lewat <Motion> +
+    identify_row + tag.
+
+    Tanpa animasi: warna baris berpindah dalam satu frame. Menganimasikannya
+    berarti men-tween tag_configure (9,83 ms/frame) pada setiap gerakan mouse
+    — terlalu mahal untuk imbalannya. Kilat baris (item 10) memang memakai
+    tween tag, tapi hanya sekali per aksi, bukan per piksel gerakan.
+    """
+
+    def __init__(self, tree: ttk.Treeview):
+        self.tree = tree
+        self._current = None
+        tree.tag_configure(HOVER_TAG, background=COLOR_SURFACE_HIGH)
+        tree.bind("<Motion>", self._on_motion, add="+")
+        tree.bind("<Leave>", lambda _e: self._apply(None), add="+")
+        tree._row_hover = self          # pegangan untuk tes & pembersihan
+
+    def _on_motion(self, event):
+        self._apply(self.tree.identify_row(event.y) or None)
+
+    def _apply(self, iid):
+        if iid == self._current:
+            return
+        if self._current:
+            self._set_tags(self._current, add=False)
+        self._current = iid
+        if iid:
+            self._set_tags(iid, add=True)
+
+    def _set_tags(self, iid, *, add: bool):
+        try:
+            tags = [t for t in self.tree.item(iid, "tags") if t != HOVER_TAG]
+        except tk.TclError:
+            return                      # baris sudah lenyap saat daftar dibangun ulang
+        if add:
+            tags.append(HOVER_TAG)
+        self.tree.item(iid, tags=tuple(tags))
+
+
 class CellTooltip:
     """Hover tooltip showing the full text of one column's cell — for columns
     whose content gets truncated (e.g. Alasan). Bind once per tree."""

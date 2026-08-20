@@ -8,7 +8,7 @@ from src.db.settings import get_setting, set_setting
 from src.db.employees import list_employees, toggle_employee_active
 from src.db import backup as backup_mod
 from src.ui import feedback
-from src.ui.components.tree_style import style_treeview
+from src.ui.components.tree_style import style_treeview, RowHover
 from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
     COLOR_BORDER,
@@ -406,6 +406,7 @@ class SettingsScreen(ctk.CTkFrame):
         self.tree.tag_configure("active", foreground=COLOR_SUCCESS)
         self.tree.tag_configure("inactive", foreground=COLOR_TEXT_MUTED)
         self.tree.pack(fill="both", expand=True, padx=SPACE_SM, pady=SPACE_SM)
+        RowHover(self.tree)     # v25 item 15
 
         # Toggle button row below treeview.
         actions = ctk.CTkFrame(parent, fg_color="transparent")
