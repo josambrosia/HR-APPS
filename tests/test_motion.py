@@ -154,3 +154,35 @@ class TestPembatalan:
         while not done and time.perf_counter() - t0 < 3.0:
             tk_root.update()
         assert motion.active_count() == 0
+
+
+class TestRenderSignature:
+    def test_render_pertama_selalu_dianggap_berubah(self):
+        sig = motion.RenderSignature()
+        assert sig.changed(1, "2026-07") is True
+
+    def test_tuple_sama_berarti_tidak_berubah(self):
+        sig = motion.RenderSignature()
+        sig.changed(1, "2026-07")
+        assert sig.changed(1, "2026-07") is False
+
+    def test_satu_bagian_berubah_sudah_cukup(self):
+        sig = motion.RenderSignature()
+        sig.changed(1, "2026-07")
+        assert sig.changed(2, "2026-07") is True
+
+    def test_kembali_ke_nilai_lama_tetap_dihitung_berubah(self):
+        sig = motion.RenderSignature()
+        sig.changed(1, "2026-07")
+        sig.changed(1, "2026-08")
+        assert sig.changed(1, "2026-07") is True
+
+    def test_kata_pencarian_heatmap_sengaja_diluar_sidik_jari(self):
+        """Regresi jebakan #1: heatmap._repaint() juga dipanggil oleh
+        _on_search. Sidik jari heatmap TIDAK memuat kata pencarian, jadi
+        mengetik tidak akan pernah bisa memicu sapuan ulang."""
+        sig = motion.RenderSignature()
+        data_version, month, sort_key = 3, "2026-07", "nama"
+        assert sig.changed(data_version, month, sort_key) is True
+        # user mengetik di kotak cari — tidak ada bagian sidik jari yang berubah
+        assert sig.changed(data_version, month, sort_key) is False

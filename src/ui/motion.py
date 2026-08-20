@@ -189,3 +189,39 @@ def tween(
     holder["job"] = first
     _register(widget, first)
     return first
+
+
+# ─────────────────────────────────────────────── kapan boleh main ulang
+
+_UNSET = object()
+
+
+class RenderSignature:
+    """Menjawab satu pertanyaan: 'apakah yang tampil sekarang berbeda dari
+    render sebelumnya?'
+
+    Sejak v22 layar disimpan di cache (app.py._show + kontrak on_show), jadi
+    tanpa aturan setiap animasi masuk akan main ulang tiap kali user bolak-
+    balik menu. Setelah kesepuluh kalinya, 'hidup' berubah jadi 'mengganggu'.
+
+    Apa yang TIDAK dimasukkan ke sidik jari sama pentingnya dengan apa yang
+    dimasukkan. Heatmap sengaja tidak memasukkan kata pencarian dan ukuran
+    jendela, sehingga mengetik atau resize tidak pernah bisa memicu sapuan —
+    bukan karena ada `if` yang mencegah, tapi karena menurut definisinya
+    tidak ada yang berubah.
+    """
+
+    __slots__ = ("_last",)
+
+    def __init__(self):
+        self._last = _UNSET
+
+    def changed(self, *parts) -> bool:
+        if self._last is _UNSET or self._last != parts:
+            self._last = parts
+            return True
+        return False
+
+    def reset(self) -> None:
+        """Paksa render berikutnya dianggap berubah."""
+        self._last = _UNSET
