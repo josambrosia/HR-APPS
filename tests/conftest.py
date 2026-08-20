@@ -107,3 +107,21 @@ def reset_data_version():
     data_version.reset()
     yield
     data_version.reset()
+
+
+@pytest.fixture(autouse=True)
+def disable_motion():
+    """Matikan animasi di SELURUH tes secara default.
+
+    Dua alasan. Pertama, tanpa ini setiap konstruksi layar menjadwalkan
+    after() yang menyala di tes lain dan bikin kegagalan bergantung-urutan.
+    Kedua — dan ini yang penting — dengan motion mati setiap layar wajib
+    tampil persis seperti v24. Kalau ada tes lama yang butuh diubah, itu
+    bukan tes usang: itu tanda animasinya menggeser keadaan akhir.
+
+    Tes motion sendiri menyalakannya lewat motion.set_enabled(True).
+    """
+    from src.ui import motion
+    motion.set_enabled(False)
+    yield
+    motion.set_enabled(False)

@@ -4,6 +4,16 @@ import pytest
 from src.ui import motion
 
 
+@pytest.fixture(autouse=True)
+def motion_on():
+    """Tes di berkas ini menguji mesinnya, jadi harus menyala. Berjalan
+    SETELAH fixture disable_motion di conftest (autouse berkas lebih dalam
+    dieksekusi belakangan), sehingga menang."""
+    motion.set_enabled(True)
+    yield
+    motion.set_enabled(False)
+
+
 class TestLerpHex:
     def test_t_nol_mengembalikan_warna_awal(self):
         assert motion.lerp_hex("#000000", "#FFFFFF", 0.0) == "#000000"
@@ -94,7 +104,6 @@ class TestTweenDimatikan:
 
 class TestTweenAktif:
     def test_menjadwalkan_dan_akhirnya_mencapai_satu(self, tk_root):
-        motion.set_enabled(True)
         seen = []
         done = []
         motion.tween(tk_root, 60, seen.append, on_done=lambda: done.append(1),
@@ -110,7 +119,6 @@ class TestTweenAktif:
         assert all(b >= a for a, b in zip(seen, seen[1:])), "progres harus monoton"
 
     def test_durasi_nol_langsung_selesai(self, tk_root):
-        motion.set_enabled(True)
         seen = []
         motion.tween(tk_root, 0, seen.append)
         assert seen == [1.0]
@@ -118,7 +126,6 @@ class TestTweenAktif:
 
 class TestPembatalan:
     def test_cancel_for_menghentikan_tween_berjalan(self, tk_root):
-        motion.set_enabled(True)
         seen = []
         motion.tween(tk_root, 2000, seen.append)
         tk_root.update()
@@ -131,7 +138,6 @@ class TestPembatalan:
 
     def test_widget_dihancurkan_membatalkan_tween_nya(self, tk_root):
         import customtkinter as ctk
-        motion.set_enabled(True)
         child = ctk.CTkFrame(tk_root)
         seen = []
         motion.tween(child, 2000, seen.append)
@@ -142,7 +148,6 @@ class TestPembatalan:
 
     def test_registry_bersih_setelah_tween_selesai_wajar(self, tk_root):
         import time
-        motion.set_enabled(True)
         done = []
         motion.tween(tk_root, 40, lambda t: None, on_done=lambda: done.append(1))
         t0 = time.perf_counter()
