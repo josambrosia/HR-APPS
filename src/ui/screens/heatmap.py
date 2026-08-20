@@ -33,7 +33,7 @@ from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH, COLOR_BORDER, COLOR_ERROR,
     COLOR_ACCENT, COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
     FONT_FAMILY, FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_SMALL,
-    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG, SPACE_XL, RADIUS_MD,
+    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG, SPACE_XL, RADIUS_MD, MOTION_FADE,
 )
 
 _PAD = 14
@@ -624,9 +624,35 @@ class HeatmapScreen(ctk.CTkFrame):
         return self._cell_by_item.get(item[0]) if item else None
 
     def _on_cell_motion(self, event):
-        cell = self._current_cell()
+        item = self._canvas.find_withtag("current")
+        item_id = item[0] if item else None
+        cell = self._cell_by_item.get(item_id) if item_id else None
         if cell:
+            self._highlight_cell(item_id)
             self._show_tip(event, cell)
+        else:
+            self._highlight_cell(None)
+
+    def _highlight_cell(self, item_id):
+        """Tandai sel di bawah kursor dengan outline putih tipis (v25 item 06).
+
+        Sebelumnya tooltip muncul tanpa penanda apa pun di kanvas, jadi user
+        harus menebak sel mana yang sedang dibaca — terutama saat kursor
+        berada di antara dua sel yang berdempetan.
+        """
+        prev = getattr(self, "_hover_item", None)
+        if prev == item_id:
+            return
+        if prev is not None:
+            try:
+                self._canvas.itemconfig(prev, outline=self._hover_prev_outline,
+                                        width=1)
+            except tk.TclError:
+                pass
+        self._hover_item = item_id
+        if item_id is not None:
+            self._hover_prev_outline = self._canvas.itemcget(item_id, "outline")
+            self._canvas.itemconfig(item_id, outline=COLOR_TEXT, width=2)
 
     def _show_tip(self, event, cell):
         if self._tip is None:
@@ -640,9 +666,16 @@ class HeatmapScreen(ctk.CTkFrame):
             f"Tanggal {cell['date']} · Masuk {cell['masuk']} · Keluar {cell['keluar']}\n"
             f"Telat {cell['telat']} · Alasan {cell['alasan']}"))
         self._tip.wm_geometry(f"+{event.x_root + 14}+{event.y_root + 12}")
-        self._tip.deiconify()
+        if not self._tip.winfo_viewable():
+            self._tip.attributes("-alpha", 0.0)
+            self._tip.deiconify()
+            motion.tween(self._tip, MOTION_FADE,
+                         lambda t: self._tip.attributes("-alpha", t))
+        else:
+            self._tip.deiconify()
 
     def _hide_tip(self):
+        self._highlight_cell(None)
         if self._tip is not None:
             self._tip.withdraw()
 

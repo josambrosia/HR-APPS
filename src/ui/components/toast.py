@@ -11,6 +11,7 @@ Variants:
 """
 import customtkinter as ctk
 
+from src.ui import motion
 from src.ui.theme import (
     FONT_FAMILY,
     COLOR_SURFACE,
@@ -106,6 +107,7 @@ def _show_toast(
 
     # Modal + focus, but grab AFTER window is ready (otherwise grab fails)
     toast.after(50, lambda: (toast.grab_set(), toast.focus_set()))
+    motion.fade_window(toast)       # v25 item 08
     toast.wait_window()
 
 

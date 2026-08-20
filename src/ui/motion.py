@@ -383,3 +383,57 @@ def wipe_canvas(canvas, tag: str, base_color: str,
                     return          # canvas dibersihkan di tengah sapuan
         job = canvas.after(n * step_ms, light)
         _register(canvas, job)
+
+
+# ─────────────────────────────────────────────── penolong: bar Canvas
+
+def grow_bar(bar_canvas, to_pct: float, duration_ms: int = None) -> None:
+    """Tumbuhkan bar metrik Rekap Dinas dari 0 ke `to_pct`.
+
+    Bar-nya Canvas yang menggambar dari atribut `_pct`, jadi menumbuhkannya
+    hanya soal men-tween satu angka lalu menggambar ulang — 1,74 ms per frame
+    untuk 15 bar sekaligus.
+    """
+    from src.ui.theme import MOTION_SLOW
+    from src.ui.screens.dinas_recap import _draw_metric_bar
+    if duration_ms is None:
+        duration_ms = MOTION_SLOW
+    cancel_for(bar_canvas)
+
+    def frame(t):
+        bar_canvas._pct = to_pct * t
+        _draw_metric_bar(bar_canvas)
+
+    tween(bar_canvas, duration_ms, frame,
+          on_done=lambda: (setattr(bar_canvas, "_pct", to_pct),
+                           _draw_metric_bar(bar_canvas)))
+
+
+# ─────────────────────────────────────────────── penolong: fade jendela
+
+def fade_window(window, duration_ms: int = None) -> None:
+    """Munculkan Toplevel/root dengan memudar dari transparan ke penuh.
+
+    Widget Tk tidak punya kanal alpha, tapi JENDELA punya — di Windows.
+    Ini satu-satunya tempat di seluruh aplikasi yang bisa memudar sungguhan,
+    dan biayanya praktis nol (0,23 ms per frame).
+
+    Kalau platform tidak mendukung -alpha, jendela tetap tampil penuh:
+    tanpa fade lebih baik daripada tanpa jendela.
+    """
+    from src.ui.theme import MOTION_FADE
+    if duration_ms is None:
+        duration_ms = MOTION_FADE
+
+    def _set(value: float) -> bool:
+        try:
+            window.attributes("-alpha", value)
+            return True
+        except tk.TclError:
+            return False
+
+    if not _set(0.0):
+        _set(1.0)
+        return
+    tween(window, duration_ms, lambda t: _set(t), on_done=lambda: _set(1.0),
+          easing=linear)

@@ -39,6 +39,17 @@ class HRApp(ctk.CTk):
         self.configure(fg_color=COLOR_BG)
         self.bind_all("<Return>", self._on_return_key)
 
+        # Muat preferensi motion dari DB SEBELUM layar pertama dibangun
+        # (v25 item 12), supaya seluruh chrome awal — sidebar, dashboard —
+        # sudah menghormati sakelar user, bukan cuma default aktif.
+        try:
+            from src.config import DB_PATH
+            from src.db.connection import get_connection
+            with get_connection(DB_PATH) as conn:
+                motion.load_enabled_from_db(conn)
+        except Exception:
+            pass    # DB belum ada saat first-run wizard; default aktif sudah benar
+
         self._build_sidebar()
         self._build_content_area()
         # Screen instances are cached: built once on first visit, then
@@ -49,6 +60,17 @@ class HRApp(ctk.CTk):
         self._screens: Dict[str, ctk.CTkFrame] = {}
         self._visible_name: str = ""
         self._show("Dashboard")
+
+        # Jendela utama memudar masuk (v25 item 12). Sebelumnya splash menutup
+        # lalu jendela ini menjeplak muncul dengan widget bermunculan satu per
+        # satu — bagian paling kasar dari pengalaman, dan yang pertama dilihat.
+        #
+        # Fade jendela utama (item 12) TIDAK dipicu di sini. Di src/main.py,
+        # HRApp() dikonstruksi lalu segera di-withdraw() sebelum splash tampil,
+        # dan deiconify() baru terjadi ~2 detik kemudian. Tween 170ms yang
+        # dimulai di konstruktor akan tuntas dalam keadaan tersembunyi, jadi
+        # fade-nya tidak pernah terlihat. Pemicunya ada di main.py::_reveal(),
+        # tepat setelah jendela benar-benar dimunculkan.
 
     def _on_return_key(self, event):
         """Walk up from the focused widget to find a CTkButton; invoke it."""

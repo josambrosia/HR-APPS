@@ -15,6 +15,7 @@ show_warning / show_error / ask_yes_no) instead of this class directly.
 """
 import customtkinter as ctk
 
+from src.ui import motion
 from src.ui.theme import (
     FONT_FAMILY,
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
@@ -85,6 +86,7 @@ class MessageDialog(ctk.CTkToplevel):
         self.geometry(f"{w}x{h}+{x}+{y}")
 
         self.after(50, self._deferred_grab)
+        motion.fade_window(self)     # v25 item 08
         self.bind("<Escape>", lambda _e: self._on_cancel())
         self.bind("<Return>", lambda _e: self._on_primary())
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)

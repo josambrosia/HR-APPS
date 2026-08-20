@@ -30,6 +30,7 @@ import customtkinter as ctk
 from src.config import DB_PATH
 from src.core.dinas_recap import (
     SPANS, DEFAULT_SPAN, rank_by, resolve_range, sort_month_rows, span_label)
+from src.core.session_state import data_version
 from src.core.week_utils import MONTH_NAMES_ID, full_month_range
 from src.db.attendance import count_dinas_paparan_by_employee
 from src.db.connection import get_connection
@@ -211,7 +212,7 @@ class _MetricPanel:
             motion.slide_pill(self._pill, btn)
 
     # ---------- render ----------
-    def render(self, rows, span_text):
+    def render(self, rows, span_text, animate=False):
         self.span_lbl.configure(text=span_text)
         if not rows:
             self._host.pack_forget()
@@ -233,8 +234,13 @@ class _MetricPanel:
                 text=f"{r['nama']} {r['mark']}".strip(),
                 text_color=(COLOR_TEXT if ranked else COLOR_TEXT_MUTED))
             _set_num(e["val"], r["value"], self.color)
-            e["bar"]._pct = r["bar_pct"]
-            _draw_metric_bar(e["bar"])
+            # Bar tumbuh dari nol saat data benar-benar berubah (v25 item 07);
+            # sekadar bolak-balik menu (cache re-display) menggambar langsung.
+            if animate:
+                motion.grow_bar(e["bar"], r["bar_pct"])
+            else:
+                e["bar"]._pct = r["bar_pct"]
+                _draw_metric_bar(e["bar"])
 
 
 class DinasRecapScreen(ctk.CTkFrame):
@@ -252,6 +258,10 @@ class DinasRecapScreen(ctk.CTkFrame):
         self._month_totals = {"dinas": 0, "paparan": 0, "total": 0}
         self._month_pool = []
         self._sort_headers = {}
+        # Sidik jari render — bar papan peringkat hanya tumbuh dari nol saat
+        # data benar-benar berubah, bukan setiap kali layar cache ditampilkan
+        # lagi (v25 item 07, sama seperti item 05 di heatmap).
+        self._anim_sig = motion.RenderSignature()
 
         self._build_header()
         self._build_body()
@@ -291,24 +301,30 @@ class DinasRecapScreen(ctk.CTkFrame):
                   else f"{len(self._month_rows)} pegawai · {n_ex} disembunyikan"))
         self._render_month()
 
-    def _load_dinas(self):
+    def _load_dinas(self, animate=False):
         with get_connection(DB_PATH) as conn:
             excluded = list_excluded_ids(conn)
             rows = self._rows_for(conn, self._span, excluded)
         self._dinas_panel.render(rank_by(rows, "dinas"),
-                                 span_label(self._month, self._span))
+                                 span_label(self._month, self._span), animate)
 
-    def _load_paparan(self):
+    def _load_paparan(self, animate=False):
         with get_connection(DB_PATH) as conn:
             excluded = list_excluded_ids(conn)
             rows = self._rows_for(conn, self._paparan_span, excluded)
         self._paparan_panel.render(rank_by(rows, "paparan"),
-                                   span_label(self._month, self._paparan_span))
+                                   span_label(self._month, self._paparan_span), animate)
 
     def _load(self):
         self._load_month()
-        self._load_dinas()
-        self._load_paparan()
+        # Satu keputusan animasi untuk seluruh siklus load ini — dipanggil
+        # SEKALI dan dipakai bagi kedua papan, supaya render pertama layar
+        # menumbuhkan keduanya bersamaan alih-alih hanya papan yang lebih
+        # dulu digambar.
+        animate = self._anim_sig.changed(
+            data_version.get(), self._month, self._span, self._paparan_span)
+        self._load_dinas(animate)
+        self._load_paparan(animate)
 
     def on_show(self) -> None:
         """Kontrak shell: dipanggil tiap layar cache ditampilkan lagi.
@@ -489,11 +505,15 @@ class DinasRecapScreen(ctk.CTkFrame):
 
     def _on_dinas_span(self, label):
         self._span = _LABEL_TO_SPAN.get(label, DEFAULT_SPAN)
-        self._load_dinas()
+        animate = self._anim_sig.changed(
+            data_version.get(), self._month, self._span, self._paparan_span)
+        self._load_dinas(animate)
 
     def _on_paparan_span(self, label):
         self._paparan_span = _LABEL_TO_SPAN.get(label, DEFAULT_SPAN)
-        self._load_paparan()
+        animate = self._anim_sig.changed(
+            data_version.get(), self._month, self._span, self._paparan_span)
+        self._load_paparan(animate)
 
     def _open_exclude(self):
         from src.ui.components.dinas_exclude_dialog import DinasExcludeDialog
