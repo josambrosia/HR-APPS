@@ -4,7 +4,7 @@ from tkinter import ttk
 import customtkinter as ctk
 
 from src.config import DB_PATH
-from src.core.session_state import period_state
+from src.core.session_state import period_state, data_version
 from src.core.week_utils import parse_week_key, week_range
 from src.db.coaching import (
     list_coaching_for_week, mark_coached, unmark_coached,
@@ -13,6 +13,7 @@ from src.db.coaching import (
 from src.db.connection import get_connection
 from src.db.holidays import working_days_count
 from src.db.settings import get_setting
+from src.ui import motion
 from src.ui.components.kpi_card import KPICard
 from src.ui.components.tree_style import style_treeview, RowHover
 from src.ui.components.week_nav import WeekNavBar
@@ -31,6 +32,8 @@ from src.ui.theme import (
 
 
 class CoachingScreen(ctk.CTkFrame):
+    _STATS_SLOTS = ("Total", "Sudah", "Belum", "Coverage")
+
     def __init__(self, parent):
         super().__init__(parent, fg_color="transparent")
         self.grid_columnconfigure(0, weight=2)
@@ -101,13 +104,21 @@ class CoachingScreen(ctk.CTkFrame):
         self.stats.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, SPACE_MD))
         for i in range(4):
             self.stats.grid_columnconfigure(i, weight=1)
+        self._anim_sig = motion.RenderSignature()
+        self._build_stats_cards()
+
+    def _build_stats_cards(self):
+        """Bangun keempat kartu SEKALI. Sebelumnya kartu dihancurkan dan
+        dibangun ulang tiap _reload(), jadi setiap toggle 'Sudah Coaching'
+        membuat seluruh baris KPI berkedip putih (v25 item 19)."""
         self._stats_cards = []
+        for i, label in enumerate(self._STATS_SLOTS):
+            c = KPICard(self.stats, label, "—", value_color=COLOR_TEXT)
+            c.grid(row=0, column=i, padx=SPACE_XS, sticky="ew")
+            self._stats_cards.append(c)
 
     def _render_stats(self, rows):
-        for c in self._stats_cards:
-            c.destroy()
-        self._stats_cards = []
-
+        """Perbarui nilai kartu DI TEMPAT — tidak pernah destroy()/rebuild."""
         total = len(rows)
         sudah = sum(1 for r in rows if r["is_coached"])
         belum = total - sudah
@@ -127,16 +138,26 @@ class CoachingScreen(ctk.CTkFrame):
         #   Sudah  → emerald (success)
         #   Belum  → rose (warn)
         #   Cov %  → conditional emerald/rose
-        cards = [
-            ("Total", str(total), COLOR_TEXT),
-            ("Sudah", str(sudah), COLOR_SUCCESS),
-            ("Belum", str(belum), COLOR_WARN),
-            ("Coverage", coverage, coverage_color),
-        ]
-        for i, (label, val, color) in enumerate(cards):
-            c = KPICard(self.stats, label, val, value_color=color)
-            c.grid(row=0, column=i, padx=SPACE_XS, sticky="ew")
-            self._stats_cards.append(c)
+        #
+        # Animate (count-up) only when the underlying data actually looks
+        # different from the last render — a genuine month switch or a
+        # data_version bump from elsewhere (e.g. import while this screen
+        # was cached). A direct user action (toggle "Sudah Coaching", week
+        # pill click) updates the number instantly via set_value — snappier
+        # than waiting for a count-up on a click the user just made.
+        animate = self._anim_sig.changed(data_version.get(), self._current_month)
+
+        numeric = ((0, total, COLOR_TEXT),
+                   (1, sudah, COLOR_SUCCESS),
+                   (2, belum, COLOR_WARN))
+        for idx, value, color in numeric:
+            card = self._stats_cards[idx]
+            if animate:
+                card._value_label.configure(text_color=color)
+                motion.count_up(card._value_label, value)
+            else:
+                card.set_value(str(value), color)
+        self._stats_cards[3].set_value(coverage, coverage_color)
 
     def _build_table_and_panel(self):
         left = ctk.CTkFrame(self, fg_color="transparent")

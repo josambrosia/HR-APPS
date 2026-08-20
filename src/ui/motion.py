@@ -336,3 +336,50 @@ def count_up(label, to_value: int, fmt: Callable[[int], str] = str,
     cancel_for(label)
     tween(label, duration_ms,
           lambda t: label.configure(text=fmt(int(round(to_value * t)))))
+
+
+# ─────────────────────────────────────────────── penolong: sapuan Canvas
+
+def wipe_canvas(canvas, tag: str, base_color: str,
+                step_ms: int = None, group_px: int = 14) -> None:
+    """Nyalakan item ber-`tag` kolom demi kolom, dari kiri ke kanan.
+
+    Kenapa bertahap dan bukan memudarkan semuanya serentak: memudarkan 675
+    sel sekaligus hanya dapat 31 fps (32,54 ms per frame) — patah-patah.
+    Menyapu per kolom hanya menyentuh belasan item per frame: 366 fps, dan
+    seluruh sapuan tuntas dalam ~135 ms. Versi yang lebih indah kebetulan
+    juga versi yang lebih cepat.
+
+    Warna tujuan dibaca dari item itu sendiri, jadi pemanggil tidak perlu
+    tahu apa pun soal palet — dan `_paint_grid` tidak perlu diubah.
+    """
+    from src.ui.theme import MOTION_WIPE_STEP
+    if step_ms is None:
+        step_ms = MOTION_WIPE_STEP
+
+    items = canvas.find_withtag(tag)
+    if not items:
+        return
+
+    targets = [(canvas.coords(i)[0], i, canvas.itemcget(i, "fill")) for i in items]
+
+    if not _enabled:
+        return                      # warnanya memang sudah benar; tak ada yang perlu dilakukan
+
+    columns: dict[int, list] = {}
+    for x, item, fill in targets:
+        columns.setdefault(int(x // group_px), []).append((item, fill))
+
+    for item, _fill in [(i, f) for col in columns.values() for i, f in col]:
+        canvas.itemconfig(item, fill=base_color)
+
+    order = sorted(columns)
+    for n, key in enumerate(order):
+        def light(col=columns[key]):
+            for item, fill in col:
+                try:
+                    canvas.itemconfig(item, fill=fill)
+                except tk.TclError:
+                    return          # canvas dibersihkan di tengah sapuan
+        job = canvas.after(n * step_ms, light)
+        _register(canvas, job)

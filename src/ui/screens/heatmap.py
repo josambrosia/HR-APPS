@@ -18,6 +18,7 @@ import tkinter as tk
 import customtkinter as ctk
 
 from src.config import DB_PATH
+from src.core.session_state import data_version
 from src.db.connection import get_connection
 from src.db.settings import get_setting
 from src.core.heatmap import (
@@ -25,6 +26,7 @@ from src.core.heatmap import (
 from src.reports.heatmap_print import render_heatmap_print_html
 from src.reports.employee_report import render_employee_report_html
 from src.ui.browser_launcher import open_html_in_browser
+from src.ui import motion
 from src.ui.components.search_bar import SearchBar
 from src.ui.components.heatmap_print_dialog import HeatmapPrintDialog
 from src.ui.theme import (
@@ -87,6 +89,7 @@ class HeatmapScreen(ctk.CTkFrame):
         self._last_w = None
         self._pending_width = None     # latest <Configure> width awaiting the throttle
         self._resize_after_id = None   # trailing-edge reflow timer
+        self._anim_sig = motion.RenderSignature()
 
         self._build_header()
         self._build_toolbar()
@@ -263,6 +266,12 @@ class HeatmapScreen(ctk.CTkFrame):
         self._sortkey = key
         self._repaint()
 
+    def _anim_parts(self):
+        """Sidik jari sapuan. Kata pencarian dan ukuran jendela SENGAJA tidak
+        termasuk: _repaint() juga dipanggil oleh _on_search dan _apply_resize,
+        dan sapuan yang ikut menyala di sana akan berkedip tiap ketukan tombol."""
+        return (data_version.get(), self._month, self._sortkey)
+
     # ---------- paint ----------
     def _visible(self):
         emps = self._ctx["employees"]
@@ -338,6 +347,9 @@ class HeatmapScreen(ctk.CTkFrame):
         for i, e in enumerate(emps):
             self._paint_card(e, _PAD, _PAD + i * (card_h + _CARD_GAP), card_w)
         c.configure(scrollregion=(0, 0, 0, _PAD + len(emps) * (card_h + _CARD_GAP)))
+
+        if self._anim_sig.changed(*self._anim_parts()):
+            motion.wipe_canvas(c, "cellrect", _BENTO_TILE)
 
     def _round_rect(self, x0, y0, x1, y1, r, **kw):
         pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1,
