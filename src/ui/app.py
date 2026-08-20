@@ -1,3 +1,4 @@
+import tkinter as tk
 import customtkinter as ctk
 from typing import Dict
 
@@ -18,6 +19,10 @@ from src.ui import motion
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
+
+# Garis penanda menu aktif — piksel apa adanya (tk.Frame), lihat _build_sidebar.
+NAV_INDICATOR_W = 3
+NAV_INDICATOR_H = 22
 
 
 class HRApp(ctk.CTk):
@@ -214,6 +219,26 @@ class HRApp(ctk.CTk):
                 item.pack(fill="x", pady=0)
                 self._nav_items[screen_key] = item
 
+        # Satu garis aktif untuk SELURUH sidebar (v25 item 02). Sebelumnya
+        # tiap item punya garisnya sendiri yang di-pack/pack_forget, sehingga
+        # perpindahan tampak sebagai "hilang lalu muncul di tempat lain".
+        #
+        # tk.Frame, BUKAN CTkFrame. CTkFrame membungkus geometry manager dan
+        # menskalakan koordinat mengikuti DPI — tapi hanya sebagian: pada
+        # skala 1.25, place(y=100) mendarat di 100*1.25=125 sedangkan
+        # place_configure(y=200) mendarat tepat di 200. Campuran itu membuat
+        # garis meleset ~76px pada penempatan pertama (yaitu saat aplikasi
+        # baru dibuka) di layar ber-DPI tinggi, sementara di layar 100% tampak
+        # normal. tk.Frame memakai piksel apa adanya di kedua jalur, jadi
+        # rumus pemusatan di _set_active_nav_item berlaku sebagaimana ditulis.
+        # Pelajaran yang sama sudah kita bayar di v24 untuk garis pemisah 1px.
+        self._nav_indicator = tk.Frame(
+            self.sidebar, bg=COLOR_ACCENT,
+            width=NAV_INDICATOR_W, height=NAV_INDICATOR_H,
+        )
+        self._nav_indicator.place(x=0, y=0)
+        self._nav_indicator.place_forget()      # ditampilkan saat item pertama aktif
+
         # ── Footer: brand row ("Josaphat Tech" + "Solution") + 1 mono line ──
         # Compact 2-line layout (version + tagline combined) to save sidebar height.
         from src.config import APP_VERSION, APP_TAGLINE, APP_BRAND_NAME
@@ -260,12 +285,6 @@ class HRApp(ctk.CTk):
         frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=32)
         frame.pack_propagate(False)
 
-        # Left active bar — created hidden, shown when active
-        left_bar = ctk.CTkFrame(
-            frame, fg_color=COLOR_ACCENT, width=3, corner_radius=0,
-        )
-        # Pack hidden initially; activate via _set_active_nav_item
-
         # Inner content row; left bar (when active) packs to left via before=new._content
         content = ctk.CTkFrame(frame, fg_color="transparent")
         content.pack(side="left", fill="both", expand=True, padx=SPACE_LG)
@@ -287,7 +306,6 @@ class HRApp(ctk.CTk):
         text_lbl.pack(side="left", padx=(SPACE_SM, 0))
 
         # Store refs on frame for state updates
-        frame._left_bar = left_bar
         frame._content = content
         frame._icon_lbl = icon_lbl
         frame._text_lbl = text_lbl
@@ -317,38 +335,32 @@ class HRApp(ctk.CTk):
         return frame
 
     def _set_active_nav_item(self, screen_key: str):
-        """Toggle visual active state on nav items.
+        """Pindahkan garis aktif + perbarui warna teks/ikon.
 
-        Show left magenta bar + bg tint + bold text on newly active item.
-        Hide indicators on previously active item.
+        Garisnya tunggal dan meluncur; item lama hanya kehilangan tint dan
+        ketebalan teksnya.
         """
-        # Idempotent: no-op if already active (Important #2)
-        if screen_key == self._active_nav_key and screen_key in self._nav_items:
-            # Still re-apply visuals in case this is first activation after init
-            new = self._nav_items[screen_key]
-            new.configure(fg_color=COLOR_SURFACE_HIGH)
-            if not new._left_bar.winfo_ismapped():
-                new._left_bar.pack(side="left", fill="y", pady=SPACE_XS, before=new._content)
-            new._text_lbl.configure(text_color=COLOR_TEXT, font=FONT_BODY_BOLD)
-            new._icon_lbl.configure(text_color=COLOR_ACCENT)
-            return
-
         prev = self._nav_items.get(self._active_nav_key)
-        if prev is not None:
+        if prev is not None and self._active_nav_key != screen_key:
             prev.configure(fg_color="transparent")
-            prev._left_bar.pack_forget()
             prev._text_lbl.configure(text_color=COLOR_TEXT_SOFT, font=FONT_BODY)
             prev._icon_lbl.configure(text_color=COLOR_TEXT_DIM)
 
         new = self._nav_items.get(screen_key)
-        if new is not None:
-            new.configure(fg_color=COLOR_SURFACE_HIGH)
-            # before=new._content ensures bar packs to the LEFT of content
-            # (without this, pack manager appends bar to end of slave list)
-            new._left_bar.pack(side="left", fill="y", pady=SPACE_XS, before=new._content)
-            new._text_lbl.configure(text_color=COLOR_TEXT, font=FONT_BODY_BOLD)
-            new._icon_lbl.configure(text_color=COLOR_ACCENT)
-            self._active_nav_key = screen_key
+        if new is None:
+            return
+        new.configure(fg_color=COLOR_SURFACE_HIGH)
+        new._text_lbl.configure(text_color=COLOR_TEXT, font=FONT_BODY_BOLD)
+        new._icon_lbl.configure(text_color=COLOR_ACCENT)
+
+        self.update_idletasks()          # pastikan winfo_y() item sudah valid
+        target_y = new.winfo_y() + (new.winfo_height() - NAV_INDICATOR_H) // 2
+        if not self._nav_indicator.winfo_ismapped():
+            self._nav_indicator.place(x=0, y=target_y)
+        else:
+            motion.slide_to_y(self._nav_indicator,
+                              self._nav_indicator.winfo_y(), target_y)
+        self._active_nav_key = screen_key
 
     def _load_sidebar_icon(self, parent):
         """Render a JTS icon (36x36) at the start of the sidebar header.

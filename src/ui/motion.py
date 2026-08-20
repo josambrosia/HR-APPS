@@ -259,3 +259,19 @@ def hover_tint(widget, from_color: str, to_color: str,
                 on_done=lambda: _hover_jobs.pop(key, None))
     if job is not None:
         _hover_jobs[key] = job
+
+
+# ─────────────────────────────────────────────── penolong: indikator meluncur
+
+def slide_to_y(widget, from_y: int, to_y: int, duration_ms: int = None) -> None:
+    """Geser widget ber-`place()` secara vertikal dari `from_y` ke `to_y`.
+
+    Widget WAJIB sudah diposisikan dengan place(); pack/grid tidak bisa
+    dianimasikan tanpa menata ulang tata letak tiap frame.
+    """
+    from src.ui.theme import MOTION_BASE
+    if duration_ms is None:
+        duration_ms = MOTION_BASE
+    cancel_for(widget)
+    tween(widget, duration_ms,
+          lambda t: widget.place_configure(y=int(from_y + (to_y - from_y) * t)))
