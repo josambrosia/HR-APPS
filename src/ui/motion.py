@@ -225,3 +225,37 @@ class RenderSignature:
     def reset(self) -> None:
         """Paksa render berikutnya dianggap berubah."""
         self._last = _UNSET
+
+
+# ─────────────────────────────────────────────── penolong: hover
+
+_hover_jobs: dict[tuple[int, str], str] = {}
+
+
+def hover_tint(widget, from_color: str, to_color: str,
+               duration_ms: int = None, option: str = "fg_color") -> None:
+    """Alirkan satu properti warna widget dari `from_color` ke `to_color`.
+
+    Dipakai untuk hover 1-3 widget sekaligus. JANGAN dipakai untuk puluhan
+    widget serentak — 20 CTkLabel hanya dapat 64 fps (lihat docstring modul).
+
+    Tween lama pada (widget, properti) YANG SAMA dibatalkan lebih dulu supaya
+    masuk-keluar kursor cepat tidak menumpuk dua animasi yang saling melawan.
+    Properti berbeda pada widget yang sama berjalan berdampingan.
+    """
+    from src.ui.theme import MOTION_FAST
+    if duration_ms is None:
+        duration_ms = MOTION_FAST
+    key = (id(widget), option)
+    old = _hover_jobs.pop(key, None)
+    if old is not None:
+        try:
+            widget.after_cancel(old)
+        except tk.TclError:
+            pass
+        _forget(widget, old)
+    job = tween(widget, duration_ms,
+                lambda t: widget.configure(**{option: lerp_hex(from_color, to_color, t)}),
+                on_done=lambda: _hover_jobs.pop(key, None))
+    if job is not None:
+        _hover_jobs[key] = job

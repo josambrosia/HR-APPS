@@ -5,7 +5,7 @@ from src.ui.theme import (
     FONT_FAMILY,
     COLOR_BG, COLOR_SIDEBAR, COLOR_SURFACE, COLOR_SURFACE_HIGH,
     COLOR_BORDER, COLOR_ACCENT, COLOR_ACCENT_HOVER,
-    COLOR_ACCENT_TINT_BG, COLOR_ACCENT_TINT_BORDER,
+    COLOR_ACCENT_TINT_BG, COLOR_ACCENT_TINT_BORDER, COLOR_ACCENT_TINT_HOVER,
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED, COLOR_TEXT_DISABLED,
     COLOR_TEXT_SOFT,
     SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
@@ -14,6 +14,7 @@ from src.ui.theme import (
     RADIUS_MD,
 )
 from src.ui.icons import glyph, icon_font
+from src.ui import motion
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -144,6 +145,27 @@ class HRApp(ctk.CTk):
 
         for widget in (self._active_month_chip, self._active_month_label, bulan_lbl):
             widget.bind("<Button-1>", _on_chip_click)
+
+        # Hover chip — v25 item 14. Sebelumnya chip punya cursor="hand2" dan
+        # binding klik tapi NOL umpan balik visual, jadi tidak ada yang
+        # menandakan ia bisa diklik sampai kursor kebetulan lewat.
+        def _chip_enter(_e):
+            motion.hover_tint(self._active_month_chip,
+                              COLOR_ACCENT_TINT_BG, COLOR_ACCENT_TINT_HOVER)
+            motion.hover_tint(self._active_month_chip,
+                              COLOR_ACCENT_TINT_BORDER, COLOR_ACCENT,
+                              option="border_color")
+
+        def _chip_leave(_e):
+            motion.hover_tint(self._active_month_chip,
+                              COLOR_ACCENT_TINT_HOVER, COLOR_ACCENT_TINT_BG)
+            motion.hover_tint(self._active_month_chip,
+                              COLOR_ACCENT, COLOR_ACCENT_TINT_BORDER,
+                              option="border_color")
+
+        for widget in (self._active_month_chip, self._active_month_label, bulan_lbl):
+            widget.bind("<Enter>", _chip_enter)
+            widget.bind("<Leave>", _chip_leave)
 
         # ── Sections (label + items) — categorized navigation ──
         nav_groups = [
@@ -279,14 +301,14 @@ class HRApp(ctk.CTk):
             widget.bind("<Button-1>", _on_click)
             widget.configure(cursor="hand2")
 
-        # Hover handlers
+        # Hover handlers — tint mengalir, bukan menjeplak (v25 item 01).
         def _on_enter(_e):
             if frame._screen_key != self._active_nav_key:
-                frame.configure(fg_color=COLOR_SURFACE)
+                motion.hover_tint(frame, COLOR_SIDEBAR, COLOR_SURFACE)
 
         def _on_leave(_e):
             if frame._screen_key != self._active_nav_key:
-                frame.configure(fg_color="transparent")
+                motion.hover_tint(frame, COLOR_SURFACE, COLOR_SIDEBAR)
 
         for widget in (frame, content, icon_lbl, text_lbl):
             widget.bind("<Enter>", _on_enter)
