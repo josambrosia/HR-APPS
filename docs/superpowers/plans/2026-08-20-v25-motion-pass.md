@@ -1178,12 +1178,11 @@ def test_garis_terlihat_setelah_item_pertama_diaktifkan(tk_root):
     finally:
         h.destroy()
 ```
-```
 
 - [ ] **Step 2: Jalankan tes, pastikan GAGAL**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_motion_nav_bar.py -v`
-Expected: FAIL — `AssertionError: hasattr(app, "_nav_indicator")`
+Expected: FAIL — `AssertionError: hasattr(h, "_nav_indicator")`
 
 - [ ] **Step 3: Tambahkan penolong ke `motion.py`**
 
