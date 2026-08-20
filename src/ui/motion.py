@@ -23,6 +23,10 @@ berjalan di Canvas; animasi widget CTk dibatasi 1-3 widget sekaligus.
 """
 from __future__ import annotations
 
+import time
+import tkinter as tk
+from typing import Callable, Optional
+
 
 # ─────────────────────────────────────────────── interpolasi warna
 
@@ -83,3 +87,105 @@ def load_enabled_from_db(conn) -> None:
     termasuk saat key-nya belum pernah ditulis."""
     from src.db.settings import get_setting
     set_enabled(get_setting(conn, SETTING_KEY, default="1") != "0")
+
+
+# ─────────────────────────────────────────────── registry tween aktif
+
+# key = id(widget) -> set[after_id]. Dipakai untuk membatalkan seluruh
+# animasi milik satu widget saat widget itu dihancurkan.
+_jobs: dict[int, set[str]] = {}
+# widget yang sudah dipasangi binding <Destroy>, supaya tidak dipasang dua kali
+_bound: set[int] = set()
+
+_FRAME_MS = 16          # ~60 fps; jam dinding yang menentukan, ini hanya laju polling
+
+
+def active_count() -> int:
+    """Jumlah tween yang sedang berjalan. Untuk tes kebocoran registry."""
+    return sum(len(s) for s in _jobs.values())
+
+
+def _register(widget, job_id: str) -> None:
+    key = id(widget)
+    _jobs.setdefault(key, set()).add(job_id)
+    if key not in _bound:
+        _bound.add(key)
+        widget.bind("<Destroy>", lambda _e, w=widget: _on_destroy(w), add="+")
+
+
+def _forget(widget, job_id: str) -> None:
+    jobs = _jobs.get(id(widget))
+    if jobs is not None:
+        jobs.discard(job_id)
+        if not jobs:
+            _jobs.pop(id(widget), None)
+
+
+def _on_destroy(widget) -> None:
+    cancel_for(widget)
+    _bound.discard(id(widget))
+
+
+def cancel_for(widget) -> None:
+    """Batalkan seluruh tween milik `widget`. Frame akhir TIDAK dipaksakan —
+    pembatalan berarti berhenti di tempat, bukan melompat ke ujung."""
+    for job_id in _jobs.pop(id(widget), set()):
+        try:
+            widget.after_cancel(job_id)
+        except tk.TclError:
+            # Widget sudah lenyap bersama seluruh timernya. Ini satu-satunya
+            # pengecualian yang ditangkap di jalur ini — JANGAN dilebarkan jadi
+            # `except Exception`. Di v24 penangkap selebar itu menyembunyikan
+            # tabrakan nama _draw pada CTkFrame selama berjam-jam.
+            pass
+
+
+# ─────────────────────────────────────────────── tween
+
+def tween(
+    widget,
+    duration_ms: int,
+    on_frame: Callable[[float], None],
+    on_done: Optional[Callable[[], None]] = None,
+    easing: Callable[[float], float] = ease_out_cubic,
+) -> Optional[str]:
+    """Animasikan `on_frame(t)` dari 0 ke 1 selama `duration_ms`.
+
+    `t` sudah melewati `easing`. Frame terakhir dijamin tepat 1.0, sehingga
+    keadaan akhir tidak pernah bergantung pada waktu kedatangan frame.
+
+    Saat motion mati (atau durasi <= 0): tidak ada timer sama sekali —
+    `on_frame(1.0)` lalu `on_done()` dipanggil langsung. Ini yang membuat
+    setiap pemanggil bisa ditulis tanpa percabangan, dan yang membuat
+    keadaan akhir identik dengan v24.
+
+    Mengembalikan id timer pertama, atau None bila berjalan seketika.
+    """
+    if not _enabled or duration_ms <= 0:
+        on_frame(1.0)
+        if on_done is not None:
+            on_done()
+        return None
+
+    start = time.perf_counter()
+    holder: dict[str, Optional[str]] = {"job": None}
+
+    def step() -> None:
+        if holder["job"] is not None:
+            _forget(widget, holder["job"])
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+        raw = elapsed_ms / duration_ms
+        if raw >= 1.0:
+            on_frame(1.0)
+            if on_done is not None:
+                on_done()
+            return
+        on_frame(easing(raw))
+        job = widget.after(_FRAME_MS, step)
+        holder["job"] = job
+        _register(widget, job)
+
+    first = widget.after(_FRAME_MS, step)
+    holder["job"] = first
+    _register(widget, first)
+    return first

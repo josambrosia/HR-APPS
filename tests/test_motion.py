@@ -79,3 +79,73 @@ class TestEnabledFlag:
         with get_connection(p) as conn:
             motion.load_enabled_from_db(conn)
         assert motion.enabled() is True
+
+
+class TestTweenDimatikan:
+    def test_langsung_ke_frame_terakhir_tanpa_timer(self, tk_root):
+        motion.set_enabled(False)
+        seen = []
+        done = []
+        job = motion.tween(tk_root, 500, seen.append, on_done=lambda: done.append(1))
+        assert job is None            # tidak ada timer yang dijadwalkan
+        assert seen == [1.0]          # tepat satu frame: keadaan akhir
+        assert done == [1]
+
+
+class TestTweenAktif:
+    def test_menjadwalkan_dan_akhirnya_mencapai_satu(self, tk_root):
+        motion.set_enabled(True)
+        seen = []
+        done = []
+        motion.tween(tk_root, 60, seen.append, on_done=lambda: done.append(1),
+                     easing=motion.linear)
+        # pompa event loop sampai selesai (batas aman 3 detik)
+        import time
+        t0 = time.perf_counter()
+        while not done and time.perf_counter() - t0 < 3.0:
+            tk_root.update()
+        assert done == [1], "tween tidak pernah selesai"
+        assert seen[-1] == 1.0, "frame terakhir harus tepat 1.0"
+        assert seen[0] < 1.0, "harus ada frame antara, bukan langsung selesai"
+        assert all(b >= a for a, b in zip(seen, seen[1:])), "progres harus monoton"
+
+    def test_durasi_nol_langsung_selesai(self, tk_root):
+        motion.set_enabled(True)
+        seen = []
+        motion.tween(tk_root, 0, seen.append)
+        assert seen == [1.0]
+
+
+class TestPembatalan:
+    def test_cancel_for_menghentikan_tween_berjalan(self, tk_root):
+        motion.set_enabled(True)
+        seen = []
+        motion.tween(tk_root, 2000, seen.append)
+        tk_root.update()
+        motion.cancel_for(tk_root)
+        n = len(seen)
+        for _ in range(5):
+            tk_root.update()
+        assert len(seen) == n, "tween masih berjalan setelah dibatalkan"
+        assert 1.0 not in seen, "tween yang dibatalkan tidak boleh memaksa frame akhir"
+
+    def test_widget_dihancurkan_membatalkan_tween_nya(self, tk_root):
+        import customtkinter as ctk
+        motion.set_enabled(True)
+        child = ctk.CTkFrame(tk_root)
+        seen = []
+        motion.tween(child, 2000, seen.append)
+        tk_root.update()
+        child.destroy()
+        tk_root.update()
+        assert motion.active_count() == 0, "registry bocor setelah widget dihancurkan"
+
+    def test_registry_bersih_setelah_tween_selesai_wajar(self, tk_root):
+        import time
+        motion.set_enabled(True)
+        done = []
+        motion.tween(tk_root, 40, lambda t: None, on_done=lambda: done.append(1))
+        t0 = time.perf_counter()
+        while not done and time.perf_counter() - t0 < 3.0:
+            tk_root.update()
+        assert motion.active_count() == 0
