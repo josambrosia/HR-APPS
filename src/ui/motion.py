@@ -286,6 +286,26 @@ def slide_to_y(widget, from_y: int, to_y: int, duration_ms: int = None) -> None:
 
 # ─────────────────────────────────────────────── penolong: pil geser
 
+def _pill_to_back(pill) -> None:
+    """Turunkan pil ke DASAR tumpukan, di bawah SELURUH saudaranya.
+
+    `pill.lower(widget)` hanya menaruhnya tepat di bawah satu widget itu, jadi
+    ia tetap berada DI ATAS saudara yang dibuat lebih dulu. Di Rekap Dinas
+    rentang default adalah "Tahun ini" — tombol terakhir — sehingga pil
+    mendarat di atas "3 bln" dan "6 bln" dan menutupi labelnya begitu user
+    berpindah ke sana. Dashboard lolos hanya karena defaultnya kebetulan
+    tombol pertama.
+
+    `lower()` tanpa argumen menurunkannya ke dasar, dan dipanggil di SETIAP
+    penempatan — bukan cuma yang pertama — supaya urutan tumpukan tidak bisa
+    hanyut kalau widget lain ditambahkan belakangan.
+    """
+    try:
+        pill.lower()
+    except tk.TclError:
+        pass          # pil sudah dihancurkan bersama induknya
+
+
 def slide_pill(pill, target_widget, duration_ms: int = None) -> None:
     """Geser + ubah lebar `pill` supaya menutupi `target_widget`.
 
@@ -307,10 +327,11 @@ def slide_pill(pill, target_widget, duration_ms: int = None) -> None:
     if not pill.winfo_ismapped():
         # Penempatan pertama: langsung, tanpa meluncur dari posisi nol.
         pill.place(x=to_x, y=to_y, width=to_w, height=to_h)
-        pill.lower(target_widget)
+        _pill_to_back(pill)
         return
 
     cancel_for(pill)
+    _pill_to_back(pill)
     from_x, from_w = pill.winfo_x(), pill.winfo_width()
     tween(pill, duration_ms,
           lambda t: pill.place_configure(

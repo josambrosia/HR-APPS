@@ -151,13 +151,13 @@ class _MetricPanel:
 
         # Pil geser di belakang tombol span terpilih (v25 item 13). tk.Frame,
         # bukan CTkFrame — lihat pelajaran DPI item 02 di motion.slide_pill.
-        # Sinkronisasi pertamanya SENGAJA ditunda sampai transisi eksplisit
-        # pertama (_handle_span), bukan di sini: sebelum panel ini dipasang
-        # ke jendela yang masih withdrawn, pill.place() yang telanjur
-        # dipanggil tetap membuat pil ter-map begitu jendela dimunculkan,
-        # padahal tombolnya belum ter-layout (lebar 0). Sama seperti
-        # WeekNavBar._sync_pill.
         self._pill = tk.Frame(self.span_ctl, bg=COLOR_ACCENT)
+        # Dipasang sejak konstruksi lewat after_idle (setelah tombol punya
+        # geometri), sama seperti WeekNavBar. Kalau ditunda sampai klik
+        # pertama, perpindahan rentang PERTAMA menempuh jalur "belum ter-map
+        # -> place() langsung" alias tidak meluncur — padahal konsistensi
+        # itulah alasan item 13 ada.
+        self.span_ctl.after_idle(self._sync_pill)
 
         self.span_lbl = ctk.CTkLabel(parent, text="", font=FONT_MONO_SMALL,
                                      text_color=COLOR_TEXT_DISABLED, anchor="w")
@@ -207,6 +207,8 @@ class _MetricPanel:
         self._sync_pill()
 
     def _sync_pill(self):
+        if not self.span_ctl.winfo_exists():
+            return              # panel sudah dihancurkan sebelum idle jalan
         btn = self.span_ctl._buttons_dict.get(self.span_ctl.get())
         if btn is not None:
             motion.slide_pill(self._pill, btn)
