@@ -1,14 +1,19 @@
+from datetime import date
 from tkinter import ttk
 import customtkinter as ctk
 
-from src.config import DB_PATH
+from src.config import DB_PATH, DEFAULT_OVERTIME_THRESHOLD
+from src.core.attendance_calc import to_minutes
+from src.core.schedule import is_future
 from src.core.session_state import notify_data_changed
 from src.db.connection import get_connection
 from src.db.settings import get_setting, set_setting
+from src.db.schedule import current_schedule, delete_period, list_periods
 from src.db.employees import list_employees, toggle_employee_active
 from src.db import backup as backup_mod
 from src.ui import feedback, motion
 from src.ui.tasks import BusyGuard
+from src.ui.components.schedule_change_dialog import ScheduleChangeDialog
 from src.ui.components.tree_style import style_treeview, RowHover
 from src.ui.theme import (
     COLOR_BG, COLOR_SURFACE, COLOR_SURFACE_HIGH,
@@ -68,14 +73,15 @@ class SettingsScreen(ctk.CTkFrame):
     def _build_general(self, parent):
         with get_connection(DB_PATH) as conn:
             current_month = get_setting(conn, "current_month", default="")
-            sched_start = get_setting(conn, "schedule_start", default="08.00")
-            sched_end = get_setting(conn, "schedule_end", default="16.00")
+            sched_start, sched_end = current_schedule(conn)
             threshold = get_setting(conn, "coaching_threshold_per_day", default="15")
             lupa_penalty = get_setting(conn, "lupa_absen_datang_penalty_min",
                                        default="15")
             severe = get_setting(conn, "severe_lateness_threshold_min",
                                  default="60")
             tol = get_setting(conn, "late_tolerance_min", default="12")
+            overtime = get_setting(conn, "overtime_threshold",
+                                   default=DEFAULT_OVERTIME_THRESHOLD)
 
         row = ctk.CTkFrame(
             parent, fg_color=COLOR_SURFACE,
@@ -117,17 +123,60 @@ class SettingsScreen(ctk.CTkFrame):
             placeholder_text_color=COLOR_TEXT_MUTED,
         ).pack(side="left")
 
-        row3 = ctk.CTkFrame(
+        # ── Jam Kantor (v26): jadwal berlaku per tanggal ──
+        sched_card = ctk.CTkFrame(
             parent, fg_color=COLOR_SURFACE,
             border_width=1, border_color=COLOR_BORDER,
             corner_radius=RADIUS_MD,
         )
-        row3.pack(fill="x", pady=SPACE_SM)
+        sched_card.pack(fill="x", pady=SPACE_SM)
+        sched_head = ctk.CTkFrame(sched_card, fg_color="transparent")
+        sched_head.pack(fill="x", padx=SPACE_MD, pady=(SPACE_SM, 0))
         self._sched_label = ctk.CTkLabel(
-            row3, text=f"Jadwal Kerja: {sched_start} - {sched_end}",
-            font=FONT_BODY, text_color=COLOR_TEXT,
+            sched_head, text=f"Jam Kantor: {sched_start} – {sched_end}",
+            font=FONT_BODY_BOLD, text_color=COLOR_TEXT,
         )
-        self._sched_label.pack(side="left", padx=SPACE_MD, pady=SPACE_SM + 2)
+        self._sched_label.pack(side="left")
+        ctk.CTkButton(
+            sched_head, text="+ Tambah perubahan jadwal…",
+            command=self._open_schedule_dialog, width=196,
+            fg_color=COLOR_SURFACE_HIGH, hover_color=COLOR_BORDER,
+            text_color=COLOR_TEXT, font=FONT_SMALL, corner_radius=RADIUS_MD,
+        ).pack(side="right")
+        ctk.CTkLabel(
+            sched_card,
+            text="Jadwal lama tetap dipakai untuk tanggal sebelum perubahan.",
+            font=FONT_SMALL, text_color=COLOR_TEXT_MUTED, anchor="w",
+        ).pack(fill="x", padx=SPACE_MD, pady=(2, SPACE_XS))
+        self._sched_list = ctk.CTkScrollableFrame(
+            sched_card, fg_color="transparent", height=76)
+        self._sched_list.pack(fill="x", padx=SPACE_MD, pady=(0, SPACE_SM))
+        self._render_schedule()
+
+        # ── Ambang Lembur (v26) ──
+        row_ot = ctk.CTkFrame(
+            parent, fg_color=COLOR_SURFACE,
+            border_width=1, border_color=COLOR_BORDER,
+            corner_radius=RADIUS_MD,
+        )
+        row_ot.pack(fill="x", pady=SPACE_SM)
+        ctk.CTkLabel(
+            row_ot, text="Ambang Lembur (HH.MM):",
+            font=FONT_BODY, text_color=COLOR_TEXT,
+        ).pack(side="left", padx=SPACE_MD, pady=SPACE_SM + 2)
+        self.overtime_var = ctk.StringVar(value=overtime)
+        ctk.CTkEntry(
+            row_ot, textvariable=self.overtime_var, width=80,
+            fg_color=COLOR_SURFACE_HIGH,
+            border_width=1, border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_BODY,
+            placeholder_text_color=COLOR_TEXT_MUTED,
+        ).pack(side="left")
+        ctk.CTkLabel(
+            row_ot, text="pulang setelah jam ini dihitung lembur",
+            font=FONT_SMALL, text_color=COLOR_TEXT_MUTED,
+        ).pack(side="left", padx=(SPACE_SM, 0))
 
         row4 = ctk.CTkFrame(
             parent, fg_color=COLOR_SURFACE,
@@ -216,6 +265,67 @@ class SettingsScreen(ctk.CTkFrame):
             font=FONT_BODY_BOLD,
             corner_radius=RADIUS_MD,
         ).pack(anchor="w", pady=SPACE_MD)
+
+    # ── Jam Kantor helpers (v26) ──
+    def _render_schedule(self):
+        for child in self._sched_list.winfo_children():
+            child.destroy()
+        with get_connection(DB_PATH) as conn:
+            periods = list_periods(conn)
+        today_iso = date.today().isoformat()
+        active_id = None
+        for p in periods:
+            if p["effective_from"] <= today_iso:
+                active_id = p["id"]
+        for p in periods:
+            row = ctk.CTkFrame(self._sched_list, fg_color="transparent")
+            row.pack(fill="x", pady=1)
+            label = (f"Berlaku mulai {p['effective_from']} · "
+                     f"{p['start_time']} – {p['end_time']}")
+            if p["id"] == active_id:
+                label += "   (berjalan)"
+            ctk.CTkLabel(
+                row, text=label, font=FONT_SMALL, text_color=COLOR_TEXT,
+                anchor="w",
+            ).pack(side="left")
+            if is_future(p["effective_from"]):
+                ctk.CTkButton(
+                    row, text="Hapus", width=54,
+                    command=lambda pid=p["id"]: self._delete_period(pid),
+                    fg_color="transparent", border_width=1,
+                    border_color=COLOR_ERROR, text_color=COLOR_ERROR,
+                    hover_color=COLOR_SURFACE_HIGH, font=FONT_SMALL,
+                    corner_radius=RADIUS_MD,
+                ).pack(side="right")
+
+    def _open_schedule_dialog(self):
+        ScheduleChangeDialog(self.winfo_toplevel(), on_saved=self._on_schedule_saved)
+
+    def _on_schedule_saved(self):
+        self._refresh_schedule()
+        feedback.show_info(
+            self, "Jadwal ditambahkan",
+            "Perubahan jam kantor disimpan dan berlaku mulai tanggal yang "
+            "dipilih.")
+        notify_data_changed()
+
+    def _delete_period(self, period_id: int):
+        if not feedback.ask_yes_no(
+            self, "Hapus jadwal ini?",
+            "Entri jadwal yang belum berlaku akan dihapus. Lanjut?",
+        ):
+            return
+        with get_connection(DB_PATH) as conn:
+            delete_period(conn, period_id)
+        self._refresh_schedule()
+        notify_data_changed()
+
+    def _refresh_schedule(self):
+        with get_connection(DB_PATH) as conn:
+            sched_start, sched_end = current_schedule(conn)
+        self._sched_label.configure(
+            text=f"Jam Kantor: {sched_start} – {sched_end}")
+        self._render_schedule()
 
     def _build_profil(self, parent):
         with get_connection(DB_PATH) as conn:
@@ -547,12 +657,30 @@ class SettingsScreen(ctk.CTkFrame):
                 self, "Toleransi di luar rentang",
                 f"{tol} di luar rentang. Toleransi harus antara 0 dan 999 menit.")
             return
+        # Validate Ambang Lembur (v26): HH.MM, harus setelah jam pulang berjalan
+        raw_ot = self.overtime_var.get().strip()
+        ot_min = to_minutes(raw_ot)
+        if ot_min is None:
+            feedback.show_warning(
+                self, "Ambang lembur tidak valid",
+                f"'{raw_ot}' bukan jam. Format harus HH.MM (mis. 18.00).")
+            return
+        with get_connection(DB_PATH) as conn:
+            sched_start, sched_end = current_schedule(conn)
+        end_min = to_minutes(sched_end)
+        if end_min is not None and ot_min <= end_min:
+            feedback.show_warning(
+                self, "Ambang lembur tidak valid",
+                f"Ambang lembur ({raw_ot}) harus setelah jam pulang kantor "
+                f"({sched_end}).")
+            return
         with get_connection(DB_PATH) as conn:
             set_setting(conn, "current_month", self.month_var.get().strip())
             set_setting(conn, "coaching_threshold_per_day", self.thr_var.get().strip())
             set_setting(conn, "lupa_absen_datang_penalty_min", str(penalty))
             set_setting(conn, "severe_lateness_threshold_min", str(severe))
             set_setting(conn, "late_tolerance_min", str(tol))
+            set_setting(conn, "overtime_threshold", raw_ot)
         # Thresholds/tolerance/month feed cached analytics (Dashboard memoizes
         # per data_version) — bump so cached screens refetch on next show.
         notify_data_changed()
@@ -587,10 +715,13 @@ class SettingsScreen(ctk.CTkFrame):
                 get_setting(conn, "severe_lateness_threshold_min", default="60"))
             self.tol_var.set(get_setting(conn, "late_tolerance_min", default="12"))
             self.hr_name_var.set(get_setting(conn, "hr_officer_name", default=""))
-            sched_start = get_setting(conn, "schedule_start", default="08.00")
-            sched_end = get_setting(conn, "schedule_end", default="16.00")
+            self.overtime_var.set(
+                get_setting(conn, "overtime_threshold",
+                            default=DEFAULT_OVERTIME_THRESHOLD))
+            sched_start, sched_end = current_schedule(conn)
         self._sched_label.configure(
-            text=f"Jadwal Kerja: {sched_start} - {sched_end}")
+            text=f"Jam Kantor: {sched_start} – {sched_end}")
+        self._render_schedule()
         self._reload_pegawai()
         if hasattr(self, "_backup_list"):
             self._render_backups()
