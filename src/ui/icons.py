@@ -20,6 +20,7 @@ GLYPHS = {
     "ActiveMonth":       "",  # calendar
     "Issues":            "",  # flag
     "SevereLateness":    "",  # clock
+    "Overtime":          "\ue916",  # stopwatch
     "WhatsAppAssistant": "",  # chat bubbles
     "Coaching":          "",  # target / bullseye
     "Outlier":           "",  # filter
