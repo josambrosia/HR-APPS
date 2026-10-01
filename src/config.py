@@ -447,8 +447,15 @@ BRAND_ANIMATION_SVG = BRAND_DIR / "animation-02-typing-04E.svg"
 BRAND_ANIMATION_GIF = BRAND_DIR / "animation-02-typing-04E.gif"
 
 # Defaults
-DEFAULT_SCHEDULE_START = "08.00"
-DEFAULT_SCHEDULE_END = "16.00"
+# v26: jam kantor pindah 09.00–17.00 dengan cutoff 14 Sep 2026. Database lama
+# yang masih memakai default lama dipecah otomatis oleh migrasi (schema.py);
+# nilai custom dipertahankan.
+DEFAULT_SCHEDULE_START = "09.00"
+DEFAULT_SCHEDULE_END = "17.00"
+DEFAULT_OVERTIME_THRESHOLD = "18.00"
+OLD_SCHEDULE_START = "08.00"
+OLD_SCHEDULE_END = "16.00"
+SCHEDULE_CUTOVER_DATE = "2026-09-14"
 DEFAULT_COACHING_THRESHOLD_PER_DAY = 15
 DEFAULT_LUPA_PENALTY_MIN = 15
 DEFAULT_SEVERE_LATENESS_THRESHOLD_MIN = 60

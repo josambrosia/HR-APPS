@@ -6,7 +6,7 @@ from src.db.settings import get_setting, set_setting, read_lupa_penalty_min
 def test_get_default_settings(temp_db_path):
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
-        assert get_setting(conn, "schedule_start") == "08.00"
+        assert get_setting(conn, "schedule_start") == "09.00"
         assert get_setting(conn, "coaching_threshold_per_day") == "15"
 
 

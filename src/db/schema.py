@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 
 DDL = """
@@ -97,11 +98,38 @@ CREATE TABLE IF NOT EXISTS wa_contacts (
     contacted_at TEXT    NOT NULL,
     PRIMARY KEY (employee_id, year_month)
 );
+
+-- v26: jadwal kerja berlaku per tanggal (cutoff jam kantor 14 Sep 2026).
+-- effective_from '1970-01-01' = sentinel "sejak awal".
+CREATE TABLE IF NOT EXISTS schedule_periods (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    effective_from TEXT NOT NULL UNIQUE,
+    start_time     TEXT NOT NULL,
+    end_time       TEXT NOT NULL,
+    created_at     TEXT NOT NULL
+);
+
+-- v26: keputusan verifikasi lembur. Baris Open = ketiadaan baris di sini.
+CREATE TABLE IF NOT EXISTS overtime_decisions (
+    employee_id   INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    tanggal       TEXT    NOT NULL,
+    status        TEXT    NOT NULL,
+    approved_minutes INTEGER,
+    detected_minutes_at_decision INTEGER,
+    note          TEXT,
+    submitted_at  TEXT,
+    decided_at    TEXT,
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (employee_id, tanggal)
+);
+
+CREATE INDEX IF NOT EXISTS idx_overtime_tanggal ON overtime_decisions(tanggal);
 """
 
 DEFAULT_SETTINGS = {
-    "schedule_start": "08.00",
-    "schedule_end": "16.00",
+    "schedule_start": "09.00",
+    "schedule_end": "17.00",
+    "overtime_threshold": "18.00",
     "coaching_threshold_per_day": "15",
     "severe_lateness_threshold_min": "60",
     "late_tolerance_min": "12",
@@ -178,6 +206,38 @@ def _migrate(conn: sqlite3.Connection) -> None:
         "SET reason_category = 'lupa_absen_datang' "
         "WHERE reason_category = 'lupa_absen'"
     )
+
+    # v26: seed riwayat jadwal dari setelan tunggal. Fresh DB (belum ada
+    # settings) memakai default baru; DB lama dengan default 08.00/16.00
+    # dipecah pada cutoff 14 Sep 2026; nilai custom dipertahankan apa adanya.
+    # Idempoten: hanya berjalan saat tabel riwayat masih kosong.
+    has_period = conn.execute(
+        "SELECT 1 FROM schedule_periods LIMIT 1").fetchone()
+    if has_period is None:
+        from src.config import (
+            DEFAULT_SCHEDULE_START, DEFAULT_SCHEDULE_END,
+            OLD_SCHEDULE_START, OLD_SCHEDULE_END, SCHEDULE_CUTOVER_DATE)
+        srow = conn.execute(
+            "SELECT value FROM settings WHERE key='schedule_start'").fetchone()
+        erow = conn.execute(
+            "SELECT value FROM settings WHERE key='schedule_end'").fetchone()
+        start = srow[0] if srow else DEFAULT_SCHEDULE_START
+        end = erow[0] if erow else DEFAULT_SCHEDULE_END
+        now = datetime.now(UTC).isoformat(timespec="seconds")
+        if (start, end) == (OLD_SCHEDULE_START, OLD_SCHEDULE_END):
+            conn.executemany(
+                "INSERT INTO schedule_periods "
+                "(effective_from, start_time, end_time, created_at) "
+                "VALUES (?,?,?,?)",
+                [("1970-01-01", OLD_SCHEDULE_START, OLD_SCHEDULE_END, now),
+                 (SCHEDULE_CUTOVER_DATE, DEFAULT_SCHEDULE_START,
+                  DEFAULT_SCHEDULE_END, now)])
+        else:
+            conn.execute(
+                "INSERT INTO schedule_periods "
+                "(effective_from, start_time, end_time, created_at) "
+                "VALUES (?,?,?,?)",
+                ("1970-01-01", start, end, now))
 
 
 def init_db(db_path: Path) -> None:

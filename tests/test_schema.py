@@ -18,9 +18,61 @@ def test_init_db_seeds_default_settings(temp_db_path):
     init_db(temp_db_path)
     with sqlite3.connect(temp_db_path) as conn:
         rows = dict(conn.execute("SELECT key, value FROM settings").fetchall())
-    assert rows["schedule_start"] == "08.00"
-    assert rows["schedule_end"] == "16.00"
+    assert rows["schedule_start"] == "09.00"
+    assert rows["schedule_end"] == "17.00"
+    assert rows["overtime_threshold"] == "18.00"
     assert rows["coaching_threshold_per_day"] == "15"
+
+
+def test_init_db_seeds_single_period_for_fresh_db(temp_db_path):
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        rows = conn.execute(
+            "SELECT effective_from, start_time, end_time FROM schedule_periods"
+        ).fetchall()
+    assert rows == [("1970-01-01", "09.00", "17.00")]
+
+
+def test_migrate_legacy_schedule_creates_cutover_periods(temp_db_path):
+    """DB lama 08.00/16.00 dipecah: periode lama + periode baru 14 Sep 2026."""
+    with sqlite3.connect(temp_db_path) as conn:
+        conn.execute("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)")
+        conn.execute("INSERT INTO settings VALUES ('schedule_start','08.00')")
+        conn.execute("INSERT INTO settings VALUES ('schedule_end','16.00')")
+        conn.commit()
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        rows = conn.execute(
+            "SELECT effective_from, start_time, end_time FROM schedule_periods "
+            "ORDER BY effective_from"
+        ).fetchall()
+    assert rows == [
+        ("1970-01-01", "08.00", "16.00"),
+        ("2026-09-14", "09.00", "17.00"),
+    ]
+
+
+def test_migrate_custom_schedule_preserved(temp_db_path):
+    """Jam kantor custom tidak ditimpa; satu periode sejak awal."""
+    with sqlite3.connect(temp_db_path) as conn:
+        conn.execute("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)")
+        conn.execute("INSERT INTO settings VALUES ('schedule_start','08.30')")
+        conn.execute("INSERT INTO settings VALUES ('schedule_end','16.30')")
+        conn.commit()
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        rows = conn.execute(
+            "SELECT effective_from, start_time, end_time FROM schedule_periods"
+        ).fetchall()
+    assert rows == [("1970-01-01", "08.30", "16.30")]
+
+
+def test_schedule_migration_idempotent(temp_db_path):
+    init_db(temp_db_path)
+    init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        n = conn.execute("SELECT COUNT(*) FROM schedule_periods").fetchone()[0]
+    assert n == 1
 
 
 def test_init_db_idempotent(temp_db_path):
