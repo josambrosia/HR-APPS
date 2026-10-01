@@ -49,7 +49,7 @@ def _row(tipe="Hari Kerja", masuk="08:00", keluar="16:00",
 
 
 def test_compute_derived_full_workday():
-    d = compute_derived(_row())
+    d = compute_derived(_row(), schedule_end_minutes=16 * 60)
     assert d == {"kurang_jam": 0, "pulang_cepat_menit": 0,
                  "absen_hari": 0, "lupa_hari": 0, "ijin_hari": 0}
 
@@ -70,9 +70,17 @@ def test_compute_derived_lupa_in_or_out():
 
 
 def test_compute_derived_pulang_cepat():
-    d = compute_derived(_row(keluar="15:30", kerja_jam=7.5))
+    d = compute_derived(_row(keluar="15:30", kerja_jam=7.5),
+                        schedule_end_minutes=16 * 60)
     assert d["pulang_cepat_menit"] == 30
     assert abs(d["kurang_jam"] - 0.5) < 1e-9
+
+
+def test_compute_derived_pulang_cepat_new_schedule():
+    """v26: jam pulang 17:00 -> keluar 16:30 pulang cepat 30 menit."""
+    d = compute_derived(_row(keluar="16:30", kerja_jam=7.5),
+                        schedule_end_minutes=17 * 60)
+    assert d["pulang_cepat_menit"] == 30
 
 
 def test_compute_derived_istirahat_no_derived():
@@ -249,7 +257,7 @@ def test_generate_monthly_report_holiday_row(tmp_path):
 
 
 def test_generate_applies_effective_masuk_for_work_justified_late(tmp_path):
-    """A tugas_lapangan-resolved late row exports Masuk=08:00, Terlambat=0."""
+    """A tugas_lapangan-resolved late row exports Masuk=09:00, Terlambat=0."""
     conn = _conn()
     emp = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
     upsert_attendance(
@@ -263,14 +271,14 @@ def test_generate_applies_effective_masuk_for_work_justified_late(tmp_path):
     out = tmp_path / "out.xlsx"
     generate_monthly_report(conn, year_month="2026-04", out_path=out)
     ws = load_workbook(out).active
-    assert ws.cell(row=3, column=7).value == "08:00"   # G Masuk -> effective
+    assert ws.cell(row=3, column=7).value == "09:00"   # G Masuk -> effective
     assert ws.cell(row=3, column=12).value == 0        # L Terlambat -> 0
     # Total Personal row (row 4): accumulates EFFECTIVE Terlambat, not raw 100
     assert ws.cell(row=4, column=12).value == 0
 
 
 def test_generate_applies_effective_for_forgot_clock_in(tmp_path):
-    """A lupa_absen_datang forgot-IN row exports Masuk=08:15, Terlambat=15, and
+    """A lupa_absen_datang forgot-IN row exports Masuk=09:15, Terlambat=15, and
     stops counting as a 'lupa' day (column O blank)."""
     conn = _conn()
     emp = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
@@ -285,11 +293,43 @@ def test_generate_applies_effective_for_forgot_clock_in(tmp_path):
     out = tmp_path / "out.xlsx"
     generate_monthly_report(conn, year_month="2026-04", out_path=out)
     ws = load_workbook(out).active
-    assert ws.cell(row=3, column=7).value == "08:15"      # G Masuk -> effective
+    assert ws.cell(row=3, column=7).value == "09:15"      # G Masuk -> effective
     assert ws.cell(row=3, column=12).value == 15          # L Terlambat -> penalty
     assert ws.cell(row=3, column=15).value in (None, "")  # O Lupa -> no longer lupa
     # Total Personal row (row 4): accumulates the EFFECTIVE penalty, not raw None
     assert ws.cell(row=4, column=12).value == 15
+
+
+def test_generate_pulang_cepat_uses_per_date_schedule(tmp_path):
+    """Baris 10 Sep (jadwal 16.00) vs 15 Sep (jadwal 17.00) memakai jam
+    pulang tanggalnya masing-masing."""
+    import sqlite3 as _sq
+    from src.db.connection import get_connection
+    from src.db.schema import init_db
+    p = tmp_path / "s.db"
+    with _sq.connect(p) as c:
+        c.execute("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)")
+        c.execute("INSERT INTO settings VALUES ('schedule_start','08.00')")
+        c.execute("INSERT INTO settings VALUES ('schedule_end','16.00')")
+        c.commit()
+    init_db(p)
+    with get_connection(p) as conn:
+        emp = upsert_employee(conn, no_staff="1", nama="ANDI", dept="X")
+        upsert_attendance(
+            conn, employee_id=emp, tanggal="2026-09-10", hari="Kamis",
+            tipe="Hari Kerja", jadwal=None, masuk="08:00", keluar="16:30",
+            kerja_jam=8.5, lembur_jam=None, terlambat_menit=0,
+            has_issue=0, imported_from="t")
+        upsert_attendance(
+            conn, employee_id=emp, tanggal="2026-09-15", hari="Selasa",
+            tipe="Hari Kerja", jadwal=None, masuk="09:00", keluar="16:30",
+            kerja_jam=7.5, lembur_jam=None, terlambat_menit=0,
+            has_issue=0, imported_from="t")
+        out = tmp_path / "out.xlsx"
+        generate_monthly_report(conn, year_month="2026-09", out_path=out)
+    ws = load_workbook(out).active
+    assert ws.cell(row=3, column=13).value in (None, "")   # 10 Sep: 0 -> blank
+    assert ws.cell(row=4, column=13).value == 30           # 15 Sep: 17:00-16:30
 
 
 def test_generate_no_badge_work_justified_stays_absent(tmp_path):

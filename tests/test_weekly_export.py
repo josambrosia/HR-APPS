@@ -106,7 +106,7 @@ def test_weekly_export_effective_masuk_work_justified_late(tmp_path):
     out = tmp_path / "weekly.xlsx"
     generate_weekly_export(conn, "2026-04-06", "2026-04-12", out)
     ws = load_workbook(out).active
-    assert ws.cell(row=2, column=8).value == "08:00"   # H Masuk -> effective
+    assert ws.cell(row=2, column=8).value == "09:00"   # H Masuk -> effective
     assert ws.cell(row=2, column=12).value == 0        # L Terlambat -> 0
 
 
@@ -125,5 +125,5 @@ def test_weekly_export_effective_forgot_clock_in(tmp_path):
     out = tmp_path / "weekly.xlsx"
     generate_weekly_export(conn, "2026-04-06", "2026-04-12", out)
     ws = load_workbook(out).active
-    assert ws.cell(row=2, column=8).value == "08:15"   # H Masuk -> effective
+    assert ws.cell(row=2, column=8).value == "09:15"   # H Masuk -> effective
     assert ws.cell(row=2, column=12).value == 15       # L Terlambat -> penalty

@@ -11,9 +11,9 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-from src.config import DEFAULT_SCHEDULE_START
 from src.core.reason_mapper import effective_attendance
-from src.db.settings import get_setting, read_lupa_penalty_min
+from src.db.schedule import schedule_for
+from src.db.settings import read_lupa_penalty_min
 
 HEADERS = [
     "Nama", "No. Staff", "Dept", "Tanggal", "Hari", "Tipe",
@@ -53,7 +53,6 @@ def generate_weekly_export(
         (period_start, period_end),
     ).fetchall()
 
-    schedule_start = get_setting(conn, "schedule_start", default=DEFAULT_SCHEDULE_START)
     lupa_penalty = read_lupa_penalty_min(conn)
 
     wb = Workbook()
@@ -75,7 +74,8 @@ def generate_weekly_export(
             eff_masuk, eff_terlambat = None, None
         else:
             eff = effective_attendance(
-                r, schedule_start=schedule_start, lupa_penalty_min=lupa_penalty)
+                r, schedule_start=schedule_for(conn, r["tanggal"])[0],
+                lupa_penalty_min=lupa_penalty)
             eff_masuk = eff["masuk"]
             eff_terlambat = eff["terlambat_menit"]
         ws.append([

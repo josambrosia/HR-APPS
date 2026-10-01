@@ -15,10 +15,12 @@ from openpyxl import load_workbook
 from openpyxl.cell import MergedCell
 from openpyxl.styles import PatternFill
 
-from src.config import TEMPLATE_LAPORAN_BULANAN, REASON_CATEGORIES, DEFAULT_SCHEDULE_START
+from src.config import TEMPLATE_LAPORAN_BULANAN, REASON_CATEGORIES
+from src.core.attendance_calc import to_minutes
 from src.core.reason_mapper import render_alasan_ijin, effective_attendance
 from src.core.week_utils import MONTH_NAMES_ID as _MONTH_NAMES_BY_NUM
-from src.db.settings import get_setting, read_lupa_penalty_min
+from src.db.schedule import schedule_for
+from src.db.settings import read_lupa_penalty_min
 
 
 # Canonical Indonesian month names live in src.core.week_utils
@@ -26,8 +28,9 @@ from src.db.settings import get_setting, read_lupa_penalty_min
 # list (index 0 = None) for existing importers.
 MONTH_NAMES_ID = [None] + [_MONTH_NAMES_BY_NUM[m] for m in range(1, 13)]
 
-# Schedule end (16:00) in minutes-from-midnight, for pulang_cepat computation.
-JADWAL_END_MINUTES = 16 * 60
+# Fallback jam pulang (17:00) bila jadwal tanggal tidak terbaca — perhitungan
+# pulang_cepat utama memakai jam pulang jadwal tanggal baris (v26).
+JADWAL_END_MINUTES = 17 * 60
 
 # All reason categories except "na" (unknown) and "libur" (a company holiday,
 # not a personal ijin) — neither should add to the monthly Ijin column.
@@ -63,12 +66,17 @@ def hhmm_to_minutes(s: Optional[str]) -> Optional[int]:
         return None
 
 
-def compute_derived(row) -> dict:
+def compute_derived(row, *, schedule_end_minutes: int | None = None) -> dict:
     """Compute the 5 derived columns from an attendance row (dict-like).
+
+    ``schedule_end_minutes`` = jam pulang jadwal tanggal baris (v26);
+    fallback JADWAL_END_MINUTES bila tidak diberikan.
 
     Returns dict with keys: kurang_jam, pulang_cepat_menit,
     absen_hari, lupa_hari, ijin_hari.
     """
+    end_minutes = (schedule_end_minutes if schedule_end_minutes is not None
+                   else JADWAL_END_MINUTES)
     is_kerja = row.get("tipe") == "Hari Kerja"
     masuk = row.get("masuk")
     keluar = row.get("keluar")
@@ -82,8 +90,8 @@ def compute_derived(row) -> dict:
     pulang_cepat_menit = 0
     if has_keluar and is_kerja:
         keluar_min = hhmm_to_minutes(keluar)
-        if keluar_min is not None and keluar_min < JADWAL_END_MINUTES:
-            pulang_cepat_menit = JADWAL_END_MINUTES - keluar_min
+        if keluar_min is not None and keluar_min < end_minutes:
+            pulang_cepat_menit = end_minutes - keluar_min
 
     absen_hari = 1 if (is_kerja and not has_masuk and not has_keluar) else 0
     lupa_hari = 1 if (is_kerja and (has_masuk != has_keluar)) else 0
@@ -268,7 +276,6 @@ def generate_monthly_report(
     """
     wb = load_workbook(TEMPLATE_LAPORAN_BULANAN)
     ws = wb.active
-    schedule_start = get_setting(conn, "schedule_start", default=DEFAULT_SCHEDULE_START)
     lupa_penalty = read_lupa_penalty_min(conn)
 
     # Capture styles from sample rows 3 (data) and 4 (Total Personal)
@@ -322,11 +329,15 @@ def generate_monthly_report(
         for r in emp_records:
             is_holiday = r.get("tipe") == "Hari Libur"
             if not is_holiday:
+                sched_start, sched_end = schedule_for(conn, r["tanggal"])
                 eff = effective_attendance(
-                    r, schedule_start=schedule_start, lupa_penalty_min=lupa_penalty)
+                    r, schedule_start=sched_start, lupa_penalty_min=lupa_penalty)
                 r = {**r, "masuk": eff["masuk"],
                      "terlambat_menit": eff["terlambat_menit"]}
-            derived = {} if is_holiday else compute_derived(r)
+                derived = compute_derived(
+                    r, schedule_end_minutes=to_minutes(sched_end))
+            else:
+                derived = {}
             _write_data_row(ws, current_row, r, derived, data_styles, is_holiday=is_holiday)
             if not is_holiday:
                 _accumulate_total(total, r, derived)
