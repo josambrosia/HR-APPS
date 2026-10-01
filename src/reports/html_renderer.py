@@ -12,11 +12,13 @@ from typing import Optional
 from jinja2 import Environment, FileSystemLoader
 
 from src.config import BRAND_LOCKUP_LIGHT_SVG
+from src.core.attendance_calc import to_minutes
 from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
-    avg_minutes_per_late_event, pola_jam_masuk,
+    avg_minutes_per_late_event, pola_jam_masuk, band_labels,
 )
 from src.db.outlier import list_active_exclusions
+from src.db.schedule import schedule_for
 from src.db.settings import get_setting
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -142,6 +144,9 @@ def render_dashboard_html(
     ]
     avg_min = avg_minutes_per_late_event(conn, period_start, period_end)
     jam_masuk = pola_jam_masuk(conn, period_start, period_end)
+    # Label "ambang tepat waktu" mengikuti jam masuk jadwal di akhir periode.
+    jam_threshold_label = band_labels(
+        to_minutes(schedule_for(conn, period_end)[0]) or 0)[2][0]
 
     # KPI tallies derived from ranking
     total_terlambat = sum(r['hari_telat'] for r in ranking)
@@ -204,6 +209,7 @@ def render_dashboard_html(
         coaching_threshold_daily=threshold_info["daily"],
         coaching_working_days=threshold_info["working_days"],
         jam_masuk=jam_masuk,
+        jam_threshold_label=jam_threshold_label,
         ranking=ranking,
         sections=sections,
         kpi_deltas=kpi_deltas,

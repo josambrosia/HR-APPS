@@ -2,7 +2,9 @@ import sqlite3
 from typing import List, Optional
 
 from src.config import COACHING_EXCLUDED
+from src.core.attendance_calc import to_minutes
 from src.db.outlier import excluded_employee_ids, exclusion_sql
+from src.db.schedule import schedule_for
 
 
 def terlambat_ranking(
@@ -273,28 +275,45 @@ def avg_minutes_per_late_event(
     return float(total) / cnt if cnt else 0.0
 
 
-_POLA_JAM_BANDS = [
-    ('<07:45',      'early'),
-    ('07:45-07:59', 'early'),
-    ('08:00',       'ontime'),
-    ('08:01-08:05', 'mild'),
-    ('08:06-08:15', 'mild'),
-    ('08:16-08:30', 'mod'),
-    ('08:31-09:00', 'severe'),
-    ('>09:00',      'chronic'),
-]
+def band_labels(start_min: int) -> list[tuple[str, str]]:
+    """8 band waktu kedatangan relatif jam masuk (label, severity).
+
+    v26: label mengikuti jam masuk jadwal yang berlaku pada akhir periode,
+    sedangkan klasifikasi tiap baris memakai jam masuk tanggal baris itu.
+    """
+    def f(m: int) -> str:
+        return f"{m // 60:02d}:{m % 60:02d}"
+
+    return [
+        (f"<{f(start_min - 15)}", "early"),
+        (f"{f(start_min - 15)}-{f(start_min - 1)}", "early"),
+        (f(start_min), "ontime"),
+        (f"{f(start_min + 1)}-{f(start_min + 5)}", "mild"),
+        (f"{f(start_min + 6)}-{f(start_min + 15)}", "mild"),
+        (f"{f(start_min + 16)}-{f(start_min + 30)}", "mod"),
+        (f"{f(start_min + 31)}-{f(start_min + 60)}", "severe"),
+        (f">{f(start_min + 60)}", "chronic"),
+    ]
 
 
-def _classify_jam_masuk(masuk: str) -> str:
-    """Map HH:MM string to band label. Caller already filters masuk IS NOT NULL."""
-    if masuk < '07:45':    return '<07:45'
-    if masuk < '08:00':    return '07:45-07:59'
-    if masuk == '08:00':   return '08:00'
-    if masuk <= '08:05':   return '08:01-08:05'
-    if masuk <= '08:15':   return '08:06-08:15'
-    if masuk <= '08:30':   return '08:16-08:30'
-    if masuk <= '09:00':   return '08:31-09:00'
-    return '>09:00'
+def _band_index(masuk_min: int, start_min: int) -> int:
+    """Indeks band 0..7 untuk menit masuk relatif jam masuk."""
+    delta = masuk_min - start_min
+    if delta < -15:
+        return 0
+    if delta < 0:
+        return 1
+    if delta == 0:
+        return 2
+    if delta <= 5:
+        return 3
+    if delta <= 15:
+        return 4
+    if delta <= 30:
+        return 5
+    if delta <= 60:
+        return 6
+    return 7
 
 
 def pola_jam_masuk(
@@ -302,22 +321,16 @@ def pola_jam_masuk(
 ) -> list[dict]:
     """Distribusi 8-band waktu kedatangan untuk sesi present (masuk IS NOT NULL).
 
-    Returns: list of 8 dicts (chronological), even bands dengan count=0.
-        [{'band': '<07:45', 'count': int, 'severity': 'early'}, ...]
-
-    Severity mapping:
-        early   — datang sebelum 08:00
-        ontime  — 08:00 pas
-        mild    — 1-15 min terlambat (08:01-08:15)
-        mod     — 16-30 min terlambat (08:16-08:30)
-        severe  — 31-60 min terlambat (08:31-09:00)
-        chronic — > 60 min terlambat (>09:00)
+    v26: setiap baris diklasifikasi relatif jam masuk jadwal TANGGAL baris itu
+    (periode bisa melintasi cutoff 14 Sep 2026); label band memakai jadwal
+    yang berlaku pada `period_end`. Returns list of 8 dicts (chronological),
+    even bands dengan count=0.
     """
     excluded = excluded_employee_ids(conn, period_start[:7])
     exc_frag, exc_params = exclusion_sql(excluded, column="employee_id")
     rows = conn.execute(
         f"""
-        SELECT masuk
+        SELECT tanggal, masuk
           FROM attendance_records
          WHERE tanggal BETWEEN ? AND ?
            AND tipe = 'Hari Kerja'
@@ -326,11 +339,19 @@ def pola_jam_masuk(
         (period_start, period_end, *exc_params),
     ).fetchall()
 
-    counts = {band: 0 for band, _ in _POLA_JAM_BANDS}
-    for (masuk,) in rows:
-        counts[_classify_jam_masuk(masuk)] += 1
+    sched_cache: dict[str, tuple[str, str]] = {}
+    counts = [0] * 8
+    for tanggal, masuk in rows:
+        if tanggal not in sched_cache:
+            sched_cache[tanggal] = schedule_for(conn, tanggal)
+        start_min = to_minutes(sched_cache[tanggal][0])
+        masuk_min = to_minutes(masuk)
+        if start_min is None or masuk_min is None:
+            continue
+        counts[_band_index(masuk_min, start_min)] += 1
 
+    end_start = to_minutes(schedule_for(conn, period_end)[0]) or 0
     return [
-        {'band': band, 'count': counts[band], 'severity': severity}
-        for band, severity in _POLA_JAM_BANDS
+        {'band': label, 'count': counts[i], 'severity': severity}
+        for i, (label, severity) in enumerate(band_labels(end_start))
     ]

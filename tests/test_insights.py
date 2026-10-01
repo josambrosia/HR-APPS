@@ -250,11 +250,18 @@ POLA_JAM_BANDS = ['<07:45', '07:45-07:59', '08:00', '08:01-08:05',
                   '08:06-08:15', '08:16-08:30', '08:31-09:00', '>09:00']
 
 
+def _pin_schedule(conn, start="08.00", end="16.00"):
+    """Pin the seeded period so band labels stay 08:00-based (pre-v26 tests)."""
+    conn.execute("UPDATE schedule_periods SET start_time=?, end_time=?",
+                 (start, end))
+
+
 def test_pola_jam_masuk_8_bands_zero_fill(temp_db_path):
     """Even with no data, returns all 8 bands with count=0, chronological order"""
     from src.core.insights import pola_jam_masuk
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
+        _pin_schedule(conn)
         result = pola_jam_masuk(conn, '2026-04-01', '2026-04-30')
     assert len(result) == 8
     assert [r['band'] for r in result] == POLA_JAM_BANDS
@@ -266,6 +273,7 @@ def test_pola_jam_masuk_boundaries(temp_db_path):
     from src.core.insights import pola_jam_masuk
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
+        _pin_schedule(conn)
         cases = [
             ('A', '07:44', '<07:45'),
             ('B', '07:45', '07:45-07:59'),
@@ -298,6 +306,7 @@ def test_pola_jam_masuk_absent_excluded(temp_db_path):
     from src.core.insights import pola_jam_masuk
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
+        _pin_schedule(conn)
         a = _add_emp(conn, 'A', 'A')
         b = _add_emp(conn, 'B', 'B')
         _add_att(conn, a, '2026-04-13', 'Senin', None, None, None)
@@ -313,6 +322,7 @@ def test_pola_jam_masuk_severity_labels(temp_db_path):
     from src.core.insights import pola_jam_masuk
     init_db(temp_db_path)
     with get_connection(temp_db_path) as conn:
+        _pin_schedule(conn)
         result = pola_jam_masuk(conn, '2026-04-01', '2026-04-30')
     severity = {r['band']: r['severity'] for r in result}
     assert severity['<07:45'] == 'early'

@@ -201,7 +201,7 @@
       </div>
       {% if jam_total == 0 %}<div class="empty-state">Tidak ada data jam masuk.</div>{% else %}
         {% for b in jam_masuk %}
-          {% if b.band == '08:00' %}<div class="b-jam-divider">— ambang tepat waktu —</div>{% endif %}
+          {% if b.band == jam_threshold_label %}<div class="b-jam-divider">— ambang tepat waktu —</div>{% endif %}
           <div class="b-bar-row">
             <span class="lbl {{ b.severity }}">{{ b.band }}</span>
             <div class="b-bar-track"><div class="b-bar-fill {{ b.severity }}" style="width:{% if jam_max > 0 %}{{ (b.count * 100 / jam_max)|round(0)|int }}{% else %}0{% endif %}%"></div></div>
