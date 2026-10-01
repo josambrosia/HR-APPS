@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"/>
+<title>Laporan Lembur — {{ month_label }}</title>
+<style>
+{{ font_face_css | safe }}
+  :root{
+    --ink:#16161A; --mute:#6B7280; --faint:#9AA0AA; --line:#E9E9EE; --tint:#FAFAFB;
+    --brand:#DB2777; --ok:#0F766E; --warn:#B45309; --no:#B91C1C;
+    --disp:"Space Grotesk","Segoe UI",sans-serif;
+    --body:"Segoe UI",Arial,sans-serif;
+    --mono:"Consolas","SF Mono",monospace;
+  }
+  @page{ size:A4 portrait; margin:0; }
+  *{box-sizing:border-box}
+  html,body{width:100%}
+  body{margin:0;padding:14mm 14mm 12mm;color:var(--ink);font-family:var(--body);
+       font-size:10.5px;line-height:1.5;
+       -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rule{height:3px;background:var(--brand);border-radius:2px}
+  .mast{padding-top:11px}
+  .eyebrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+           font-family:var(--mono);font-size:8.5px;letter-spacing:1.6px;color:var(--mute);
+           text-transform:uppercase}
+  .mast .kicker{font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.2px;
+                color:var(--brand);margin:9px 0 1px}
+  .mast .kicker b{color:var(--ink);font-weight:700}
+  .mast h1{font-family:var(--disp);font-weight:700;font-size:30px;line-height:1.05;
+           letter-spacing:-.5px;margin:1px 0 2px}
+  .mast .who{font-size:11px;color:var(--mute)}
+  .mast .who .span{font-family:var(--mono);color:var(--faint)}
+  .hero{display:flex;gap:20px;margin:16px 0 4px;padding:14px 0;
+        border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .hero .c{flex:1;padding:2px 16px;border-left:1px solid var(--line)}
+  .hero .c:first-child{border-left:0;padding-left:0}
+  .hero .c .n{font-family:var(--disp);font-weight:700;font-size:22px;line-height:1.1}
+  .hero .c .k{font-family:var(--mono);font-size:8px;letter-spacing:1.2px;color:var(--mute);
+              text-transform:uppercase;margin-top:2px}
+  h2.sec{font-family:var(--mono);font-size:9px;letter-spacing:2.4px;text-transform:uppercase;
+         color:var(--ink);margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--line);
+         display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  h2.sec::before{content:"";display:inline-block;width:14px;height:2px;background:var(--brand);
+                 margin-right:8px;vertical-align:middle}
+  h2.sec .t{margin-right:auto}
+  h2.sec .hint{color:var(--faint);letter-spacing:.6px;text-transform:none;font-size:8.5px;
+               font-weight:400;white-space:nowrap}
+  table.det{width:100%;table-layout:fixed;border-collapse:collapse;font-size:9.5px}
+  table.det thead th{font-family:var(--mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;
+       color:var(--mute);text-align:left;padding:6px 8px;border-bottom:1.5px solid var(--brand);
+       font-weight:600}
+  table.det tbody td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:middle;
+       overflow-wrap:anywhere}
+  table.det tbody tr:nth-child(even){background:var(--tint)}
+  table.det tr{break-inside:avoid;page-break-inside:avoid}
+  table.det thead{display:table-header-group}
+  table.det .num{font-family:var(--mono);text-align:right}
+  table.det .nm{font-weight:600}
+  table.det .zero{color:var(--faint)}
+  table.det tfoot td{padding:7px 8px;font-family:var(--mono);font-weight:700;
+       border-top:1.5px solid var(--ink);text-align:right}
+  table.det tfoot td.lbl{font-family:var(--body);letter-spacing:1px;text-transform:uppercase;
+       text-align:left;font-size:8.5px}
+  .st{font-family:var(--mono);font-size:8.5px;letter-spacing:.4px;text-transform:uppercase}
+  .st.open{color:var(--mute)} .st.diajukan{color:var(--warn)}
+  .st.diterima{color:var(--ok)} .st.tidak_diterima{color:var(--no)}
+  .none{color:var(--mute);padding:10px 8px;font-style:italic}
+  .signoff{margin-top:26px;display:flex;justify-content:flex-end;break-inside:avoid}
+  .signoff .so{text-align:center;font-size:10px;min-width:230px}
+  .signoff .so .role{color:var(--mute);font-family:var(--mono);font-size:8.5px;letter-spacing:1px;
+       text-transform:uppercase}
+  .signoff .so .gap{height:48px}
+  .signoff .so .name{font-weight:700;border-top:1px solid var(--ink);padding-top:5px}
+  .foot{margin-top:14px;padding-top:8px;border-top:1px solid var(--line);
+        display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:8px;
+        letter-spacing:.8px;color:var(--faint);text-transform:uppercase}
+  @media screen{
+    html{background:#E7E7EC}
+    body{max-width:210mm;margin:24px auto 48px;background:#fff;border-radius:3px;
+         box-shadow:0 1px 2px rgba(18,18,28,.10),0 14px 40px rgba(18,18,28,.16)}
+  }
+</style></head><body>
+  <div class="rule"></div>
+
+  <div class="mast">
+    <div class="eyebrow"><span>Josaphat Tech Solution · HR Absensi</span><span>Confidential</span></div>
+    <div class="kicker">Laporan Lembur &middot; <b>{{ month_label }}</b></div>
+    <h1>Rekap Lembur</h1>
+    <div class="who">
+      {{ employee_count }} pegawai · {{ row_count }} baris ·
+      <span class="span">{{ mode_label }}</span>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="c">
+      <div class="n">{{ grand_detected }}</div>
+      <div class="k">Total jam terdeteksi</div>
+    </div>
+    <div class="c">
+      <div class="n" style="color:var(--ok)">{{ grand_approved }}</div>
+      <div class="k">Total jam disetujui</div>
+    </div>
+    <div class="c">
+      <div class="n">{{ employee_count }}</div>
+      <div class="k">Pegawai lembur</div>
+    </div>
+  </div>
+
+  {% if groups %}
+    {% for g in groups %}
+    <h2 class="sec">
+      <span class="t">{{ g.nama }}{% if g.dept %} · {{ g.dept }}{% endif %}</span>
+      <span class="hint">{{ g.days }} hari · {{ g.detected_label }}{% if mode == "accepted" %} · disetujui {{ g.approved_label }}{% endif %}</span>
+    </h2>
+    <table class="det">
+      <colgroup><col style="width:17%"><col style="width:11%"><col style="width:11%">
+        <col style="width:11%"><col style="width:12%"><col style="width:13%"><col style="width:25%"></colgroup>
+      <thead><tr>
+        <th>Tanggal</th><th>Masuk</th><th>Keluar</th>
+        <th class="num">Jam Lembur</th><th class="num">Jam Disetujui</th>
+        <th>Status</th><th>Catatan</th>
+      </tr></thead>
+      <tbody>
+        {% for r in g.rows %}
+        <tr>
+          <td>{{ r.tanggal }}<br><span style="color:var(--faint);font-size:8.5px">{{ r.hari }}{% if r.holiday %} · libur{% endif %}</span></td>
+          <td class="num">{{ r.masuk }}</td>
+          <td class="num">{{ r.keluar }}</td>
+          <td class="num">{{ r.minutes }}</td>
+          <td class="num{% if r.approved == "—" %} zero{% endif %}">{{ r.approved }}</td>
+          <td><span class="st {{ r.status | lower | replace(' ', '_') }}">{{ r.status }}</span></td>
+          <td>{{ r.note or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr>
+        <td class="lbl" colspan="3">Subtotal {{ g.nama }}</td>
+        <td>{{ g.detected_label }}</td>
+        <td style="color:var(--ok)">{{ g.approved_label }}</td>
+        <td colspan="2"></td>
+      </tr></tfoot>
+    </table>
+    {% endfor %}
+
+    <h2 class="sec"><span class="t">Total {{ month_label }}</span><span class="hint">{{ mode_label }}</span></h2>
+    <table class="det">
+      <tfoot><tr>
+        <td class="lbl" colspan="3">Grand total</td>
+        <td>{{ grand_detected }}</td>
+        <td style="color:var(--ok)">{{ grand_approved }}</td>
+        <td colspan="2"></td>
+      </tr></tfoot>
+    </table>
+  {% else %}
+    <div class="none">Tidak ada baris lembur untuk periode ini ({{ mode_label }}).</div>
+  {% endif %}
+
+  <div class="signoff"><div class="so">
+    <div class="role">HR Officer in Charge</div><div class="gap"></div>
+    <div class="name">{{ hr_officer_name if hr_officer_name else "____________" }}</div>
+  </div></div>
+  <div class="foot">
+    <span>Josaphat Tech Solution · From Concept to Code</span>
+    <span>Confidential · <b>{{ month_label }}</b></span>
+  </div>
+</body></html>
