@@ -36,7 +36,7 @@ def test_preview_matches_recompute(tmp_path, monkeypatch, root):
         dlg._keluar.insert(0, "16:30")
         got = dlg._recompute_preview()
         assert got == recompute(tipe="Hari Kerja", masuk="08:20", keluar="16:30",
-                                schedule_start="08.00", schedule_end="16.00")
+                                schedule_start="09.00", schedule_end="17.00")
     finally:
         dlg.destroy()
 

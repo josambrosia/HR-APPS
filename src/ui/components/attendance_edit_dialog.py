@@ -12,7 +12,7 @@ import customtkinter as ctk
 
 from src.config import DB_PATH
 from src.db.connection import get_connection
-from src.db.settings import get_setting
+from src.db.schedule import schedule_for
 from src.db.attendance import (
     get_attendance, save_manual_attendance, delete_attendance,
     set_reason, unresolve_issue)
@@ -81,8 +81,8 @@ class AttendanceEditDialog(ctk.CTkToplevel):
                            "kerja_jam": 0.0, "lembur_jam": 0.0}
 
         with get_connection(DB_PATH) as conn:
-            self._sched_start = get_setting(conn, "schedule_start", default="08.00")
-            self._sched_end = get_setting(conn, "schedule_end", default="16.00")
+            # v26: jadwal mengikuti tanggal baris (periode berlaku per tanggal).
+            self._sched_start, self._sched_end = schedule_for(conn, tanggal)
             self._existing = get_attendance(conn, employee_id=employee_id, tanggal=tanggal)
 
         self._reason_cat = (self._existing or {}).get("reason_category")

@@ -53,7 +53,7 @@ def test_late_reasons_appear_when_late(tmp_path, monkeypatch, root):
     D, _dbp, eid = _setup(tmp_path, monkeypatch)
     dlg = _dlg(D, root, eid)
     try:
-        dlg._masuk.insert(0, "08:20")   # telat 20 mnt (di bawah ambang severe)
+        dlg._masuk.insert(0, "09:20")   # telat 20 mnt (di bawah ambang severe)
         dlg._keluar.insert(0, "16:00")
         dlg._recompute_preview()
         values = dlg._reason_menu.cget("values")
