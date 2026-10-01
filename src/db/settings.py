@@ -4,6 +4,7 @@ from typing import Optional
 from src.config import DEFAULT_LUPA_PENALTY_MIN
 from src.config import DEFAULT_SEVERE_LATENESS_THRESHOLD_MIN
 from src.config import DEFAULT_LATE_TOLERANCE_MIN
+from src.config import DEFAULT_OVERTIME_THRESHOLD
 
 
 def get_setting(
@@ -57,3 +58,9 @@ def read_late_tolerance(conn) -> int:
         return int(raw)
     except (TypeError, ValueError):
         return DEFAULT_LATE_TOLERANCE_MIN
+
+
+def read_overtime_threshold(conn) -> str:
+    """Ambang lembur HH.MM (dot-format), default 18.00."""
+    return get_setting(conn, "overtime_threshold",
+                       default=DEFAULT_OVERTIME_THRESHOLD)
