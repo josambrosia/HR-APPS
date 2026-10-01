@@ -328,6 +328,14 @@ class HRApp(ctk.CTk):
         )
         text_lbl.pack(side="left", padx=(SPACE_SM, 0))
 
+        # Badge jumlah belum-final untuk item Lembur (v26).
+        frame._badge = None
+        if screen_key == "Overtime":
+            frame._badge = ctk.CTkLabel(
+                content, text="", font=FONT_MONO_SMALL,
+                text_color=COLOR_ACCENT)
+            frame._badge.pack(side="right")
+
         # Store refs on frame for state updates
         frame._content = content
         frame._icon_lbl = icon_lbl
@@ -338,7 +346,10 @@ class HRApp(ctk.CTk):
         def _on_click(_e):
             self._show(screen_key)
 
-        for widget in (frame, content, icon_lbl, text_lbl):
+        click_widgets = [frame, content, icon_lbl, text_lbl]
+        if frame._badge is not None:
+            click_widgets.append(frame._badge)
+        for widget in click_widgets:
             widget.bind("<Button-1>", _on_click)
             widget.configure(cursor="hand2")
 
@@ -454,6 +465,28 @@ class HRApp(ctk.CTk):
                 )
             except Exception:
                 pass
+        self._refresh_overtime_badge()
+
+    def _refresh_overtime_badge(self):
+        """Badge item nav Lembur = jumlah Open + Diajukan bulan aktif."""
+        item = self._nav_items.get("Overtime")
+        badge = getattr(item, "_badge", None) if item is not None else None
+        if badge is None:
+            return
+        try:
+            from src.config import DB_PATH
+            from src.core.overtime import count_pending
+            from src.db.connection import get_connection
+            from src.db.settings import get_setting
+            with get_connection(DB_PATH) as conn:
+                month = get_setting(conn, "current_month", default="") or ""
+                n = count_pending(conn, month) if month else 0
+        except Exception:
+            n = 0
+        try:
+            badge.configure(text=str(n) if n else "")
+        except Exception:
+            pass
 
     def _create_screen(self, name: str) -> ctk.CTkFrame:
         """Construct (without gridding) the screen instance for `name`.

@@ -13,6 +13,7 @@ from src.core.insights import (
     terlambat_ranking, top_n_terlambat, coaching_flag,
     karyawan_teladan_top_n, ranking_departemen, hari_paling_rawan,
 )
+from src.core.overtime import count_pending
 from src.core.week_utils import full_month_range, resolve_period
 from src.reports.html_renderer import render_dashboard_html
 from PIL import ImageTk
@@ -142,7 +143,7 @@ class DashboardScreen(ctk.CTkFrame):
         # ── KPI ROW ──
         kpi_frame = ctk.CTkFrame(self.body, fg_color="transparent")
         kpi_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
-        for i in range(3):
+        for i in range(4):
             kpi_frame.grid_columnconfigure(i, weight=1)
 
         def _kpi(parent, label_text, name, color, mono=False):
@@ -176,6 +177,16 @@ class DashboardScreen(ctk.CTkFrame):
             row=0, column=1, padx=SPACE_XS, sticky="ew")
         _kpi(kpi_frame, "Coaching Flag", "coaching_count", COLOR_WARN, mono=True).grid(
             row=0, column=2, padx=SPACE_XS, sticky="ew")
+        ot_card = _kpi(kpi_frame, "Lembur Belum Diproses", "overtime_pending",
+                       COLOR_WARN, mono=True)
+        ot_card.grid(row=0, column=3, padx=SPACE_XS, sticky="ew")
+        self._kpi_deltas["overtime_pending"].configure(text="klik untuk verifikasi")
+        for widget in (ot_card, *ot_card.winfo_children()):
+            widget.bind("<Button-1>", lambda _e: self._go_overtime())
+            try:
+                widget.configure(cursor="hand2")
+            except Exception:
+                pass
 
         # ── LEFT: dense panel grid ──
         left = ctk.CTkFrame(self.body, fg_color="transparent")
@@ -494,6 +505,8 @@ class DashboardScreen(ctk.CTkFrame):
                 "dept_rows": [dict(r) for r in ranking_departemen(conn, start, end)],
                 "day_rows": [dict(r) for r in hari_paling_rawan(conn, start, end)],
                 "threshold": threshold_info,
+                "overtime_pending": (count_pending(conn, self._current_month)
+                                     if self._current_month else 0),
             }
         self._query_cache[key] = data
         return data
@@ -539,6 +552,8 @@ class DashboardScreen(ctk.CTkFrame):
         else:
             self._kpi_labels["total_terlambat"].configure(text=f"{total_late} mnt")
             self._kpi_labels["coaching_count"].configure(text=str(coaching_count))
+        self._kpi_labels["overtime_pending"].configure(
+            text=str(data.get("overtime_pending", 0)))
 
         # Coaching panel title + subtitle with dynamic threshold
         if threshold["working_days"] > 0:
@@ -620,6 +635,12 @@ class DashboardScreen(ctk.CTkFrame):
             self.rank_tree.insert("", "end", **opts)
 
     # ─────────────────────────────────────────────────────────── Print
+
+    def _go_overtime(self):
+        """Kartu KPI 'Lembur Belum Diproses' — buka layar Lembur."""
+        top = self.winfo_toplevel()
+        if hasattr(top, "_show"):
+            top._show("Overtime")
 
     def _on_print(self):
         from src.ui.components.print_dialog import PrintOptionsDialog
