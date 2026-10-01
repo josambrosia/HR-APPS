@@ -1,23 +1,17 @@
 from src import config
 
 
-def test_versi_naik_ke_25():
-    assert config.APP_VERSION == "25.0.0"
-
-
-def test_changelog_punya_entri_v25_paling_atas():
-    entry = config.APP_CHANGELOG[0]
-    assert entry["version"] == "25.0.0"
+def test_changelog_retains_v25_entry():
+    """v25.0.0 bukan lagi versi terkini, tapi entri changelog-nya harus tetap
+    ada (dialog About menampilkan riwayat penuh)."""
+    entry = next((e for e in config.APP_CHANGELOG if e["version"] == "25.0.0"), None)
+    assert entry is not None
     assert entry["date"] == "2026-08-21"
-    blob = " ".join(d for _, d in entry["changes"]).lower()
-    assert "animasi" in blob
-
-
-def test_changelog_menyebut_perbaikan_bukan_hanya_hiasan():
-    entry = config.APP_CHANGELOG[0]
     kinds = {k for k, _ in entry["changes"]}
     assert "fix" in kinds, "4 dari 17 item menutup cacat — harus tercermin"
     assert "feat" in kinds
+    blob = " ".join(d for _, d in entry["changes"]).lower()
+    assert "animasi" in blob
 
 
 def test_entri_lama_tetap_ada():

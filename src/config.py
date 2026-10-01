@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "25.0.0"
-APP_BUILD_DATE = "2026-08-21"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "26.0.0"
+APP_BUILD_DATE = "2026-10-01"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,38 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "26.0.0",
+        "date": "2026-10-01",
+        "changes": [
+            ("feat", "Jam kantor baru: masuk 09.00, pulang 17.00 (berlaku "
+                     "mulai 14 September 2026). Bulan sebelum tanggal itu "
+                     "tetap dihitung dengan jam lama 08.00–16.00, jadi "
+                     "laporan lama tidak berubah."),
+            ("feat", "Settings → Jam Kantor: lihat riwayat jadwal dan tambah "
+                     "perubahan jam kantor untuk tanggal tertentu. Jadwal "
+                     "lama otomatis tetap dipakai untuk tanggal sebelumnya."),
+            ("feat", "Menu baru \"Lembur\": daftar otomatis pegawai yang "
+                     "pulang di atas ambang lembur (default 18.00, bisa "
+                     "diubah di Settings) lengkap dengan tanggal, jam "
+                     "masuk/keluar, dan total jam. Kerja di hari libur/"
+                     "akhir pekan dihitung penuh."),
+            ("feat", "Verifikasi lembur: status Open → Diajukan → Diterima/"
+                     "Tidak Diterima, aksi per baris dan massal, jam "
+                     "disetujui bisa disesuaikan (persetujuan sebagian), "
+                     "catatan per baris, plus penanda bila data absensi "
+                     "berubah setelah keputusan."),
+            ("feat", "Cetak laporan lembur: pilih semua status (rekap) atau "
+                     "hanya yang Diterima (untuk pembayaran), dengan "
+                     "subtotal per karyawan dan tanda tangan HR."),
+            ("feat", "Kartu \"Lembur Belum Diproses\" di Dashboard dan "
+                     "angka di menu sidebar; klik untuk langsung membuka "
+                     "menu Lembur."),
+            ("change", "Pola Jam Masuk, pulang cepat, dan penalti Lupa "
+                       "Absen kini mengikuti jam kantor tanggal masing-"
+                       "masing — data lama tetap memakai jam lama."),
+        ],
+    },
     {
         "version": "25.0.0",
         "date": "2026-08-21",
