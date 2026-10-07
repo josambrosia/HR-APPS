@@ -59,15 +59,18 @@
        border-top:1.5px solid var(--ink);text-align:right}
   table.det tfoot td.lbl{font-family:var(--body);letter-spacing:1px;text-transform:uppercase;
        text-align:left;font-size:8.5px}
-  .st{font-family:var(--mono);font-size:8.5px;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap}
-  .st.diajukan{color:var(--warn)}
-  /* Highlight pill untuk keputusan yang perlu perhatian: Open (kuning),
-     disetujui (hijau), ditolak (merah). Warna terang agar aman cetak. */
-  .st.open,.st.diterima,.st.tidak_diterima{display:inline-block;padding:2px 7px;
-       border-radius:999px;font-weight:700;border:1px solid}
-  .st.open{color:#92400E;background:#FEF3C7;border-color:#FCD34D}
-  .st.diterima{color:#065F46;background:#D1FAE5;border-color:#6EE7B7}
-  .st.tidak_diterima{color:#991B1B;background:#FEE2E2;border-color:#FCA5A5}
+  /* Penanda status (opsi C): titik warna + teks tebal, tanpa blok latar.
+     Open kuning · Diajukan biru · disetujui hijau · ditolak merah. */
+  .st{font-family:var(--mono);font-size:8.5px;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap;font-weight:700}
+  .st::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
+  .st.open{color:#92400E}
+  .st.open::before{background:#F59E0B}
+  .st.diajukan{color:#1D4ED8}
+  .st.diajukan::before{background:#3B82F6}
+  .st.diterima{color:#065F46}
+  .st.diterima::before{background:#10B981}
+  .st.tidak_diterima{color:#991B1B}
+  .st.tidak_diterima::before{background:#EF4444}
   .none{color:var(--mute);padding:10px 8px;font-style:italic}
   .signoff{margin-top:26px;display:flex;justify-content:flex-end;break-inside:avoid}
   .signoff .so{text-align:center;font-size:10px;min-width:230px}

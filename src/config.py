@@ -41,8 +41,8 @@ APP_CHANGELOG = [
             ("feat", "Cetak laporan lembur: pilih semua status (rekap) atau "
                      "hanya yang Diterima (untuk pembayaran), dengan "
                      "subtotal per karyawan dan tanda tangan HR. Status "
-                     "Open/Diterima/Tidak Diterima diberi highlight warna "
-                     "di cetakan."),
+                     "diberi penanda titik warna — Open kuning, Diajukan "
+                     "biru, Diterima hijau, Tidak Diterima merah."),
             ("feat", "Kartu \"Lembur Belum Diproses\" di Dashboard dan "
                      "angka di menu sidebar; klik untuk langsung membuka "
                      "menu Lembur."),

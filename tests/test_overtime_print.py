@@ -79,17 +79,28 @@ def test_render_html_accepted_mode_label(tmp_path):
     assert "Tidak Diterima" not in html
 
 
-def test_status_highlight_pills_in_print(tmp_path):
-    """Open/Diterima/Tidak Diterima tampil sebagai pill ber-highlight."""
+def test_status_dot_markers_in_print(tmp_path):
+    """Semua status tampil dengan titik warna (opsi C), Diajukan biru."""
+    from src.db.overtime import apply_status
     p = tmp_path / "o.db"
     init_db(p)
     with get_connection(p) as conn:
         _seed(conn)
+        b = conn.execute(
+            "SELECT id FROM employees WHERE no_staff = '2'").fetchone()["id"]
+        upsert_attendance(
+            conn, employee_id=b, tanggal="2026-10-05", hari=None,
+            tipe="Hari Kerja", jadwal=None, masuk="09:00", keluar="19:00",
+            kerja_jam=None, lembur_jam=None, terlambat_menit=0,
+            has_issue=0, imported_from="t")
+        apply_status(conn, employee_id=b, tanggal="2026-10-05",
+                     status="diajukan", detected_minutes=120)
         html = render_overtime_print_html(conn, "2026-10", mode="all")
-    for marker in ('class="st open"', 'class="st diterima"',
-                   'class="st tidak_diterima"'):
-        assert marker in html, f"pill {marker} tidak ada"
-    assert "border-radius:999px" in html
-    assert "background:#FEF3C7" in html   # Open
-    assert "background:#D1FAE5" in html   # Diterima
-    assert "background:#FEE2E2" in html   # Tidak Diterima
+    for marker in ('class="st open"', 'class="st diajukan"',
+                   'class="st diterima"', 'class="st tidak_diterima"'):
+        assert marker in html, f"status {marker} tidak ada"
+    assert "border-radius:50%" in html
+    assert ".st.diajukan::before{background:#3B82F6}" in html
+    assert ".st.open::before{background:#F59E0B}" in html
+    assert ".st.diterima::before{background:#10B981}" in html
+    assert ".st.tidak_diterima::before{background:#EF4444}" in html
