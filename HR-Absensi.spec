@@ -10,6 +10,7 @@ a = Analysis(
         ('src/reports/templates/heatmap_print.html.j2', 'src/reports/templates'),
         ('src/reports/templates/employee_report.html.j2', 'src/reports/templates'),
         ('src/reports/templates/dinas_recap_print.html.j2', 'src/reports/templates'),
+        ('src/reports/templates/overtime.html.j2', 'src/reports/templates'),
         ('assets/templates/laporan_bulanan_template.xlsx', 'assets/templates'),
         # Brand assets (Josaphat Tech Solution) — readable at runtime via src.config.BRAND_*
         ('assets/brand/icon-04E.svg', 'assets/brand'),
