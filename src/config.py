@@ -47,6 +47,9 @@ APP_CHANGELOG = [
             ("change", "Pola Jam Masuk, pulang cepat, dan penalti Lupa "
                        "Absen kini mengikuti jam kantor tanggal masing-"
                        "masing — data lama tetap memakai jam lama."),
+            ("fix", "Sidebar menu kini bisa digulir: di layar pendek "
+                    "seluruh menu tetap terjangkau dan tidak lagi tertutup "
+                    "taskbar."),
         ],
     },
     {

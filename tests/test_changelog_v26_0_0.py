@@ -20,6 +20,14 @@ def test_changelog_v26_menyebut_status_verifikasi():
     assert "open" in blob and "diajukan" in blob and "diterima" in blob
 
 
+def test_changelog_v26_menyebut_perbaikan_sidebar():
+    entry = config.APP_CHANGELOG[0]
+    kinds = {k for k, _ in entry["changes"]}
+    assert "fix" in kinds
+    blob = " ".join(d for _, d in entry["changes"]).lower()
+    assert "sidebar" in blob
+
+
 def test_entri_lama_tetap_ada():
     versions = [e["version"] for e in config.APP_CHANGELOG]
     for v in ("25.0.0", "24.0.2", "24.0.1", "24.0.0"):

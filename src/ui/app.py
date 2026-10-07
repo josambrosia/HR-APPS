@@ -194,6 +194,52 @@ class HRApp(ctk.CTk):
             widget.bind("<Enter>", _chip_enter)
             widget.bind("<Leave>", _chip_leave)
 
+        # ── Footer dipack LEBIH DULU (side=bottom) supaya area nav di atasnya
+        # bisa mengambil sisa ruang dan discroll; footer selalu terlihat. ──
+        from src.config import APP_VERSION, APP_TAGLINE, APP_BRAND_NAME
+
+        # Split brand name into 2 lines on the last word for the stacked layout.
+        # "Josaphat Tech Solution" → ["Josaphat Tech", "Solution"]
+        brand_parts = APP_BRAND_NAME.rsplit(" ", 1)
+        brand_line1 = brand_parts[0] if len(brand_parts) == 2 else APP_BRAND_NAME
+        brand_line2 = brand_parts[1] if len(brand_parts) == 2 else ""
+
+        footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        footer.pack(side="bottom", fill="x", padx=8, pady=(SPACE_SM, 10))
+
+        sep = ctk.CTkFrame(footer, fg_color=COLOR_BORDER, height=1)
+        sep.pack(fill="x", pady=(0, SPACE_SM))
+
+        # Brand — single horizontal row: "Josaphat Tech" white + "Solution" magenta
+        brand_row = ctk.CTkFrame(footer, fg_color="transparent")
+        brand_row.pack(fill="x")
+        ctk.CTkLabel(
+            brand_row, text=brand_line1, font=(FONT_FAMILY, 12, "bold"),
+            text_color=COLOR_TEXT,
+        ).pack(side="left")
+        if brand_line2:
+            ctk.CTkLabel(
+                brand_row, text=f" {brand_line2}",
+                font=(FONT_FAMILY, 12, "bold"), text_color=COLOR_ACCENT,
+            ).pack(side="left")
+
+        # Version + tagline — single mono line
+        ctk.CTkLabel(
+            footer,
+            text=f"v{APP_VERSION} · {APP_TAGLINE.rstrip('.').lower()}",
+            font=("Consolas", 8), text_color=COLOR_TEXT_DIM, anchor="w",
+        ).pack(fill="x", pady=(2, 0))
+
+        # ── Nav area scrollable (v26 fix): seluruh grup menu hidup di dalam
+        # CTkScrollableFrame, jadi di layar pendek menu terakhir tidak lagi
+        # terpotong taskbar — cukup scroll. Footer di atas tetap diam. ──
+        self._nav_parent = ctk.CTkScrollableFrame(
+            self.sidebar, fg_color="transparent", corner_radius=0,
+            scrollbar_button_color=COLOR_SURFACE_HIGH,
+            scrollbar_button_hover_color=COLOR_BORDER,
+        )
+        self._nav_parent.pack(fill="both", expand=True)
+
         # ── Sections (label + items) — categorized navigation ──
         nav_groups = [
             ("INSIGHT", [
@@ -229,7 +275,7 @@ class HRApp(ctk.CTk):
         for group_label, items in nav_groups:
             # Section label
             ctk.CTkLabel(
-                self.sidebar,
+                self._nav_parent,
                 text=group_label,
                 font=FONT_LABEL,
                 text_color=COLOR_TEXT_DISABLED,
@@ -256,47 +302,11 @@ class HRApp(ctk.CTk):
         # rumus pemusatan di _set_active_nav_item berlaku sebagaimana ditulis.
         # Pelajaran yang sama sudah kita bayar di v24 untuk garis pemisah 1px.
         self._nav_indicator = tk.Frame(
-            self.sidebar, bg=COLOR_ACCENT,
+            self._nav_parent, bg=COLOR_ACCENT,
             width=NAV_INDICATOR_W, height=NAV_INDICATOR_H,
         )
         self._nav_indicator.place(x=0, y=0)
         self._nav_indicator.place_forget()      # ditampilkan saat item pertama aktif
-
-        # ── Footer: brand row ("Josaphat Tech" + "Solution") + 1 mono line ──
-        # Compact 2-line layout (version + tagline combined) to save sidebar height.
-        from src.config import APP_VERSION, APP_TAGLINE, APP_BRAND_NAME
-
-        # Split brand name into 2 lines on the last word for the stacked layout.
-        # "Josaphat Tech Solution" → ["Josaphat Tech", "Solution"]
-        brand_parts = APP_BRAND_NAME.rsplit(" ", 1)
-        brand_line1 = brand_parts[0] if len(brand_parts) == 2 else APP_BRAND_NAME
-        brand_line2 = brand_parts[1] if len(brand_parts) == 2 else ""
-
-        footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        footer.pack(side="bottom", fill="x", padx=8, pady=(SPACE_SM, 10))
-
-        sep = ctk.CTkFrame(footer, fg_color=COLOR_BORDER, height=1)
-        sep.pack(fill="x", pady=(0, SPACE_SM))
-
-        # Brand — single horizontal row: "Josaphat Tech" white + "Solution" magenta
-        brand_row = ctk.CTkFrame(footer, fg_color="transparent")
-        brand_row.pack(fill="x")
-        ctk.CTkLabel(
-            brand_row, text=brand_line1, font=(FONT_FAMILY, 12, "bold"),
-            text_color=COLOR_TEXT,
-        ).pack(side="left")
-        if brand_line2:
-            ctk.CTkLabel(
-                brand_row, text=f" {brand_line2}",
-                font=(FONT_FAMILY, 12, "bold"), text_color=COLOR_ACCENT,
-            ).pack(side="left")
-
-        # Version + tagline — single mono line
-        ctk.CTkLabel(
-            footer,
-            text=f"v{APP_VERSION} · {APP_TAGLINE.rstrip('.').lower()}",
-            font=("Consolas", 8), text_color=COLOR_TEXT_DIM, anchor="w",
-        ).pack(fill="x", pady=(2, 0))
 
     def _build_nav_item(self, icon: str, label: str, screen_key: str) -> ctk.CTkFrame:
         """Custom nav item with active state indicator (3px magenta left bar).
@@ -305,7 +315,7 @@ class HRApp(ctk.CTk):
         State stored visually — when this item becomes active, left bar shows
         + bg tints. Click handled by binding on the entire frame.
         """
-        frame = ctk.CTkFrame(self.sidebar, fg_color="transparent", height=32)
+        frame = ctk.CTkFrame(self._nav_parent, fg_color="transparent", height=32)
         frame.pack_propagate(False)
 
         # Inner content row; left bar (when active) packs to left via before=new._content
