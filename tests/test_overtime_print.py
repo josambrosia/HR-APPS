@@ -77,3 +77,19 @@ def test_render_html_accepted_mode_label(tmp_path):
         html = render_overtime_print_html(conn, "2026-10", mode="accepted")
     assert "Hanya Diterima" in html
     assert "Tidak Diterima" not in html
+
+
+def test_status_highlight_pills_in_print(tmp_path):
+    """Open/Diterima/Tidak Diterima tampil sebagai pill ber-highlight."""
+    p = tmp_path / "o.db"
+    init_db(p)
+    with get_connection(p) as conn:
+        _seed(conn)
+        html = render_overtime_print_html(conn, "2026-10", mode="all")
+    for marker in ('class="st open"', 'class="st diterima"',
+                   'class="st tidak_diterima"'):
+        assert marker in html, f"pill {marker} tidak ada"
+    assert "border-radius:999px" in html
+    assert "background:#FEF3C7" in html   # Open
+    assert "background:#D1FAE5" in html   # Diterima
+    assert "background:#FEE2E2" in html   # Tidak Diterima
