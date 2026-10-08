@@ -79,6 +79,23 @@ def test_render_html_accepted_mode_label(tmp_path):
     assert "Tidak Diterima" not in html
 
 
+def test_print_includes_orphan_decision(tmp_path):
+    """Keputusan tanpa baris absensi tetap tercetak + diberi keterangan."""
+    from src.db.attendance import delete_attendance
+    p = tmp_path / "o.db"
+    init_db(p)
+    with get_connection(p) as conn:
+        a, _b = _seed(conn)
+        apply_status(conn, employee_id=a, tanggal="2026-10-01",
+                     status="diajukan", detected_minutes=150)
+        delete_attendance(conn, employee_id=a, tanggal="2026-10-01")
+        ctx = build_overtime_context(conn, "2026-10", mode="all")
+        html = render_overtime_print_html(conn, "2026-10", mode="all")
+    assert "data absensi tidak ditemukan" in html
+    statuses = [r["status"] for g in ctx["groups"] for r in g["rows"]]
+    assert "Diajukan" in statuses
+
+
 def test_status_dot_markers_in_print(tmp_path):
     """Semua status tampil dengan titik warna (opsi C), Diajukan biru."""
     from src.db.overtime import apply_status

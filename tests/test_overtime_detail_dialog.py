@@ -121,3 +121,29 @@ def test_revert_to_open_removes_decision(tmp_path, monkeypatch, tk_root):
             dlg.destroy()
     with get_connection(p) as conn:
         assert get_decision(conn, 1, "2026-10-01") is None
+
+
+def test_dialog_handles_missing_data_row(tmp_path, monkeypatch, tk_root):
+    """Keputusan yatim tetap bisa diverifikasi dari dialognya."""
+    import src.ui.components.overtime_detail_dialog as mod
+    from src.db.attendance import delete_attendance
+    p = tmp_path / "o.db"
+    _seed(p)
+    with get_connection(p) as conn:
+        apply_status(conn, employee_id=1, tanggal="2026-10-01",
+                     status="diajukan", detected_minutes=150)
+        delete_attendance(conn, employee_id=1, tanggal="2026-10-01")
+    monkeypatch.setattr(mod, "DB_PATH", p)
+    monkeypatch.setattr(mod.feedback, "ask_yes_no", lambda *a, **k: True)
+    monkeypatch.setattr(mod.feedback, "show_warning", lambda *a, **k: None)
+    row = _row(p, "diajukan")
+    assert row.missing_data is True
+    dlg = mod.OvertimeDetailDialog(tk_root, row, on_saved=lambda: None)
+    try:
+        dlg._apply("tidak_diterima")
+    finally:
+        if dlg.winfo_exists():
+            dlg.destroy()
+    with get_connection(p) as conn:
+        d = get_decision(conn, 1, "2026-10-01")
+    assert d["status"] == "tidak_diterima"

@@ -280,13 +280,14 @@ class OvertimeScreen(ctk.CTkFrame):
         rows = self._filtered_rows()
         for r in rows:
             iid = f"{r.employee_id}|{r.tanggal}"
+            tanggal_cell = r.tanggal + (" ⚠" if r.missing_data else "")
             self.tree.insert(
                 "", "end", iid=iid,
                 values=(
                     CHECK_ON if iid in self._checked else CHECK_OFF,
-                    r.tanggal, r.nama, r.dept or "—",
+                    tanggal_cell, r.nama, r.dept or "—",
                     r.masuk or "—", r.keluar or "—",
-                    format_duration(r.minutes),
+                    format_duration(r.minutes) if r.qualifies else "—",
                     format_duration(r.approved_minutes)
                     if r.approved_minutes is not None else "—",
                     STATUS_LABELS.get(r.status, r.status),
@@ -364,8 +365,10 @@ class OvertimeScreen(ctk.CTkFrame):
 
     def _on_detail_saved(self):
         self._reload()
-        show_success_toast(self.winfo_toplevel(), title="Tersimpan",
-                           message="Status lembur diperbarui.")
+        show_success_toast(
+            self.winfo_toplevel(), title="Tersimpan",
+            message="Status lembur diperbarui — baris yang diubah kini ada "
+                    "di tab status barunya.")
 
     def _apply_batch(self, status):
         if not self._checked:

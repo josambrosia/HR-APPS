@@ -37,6 +37,7 @@ class OvertimeRow:
     submitted_at: str | None
     decided_at: str | None
     detected_at_decision: int | None
+    missing_data: bool = False
 
     @property
     def changed(self) -> bool:
@@ -121,6 +122,36 @@ def month_rows(conn: sqlite3.Connection, year_month: str) -> list[OvertimeRow]:
             approved_minutes=r["approved_minutes"], note=r["note"],
             submitted_at=r["submitted_at"], decided_at=r["decided_at"],
             detected_at_decision=r["detected_minutes_at_decision"]))
+
+    # Keputusan "yatim": baris absensinya sudah tidak ada (dihapus dari
+    # Heatmap, data bulan di-reset, atau restore backup). Tanpa ini keputusan
+    # hilang dari semua daftar — lihat laporan user v26.
+    orphans = conn.execute(
+        """
+        SELECT od.employee_id, od.tanggal, od.status, od.approved_minutes,
+               od.note, od.submitted_at, od.decided_at,
+               od.detected_minutes_at_decision, e.nama, e.dept
+          FROM overtime_decisions od
+          JOIN employees e ON e.id = od.employee_id
+          LEFT JOIN attendance_records ar
+                 ON ar.employee_id = od.employee_id
+                AND ar.tanggal = od.tanggal
+         WHERE substr(od.tanggal, 1, 7) = ?
+           AND ar.id IS NULL
+        """,
+        (year_month,),
+    ).fetchall()
+    for r in orphans:
+        out.append(OvertimeRow(
+            employee_id=r["employee_id"], nama=r["nama"], dept=r["dept"],
+            tanggal=r["tanggal"], hari=None, tipe=None,
+            masuk=None, keluar=None, minutes=0, is_holiday=False,
+            qualifies=False, status=r["status"],
+            approved_minutes=r["approved_minutes"], note=r["note"],
+            submitted_at=r["submitted_at"], decided_at=r["decided_at"],
+            detected_at_decision=r["detected_minutes_at_decision"],
+            missing_data=True))
+    out.sort(key=lambda r: (r.tanggal, r.nama))
     return out
 
 

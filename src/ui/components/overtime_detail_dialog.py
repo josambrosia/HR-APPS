@@ -105,14 +105,25 @@ class OvertimeDetailDialog(ctk.CTkToplevel):
         self._metric(grid, 0, 1, "Keluar", r.keluar or "—")
         self._metric(grid, 1, 0, "Lembur", format_duration(r.minutes),
                      COLOR_ACCENT if r.minutes else COLOR_TEXT_DIM)
-        self._metric(grid, 1, 1, "Jenis", "Libur/akhir pekan"
-                     if r.is_holiday else "Hari kerja")
-        if not r.qualifies:
+        if r.missing_data:
+            jenis = "—"
+        elif r.is_holiday:
+            jenis = "Libur/akhir pekan"
+        else:
+            jenis = "Hari kerja"
+        self._metric(grid, 1, 1, "Jenis", jenis)
+        if r.missing_data:
+            ctk.CTkLabel(box, text="⚠ Data absensi tanggal ini tidak "
+                                   "ditemukan — keputusan tetap tersimpan",
+                         font=FONT_SMALL, text_color=COLOR_WARN,
+                         anchor="w").pack(fill="x", padx=SPACE_MD,
+                                          pady=(0, SPACE_SM))
+        elif not r.qualifies:
             ctk.CTkLabel(box, text="⚠ Tidak lagi memenuhi syarat deteksi",
                          font=FONT_SMALL, text_color=COLOR_WARN,
                          anchor="w").pack(fill="x", padx=SPACE_MD,
                                           pady=(0, SPACE_SM))
-        if r.changed:
+        if r.changed and not r.missing_data:
             ctk.CTkLabel(box, text="⚠ Data absensi berubah setelah keputusan "
                                    "terakhir",
                          font=FONT_SMALL, text_color=COLOR_WARN,

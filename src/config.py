@@ -52,6 +52,10 @@ APP_CHANGELOG = [
             ("fix", "Sidebar menu kini bisa digulir: di layar pendek "
                     "seluruh menu tetap terjangkau dan tidak lagi tertutup "
                     "taskbar."),
+            ("fix", "Keputusan lembur tidak lagi hilang dari daftar ketika "
+                    "baris absensinya terhapus atau data bulan di-reset — "
+                    "baris tetap tampil di tab statusnya dengan penanda "
+                    "\"data absensi tidak ditemukan\"."),
         ],
     },
     {

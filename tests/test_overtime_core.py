@@ -160,3 +160,45 @@ def test_custom_threshold_setting(tmp_path):
         # 10-01 tetap lolos; baris libur tidak terpengaruh ambang.
         assert set(by_date) == {"2026-10-01", "2026-10-04", "2026-10-05"}
         assert by_date["2026-10-01"].minutes == 150
+
+
+def test_orphan_decision_survives_without_attendance_row(tmp_path):
+    """Keputusan tetap tampil walau baris absensinya hilang (bug v26)."""
+    from src.db.attendance import delete_attendance
+    p = tmp_path / "o.db"
+    init_db(p)
+    with get_connection(p) as conn:
+        eid = _seed(conn)
+        apply_status(conn, employee_id=eid, tanggal="2026-10-01",
+                     status="diterima", detected_minutes=150,
+                     approved_minutes=120)
+        delete_attendance(conn, employee_id=eid, tanggal="2026-10-01")
+        rows = month_rows(conn, "2026-10")
+        by_date = {r.tanggal: r for r in rows}
+        assert "2026-10-01" in by_date, "keputusan yatim hilang dari daftar"
+        orphan = by_date["2026-10-01"]
+        assert orphan.missing_data is True
+        assert orphan.qualifies is False
+        assert orphan.minutes == 0
+        assert orphan.status == "diterima"
+        assert orphan.approved_minutes == 120
+        assert orphan.detected_at_decision == 150
+        # urutan tetap kronologis
+        assert [r.tanggal for r in rows] == sorted(r.tanggal for r in rows)
+        # ikut terhitung badge (belum final)
+        assert count_pending(conn, "2026-10") == 3
+
+
+def test_orphan_diajukan_counted_as_pending(tmp_path):
+    from src.db.attendance import delete_attendance
+    p = tmp_path / "o.db"
+    init_db(p)
+    with get_connection(p) as conn:
+        eid = _seed(conn)
+        apply_status(conn, employee_id=eid, tanggal="2026-10-01",
+                     status="diajukan", detected_minutes=150)
+        delete_attendance(conn, employee_id=eid, tanggal="2026-10-01")
+        rows = month_rows(conn, "2026-10")
+        orphan = [r for r in rows if r.tanggal == "2026-10-01"][0]
+        assert orphan.status == "diajukan"
+        assert count_pending(conn, "2026-10") == 4

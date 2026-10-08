@@ -56,11 +56,12 @@ def build_overtime_context(conn, year_month: str, mode: str = "all") -> dict:
             "hari": r.hari or hari_name(r.tanggal),
             "masuk": r.masuk or "—",
             "keluar": r.keluar or "—",
-            "minutes": format_duration(r.minutes),
+            "minutes": format_duration(r.minutes) if r.qualifies else "—",
             "approved": format_duration(approved) if approved is not None else "—",
             "status": STATUS_LABELS.get(r.status, r.status),
             "note": r.note or "",
             "holiday": r.is_holiday,
+            "missing": r.missing_data,
         })
         g["detected"] += r.minutes
         if approved is not None:

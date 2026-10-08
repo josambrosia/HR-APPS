@@ -131,7 +131,7 @@
       <tbody>
         {% for r in g.rows %}
         <tr>
-          <td>{{ r.tanggal }}<br><span style="color:var(--faint);font-size:8.5px">{{ r.hari }}{% if r.holiday %} · libur{% endif %}</span></td>
+          <td>{{ r.tanggal }}<br><span style="color:var(--faint);font-size:8.5px">{{ r.hari }}{% if r.holiday %} · libur{% endif %}{% if r.missing %} · data absensi tidak ditemukan{% endif %}</span></td>
           <td class="num">{{ r.masuk }}</td>
           <td class="num">{{ r.keluar }}</td>
           <td class="num">{{ r.minutes }}</td>
