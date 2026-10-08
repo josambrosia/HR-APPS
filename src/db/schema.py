@@ -109,6 +109,15 @@ CREATE TABLE IF NOT EXISTS schedule_periods (
     created_at     TEXT NOT NULL
 );
 
+-- v26: riwayat toleransi keterlambatan (berlaku per tanggal) supaya
+-- perubahan tidak mengubah warna/status bulan-bulan lama.
+CREATE TABLE IF NOT EXISTS tolerance_periods (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    effective_from TEXT NOT NULL UNIQUE,
+    tolerance_min  INTEGER NOT NULL,
+    created_at     TEXT NOT NULL
+);
+
 -- v26: keputusan verifikasi lembur. Baris Open = ketiadaan baris di sini.
 CREATE TABLE IF NOT EXISTS overtime_decisions (
     employee_id   INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
@@ -238,6 +247,26 @@ def _migrate(conn: sqlite3.Connection) -> None:
                 "(effective_from, start_time, end_time, created_at) "
                 "VALUES (?,?,?,?)",
                 ("1970-01-01", start, end, now))
+
+    # v26: seed riwayat toleransi dari setelan tunggal. Nilai lama
+    # dipertahankan sebagai periode "sejak awal"; perubahan berikutnya
+    # ditambahkan ber-tanggal lewat Settings.
+    has_tol = conn.execute(
+        "SELECT 1 FROM tolerance_periods LIMIT 1").fetchone()
+    if has_tol is None:
+        from src.config import DEFAULT_LATE_TOLERANCE_MIN
+        trow = conn.execute(
+            "SELECT value FROM settings WHERE key='late_tolerance_min'"
+        ).fetchone()
+        try:
+            tol = int(trow[0]) if trow else DEFAULT_LATE_TOLERANCE_MIN
+        except (TypeError, ValueError):
+            tol = DEFAULT_LATE_TOLERANCE_MIN
+        conn.execute(
+            "INSERT INTO tolerance_periods "
+            "(effective_from, tolerance_min, created_at) VALUES (?,?,?)",
+            ("1970-01-01", tol,
+             datetime.now(UTC).isoformat(timespec="seconds")))
 
 
 def init_db(db_path: Path) -> None:

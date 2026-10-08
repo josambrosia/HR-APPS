@@ -9,6 +9,7 @@ from src.core.session_state import notify_data_changed
 from src.db.connection import get_connection
 from src.db.settings import get_setting, set_setting
 from src.db.schedule import current_schedule, delete_period, list_periods
+from src.db.tolerance import add_period, current_tolerance, list_periods as list_tol_periods
 from src.db.employees import list_employees, toggle_employee_active
 from src.db import backup as backup_mod
 from src.ui import feedback, motion
@@ -24,7 +25,7 @@ from src.ui.theme import (
     COLOR_TEXT, COLOR_TEXT_DIM, COLOR_TEXT_MUTED,
     FONT_DISPLAY,
     FONT_BODY, FONT_BODY_BOLD, FONT_SMALL, FONT_MONO_SMALL,
-    SPACE_XS, SPACE_SM, SPACE_MD,
+    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
     RADIUS_MD,
 )
 
@@ -79,15 +80,14 @@ class SettingsScreen(ctk.CTkFrame):
                                        default="15")
             severe = get_setting(conn, "severe_lateness_threshold_min",
                                  default="60")
-            tol = get_setting(conn, "late_tolerance_min", default="12")
+            tol = str(current_tolerance(conn))
             overtime = get_setting(conn, "overtime_threshold",
                                    default=DEFAULT_OVERTIME_THRESHOLD)
 
-        # Tombol Simpan sticky di bawah tab: selalu terlihat walau isi tab
-        # lebih tinggi dari layar (v26 fix — sebelumnya tombol ikut terpotong
-        # di bawah sehingga perubahan toleransi tampak "tidak tersimpan").
+        # Tombol Simpan di ATAS tab (area kanan yang kosong) — selalu terlihat
+        # tanpa perlu scroll (v26 fix lanjutan).
         self._save_bar = ctk.CTkFrame(parent, fg_color="transparent")
-        self._save_bar.pack(side="bottom", fill="x")
+        self._save_bar.pack(side="top", fill="x")
         self._save_btn = ctk.CTkButton(
             self._save_bar, text="Simpan Pengaturan",
             command=self._save,
@@ -96,7 +96,7 @@ class SettingsScreen(ctk.CTkFrame):
             font=FONT_BODY_BOLD,
             corner_radius=RADIUS_MD,
         )
-        self._save_btn.pack(anchor="w", pady=SPACE_MD)
+        self._save_btn.pack(anchor="e", pady=(SPACE_SM, SPACE_XS))
 
         # Isi tab bisa discroll; semua baris dibangun ke dalam scroller.
         self._general_scroller = ctk.CTkScrollableFrame(
@@ -261,6 +261,24 @@ class SettingsScreen(ctk.CTkFrame):
             font=FONT_BODY,
             placeholder_text_color=COLOR_TEXT_MUTED,
         ).pack(side="left")
+        ctk.CTkLabel(
+            row6, text="berlaku mulai:",
+            font=FONT_BODY, text_color=COLOR_TEXT,
+        ).pack(side="left", padx=(SPACE_LG, SPACE_XS))
+        self.tol_date_var = ctk.StringVar(value=date.today().isoformat())
+        ctk.CTkEntry(
+            row6, textvariable=self.tol_date_var, width=110,
+            fg_color=COLOR_SURFACE_HIGH,
+            border_width=1, border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_BODY,
+            placeholder_text_color=COLOR_TEXT_MUTED,
+        ).pack(side="left")
+        self._tol_note = ctk.CTkLabel(
+            row6, text="", font=FONT_SMALL, text_color=COLOR_TEXT_MUTED,
+        )
+        self._tol_note.pack(side="left", padx=(SPACE_SM, 0))
+        self._refresh_tolerance_note()
 
         row7 = ctk.CTkFrame(
             parent, fg_color=COLOR_SURFACE,
@@ -279,6 +297,24 @@ class SettingsScreen(ctk.CTkFrame):
             self._motion_switch.select()
         else:
             self._motion_switch.deselect()
+
+    def _refresh_tolerance_note(self):
+        """Label kecil: toleransi yang berlaku hari ini + sejak tanggal berapa."""
+        if not hasattr(self, "_tol_note"):
+            return
+        with get_connection(DB_PATH) as conn:
+            periods = list_tol_periods(conn)
+        today_iso = date.today().isoformat()
+        active = None
+        for p in periods:
+            if p["effective_from"] <= today_iso:
+                active = p
+        if active is not None:
+            self._tol_note.configure(
+                text=f"(berlaku sejak {active['effective_from']} · "
+                     f"{active['tolerance_min']} mnt)")
+        else:
+            self._tol_note.configure(text="")
 
     # ── Jam Kantor helpers (v26) ──
     def _render_schedule(self):
@@ -671,6 +707,22 @@ class SettingsScreen(ctk.CTkFrame):
                 self, "Toleransi di luar rentang",
                 f"{tol} di luar rentang. Toleransi harus antara 0 dan 999 menit.")
             return
+        # Validate tanggal berlaku toleransi (v26): YYYY-MM-DD, min hari ini
+        raw_tol_date = self.tol_date_var.get().strip()
+        try:
+            tol_date = date.fromisoformat(raw_tol_date)
+        except ValueError:
+            feedback.show_warning(
+                self, "Tanggal toleransi tidak valid",
+                f"'{raw_tol_date}' bukan tanggal. Format YYYY-MM-DD "
+                f"(mis. 2026-10-08).")
+            return
+        if tol_date < date.today():
+            feedback.show_warning(
+                self, "Tanggal tidak boleh di masa lalu",
+                "Toleransi hanya bisa berlaku mulai hari ini atau setelahnya. "
+                "Tanggal sebelum itu tetap memakai toleransi lama.")
+            return
         # Validate Ambang Lembur (v26): HH.MM, harus setelah jam pulang berjalan
         raw_ot = self.overtime_var.get().strip()
         ot_min = to_minutes(raw_ot)
@@ -693,10 +745,21 @@ class SettingsScreen(ctk.CTkFrame):
             set_setting(conn, "coaching_threshold_per_day", self.thr_var.get().strip())
             set_setting(conn, "lupa_absen_datang_penalty_min", str(penalty))
             set_setting(conn, "severe_lateness_threshold_min", str(severe))
-            set_setting(conn, "late_tolerance_min", str(tol))
             set_setting(conn, "overtime_threshold", raw_ot)
+            # Toleransi berlaku per tanggal (v26): hanya tulis periode bila
+            # nilainya berubah, atau tanggal itu sudah punya periode (koreksi).
+            existing = [p for p in list_tol_periods(conn)
+                        if p["effective_from"] == raw_tol_date]
+            if existing:
+                if existing[0]["tolerance_min"] != tol:
+                    add_period(conn, effective_from=raw_tol_date,
+                               tolerance_min=tol)
+            elif tol != current_tolerance(conn):
+                add_period(conn, effective_from=raw_tol_date,
+                           tolerance_min=tol)
         # Thresholds/tolerance/month feed cached analytics (Dashboard memoizes
         # per data_version) — bump so cached screens refetch on next show.
+        self._refresh_tolerance_note()
         notify_data_changed()
         feedback.show_info(self, "Tersimpan", "Pengaturan disimpan.")
 
@@ -727,7 +790,8 @@ class SettingsScreen(ctk.CTkFrame):
                 get_setting(conn, "lupa_absen_datang_penalty_min", default="15"))
             self.severe_var.set(
                 get_setting(conn, "severe_lateness_threshold_min", default="60"))
-            self.tol_var.set(get_setting(conn, "late_tolerance_min", default="12"))
+            self.tol_var.set(str(current_tolerance(conn)))
+            self.tol_date_var.set(date.today().isoformat())
             self.hr_name_var.set(get_setting(conn, "hr_officer_name", default=""))
             self.overtime_var.set(
                 get_setting(conn, "overtime_threshold",
@@ -736,6 +800,7 @@ class SettingsScreen(ctk.CTkFrame):
         self._sched_label.configure(
             text=f"Jam Kantor: {sched_start} – {sched_end}")
         self._render_schedule()
+        self._refresh_tolerance_note()
         self._reload_pegawai()
         if hasattr(self, "_backup_list"):
             self._render_backups()

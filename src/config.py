@@ -49,9 +49,16 @@ APP_CHANGELOG = [
             ("change", "Pola Jam Masuk, pulang cepat, dan penalti Lupa "
                        "Absen kini mengikuti jam kantor tanggal masing-"
                        "masing — data lama tetap memakai jam lama."),
+            ("feat", "Toleransi Telat kini berlaku mulai tanggal (seperti "
+                     "jam kantor): mengubahnya tidak lagi mengubah warna/"
+                     "status bulan-bulan lama. Settings menampilkan tanggal "
+                     "berlaku dan nilai yang sedang berjalan."),
             ("fix", "Sidebar menu kini bisa digulir: di layar pendek "
                     "seluruh menu tetap terjangkau dan tidak lagi tertutup "
                     "taskbar."),
+            ("fix", "Tombol Simpan Pengaturan di Settings kini selalu "
+                    "terlihat di atas tab General — sebelumnya bisa "
+                    "terpotong di bawah layar."),
             ("fix", "Keputusan lembur tidak lagi hilang dari daftar ketika "
                     "baris absensinya terhapus atau data bulan di-reset — "
                     "baris tetap tampil di tab statusnya dengan penanda "

@@ -8,7 +8,8 @@ from datetime import date
 from src.config import HEATMAP_DINAS_REASONS
 from src.core.reason_mapper import render_alasan_ijin
 from src.core.week_utils import MONTH_NAMES_ID
-from src.db.settings import read_late_tolerance, read_severe_lateness_threshold
+from src.db.settings import read_severe_lateness_threshold
+from src.db.tolerance import tolerance_for
 from src.db.employees import list_employees
 from src.db.attendance import list_attendance_matrix
 from src.db.holidays import holiday_dates_in_month
@@ -107,9 +108,17 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
     n_days = calendar.monthrange(y, m)[1]
     weekday_of = {d: date(y, m, d).weekday() for d in range(1, n_days + 1)}
     weeks = calendar.Calendar(firstweekday=0).monthdayscalendar(y, m)
-    tol = read_late_tolerance(conn)
     sev = read_severe_lateness_threshold(conn)
     holidays = holiday_dates_in_month(conn, year_month)
+
+    # v26: toleransi berlaku per tanggal — bulan yang melintasi perubahan
+    # memakai nilai lama untuk tanggal lama dan nilai baru setelahnya.
+    tol_cache: dict[str, int] = {}
+
+    def _tol(tgl: str) -> int:
+        if tgl not in tol_cache:
+            tol_cache[tgl] = tolerance_for(conn, tgl)
+        return tol_cache[tgl]
 
     emps = [dict(e) for e in list_employees(conn, include_inactive=False)]
     if exclude_outliers:
@@ -138,7 +147,7 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
             tgl = f"{year_month}-{d:02d}"
             row = by_key.get((eid, tgl))
             status = cell_status(
-                row, tolerance=tol, severe=sev,
+                row, tolerance=_tol(tgl), severe=sev,
                 is_weekend=weekday_of[d] >= 5, is_holiday=tgl in holidays)
             if status in ("sedang", "parah"):
                 tm = row["terlambat_menit"] or 0
@@ -222,7 +231,7 @@ def build_heatmap_context(conn, year_month, *, exclude_outliers, today=None):
         "weekday_labels": ["Sn", "Sl", "Rb", "Km", "Jm", "Sb", "Mg"],
         "weeks": weeks,
         "eff_hari_kerja": eff_hk,
-        "late_tolerance": tol,
+        "late_tolerance": _tol(f"{year_month}-{n_days:02d}"),
         "severe_threshold": sev,
         "is_empty": not rows,
         "legend": legend,
