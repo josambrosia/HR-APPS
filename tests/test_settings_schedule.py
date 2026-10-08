@@ -127,3 +127,27 @@ def test_dialog_rejects_past_date(tmp_path, monkeypatch, tk_root):
     finally:
         if dlg.winfo_exists():
             dlg.destroy()
+
+
+def test_general_tab_scrollable_with_sticky_save(env, tk_root, monkeypatch):
+    """Tab General bisa discroll dan tombol Simpan selalu terlihat (v26 fix:
+    perubahan toleransi tampak 'tidak tersimpan' karena tombol terpotong)."""
+    import customtkinter as ctk
+    settings_mod, dbp = env
+    monkeypatch.setattr(settings_mod.feedback, "show_info",
+                        lambda *a, **k: None)
+    monkeypatch.setattr(settings_mod.feedback, "show_warning",
+                        lambda *a, **k: None)
+    s = _screen(env, tk_root)
+    try:
+        assert isinstance(s._general_scroller, ctk.CTkScrollableFrame)
+        assert len(s._general_scroller.winfo_children()) > 0
+        # Tombol Simpan berada di bar sticky, bukan di dalam area scroll.
+        assert s._save_btn.master is s._save_bar
+        # Toleransi benar-benar tersimpan saat tombol dipakai.
+        s.tol_var.set("25")
+        s._save()
+        with get_connection(dbp) as conn:
+            assert get_setting(conn, "late_tolerance_min") == "25"
+    finally:
+        s.destroy()

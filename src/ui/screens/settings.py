@@ -83,6 +83,30 @@ class SettingsScreen(ctk.CTkFrame):
             overtime = get_setting(conn, "overtime_threshold",
                                    default=DEFAULT_OVERTIME_THRESHOLD)
 
+        # Tombol Simpan sticky di bawah tab: selalu terlihat walau isi tab
+        # lebih tinggi dari layar (v26 fix — sebelumnya tombol ikut terpotong
+        # di bawah sehingga perubahan toleransi tampak "tidak tersimpan").
+        self._save_bar = ctk.CTkFrame(parent, fg_color="transparent")
+        self._save_bar.pack(side="bottom", fill="x")
+        self._save_btn = ctk.CTkButton(
+            self._save_bar, text="Simpan Pengaturan",
+            command=self._save,
+            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
+            text_color=COLOR_BG,
+            font=FONT_BODY_BOLD,
+            corner_radius=RADIUS_MD,
+        )
+        self._save_btn.pack(anchor="w", pady=SPACE_MD)
+
+        # Isi tab bisa discroll; semua baris dibangun ke dalam scroller.
+        self._general_scroller = ctk.CTkScrollableFrame(
+            parent, fg_color="transparent", corner_radius=0,
+            scrollbar_button_color=COLOR_SURFACE_HIGH,
+            scrollbar_button_hover_color=COLOR_BORDER,
+        )
+        self._general_scroller.pack(fill="both", expand=True)
+        parent = self._general_scroller
+
         row = ctk.CTkFrame(
             parent, fg_color=COLOR_SURFACE,
             border_width=1, border_color=COLOR_BORDER,
@@ -255,16 +279,6 @@ class SettingsScreen(ctk.CTkFrame):
             self._motion_switch.select()
         else:
             self._motion_switch.deselect()
-
-        # Save = magenta primary CTA (JTS brand action color).
-        ctk.CTkButton(
-            parent, text="Simpan Pengaturan",
-            command=self._save,
-            fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
-            text_color=COLOR_BG,
-            font=FONT_BODY_BOLD,
-            corner_radius=RADIUS_MD,
-        ).pack(anchor="w", pady=SPACE_MD)
 
     # ── Jam Kantor helpers (v26) ──
     def _render_schedule(self):
