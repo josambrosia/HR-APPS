@@ -53,6 +53,12 @@ APP_CHANGELOG = [
                      "jam kantor): mengubahnya tidak lagi mengubah warna/"
                      "status bulan-bulan lama. Settings menampilkan tanggal "
                      "berlaku dan nilai yang sedang berjalan."),
+            ("feat", "Tombol \"Muat Ulang\" di menu Lembur: membaca ulang "
+                     "database dan memeriksa ulang status, sehingga tidak "
+                     "ada perubahan yang terlewat."),
+            ("fix", "Menu Lembur kini menampilkan penanda bila ada keputusan "
+                    "tersimpan di bulan lain (import bisa memindahkan Bulan "
+                    "Aktif) — keputusan lama tidak lagi tampak hilang."),
             ("fix", "Sidebar menu kini bisa digulir: di layar pendek "
                     "seluruh menu tetap terjangkau dan tidak lagi tertutup "
                     "taskbar."),

@@ -74,3 +74,16 @@ def set_note_approved(conn: sqlite3.Connection, *, employee_id: int,
         "updated_at = ? WHERE employee_id = ? AND tanggal = ?",
         (note, approved_minutes, ts, employee_id, tanggal),
     )
+
+
+def decision_months(conn: sqlite3.Connection) -> list[dict]:
+    """Bulan ('YYYY-MM') yang punya keputusan lembur + jumlahnya.
+
+    Dipakai layar Lembur untuk memberi tahu bahwa keputusan tersimpan di
+    bulan lain (menu mengikuti Bulan Aktif — import bisa memindahkannya).
+    """
+    rows = conn.execute(
+        "SELECT substr(tanggal, 1, 7) AS month, COUNT(*) AS total "
+        "FROM overtime_decisions GROUP BY month ORDER BY month DESC"
+    ).fetchall()
+    return [dict(r) for r in rows]

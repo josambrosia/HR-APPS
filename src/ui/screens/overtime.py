@@ -17,7 +17,7 @@ from src.core.overtime import count_pending, format_duration, month_rows, summar
 from src.core.session_state import data_version, notify_data_changed
 from src.core.week_utils import MONTH_NAMES_ID
 from src.db.connection import get_connection
-from src.db.overtime import apply_status
+from src.db.overtime import apply_status, decision_months
 from src.db.settings import get_setting
 from src.ui import feedback, motion
 from src.ui.browser_launcher import open_html_in_browser
@@ -115,6 +115,15 @@ class OvertimeScreen(ctk.CTkFrame):
             fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER,
             text_color=COLOR_BG, font=FONT_BODY_BOLD, corner_radius=RADIUS_MD)
         self._print_btn.pack(side="right")
+        # Tombol muat ulang: baca ulang database & periksa ulang status
+        # (memastikan tidak ada perubahan/data yang terlewat).
+        self._refresh_btn = ctk.CTkButton(
+            head, text="⟳  Muat Ulang", command=self._manual_refresh,
+            width=122,
+            fg_color="transparent", border_width=1, border_color=COLOR_INFO,
+            text_color=COLOR_INFO, hover_color=COLOR_SURFACE_HIGH,
+            font=FONT_BODY_BOLD, corner_radius=RADIUS_MD)
+        self._refresh_btn.pack(side="right", padx=(0, SPACE_SM))
         self._badge = ActiveMonthBanner(
             head, variant="badge",
             value=_month_label(self._month) if self._month else "")
@@ -155,6 +164,11 @@ class OvertimeScreen(ctk.CTkFrame):
             bar, on_change=self._on_search, width=230,
             debounce_ms=SEARCH_DEBOUNCE_MS)
         self._search.pack(side="right")
+
+        # Penanda keputusan di bulan lain (menu mengikuti Bulan Aktif).
+        self._other_hint = ctk.CTkLabel(
+            container, text="", font=FONT_SMALL, text_color=COLOR_WARN,
+            anchor="w", justify="left", wraplength=900)
 
         self._batch_bar = ctk.CTkFrame(
             container, fg_color=COLOR_SURFACE, border_width=1,
@@ -248,6 +262,7 @@ class OvertimeScreen(ctk.CTkFrame):
         self._render_table()
         self._render_summary()
         self._update_batch_bar()
+        self._update_other_months()
         if flash_iids:
             for iid in flash_iids:
                 if iid in self._row_by_iid:
@@ -359,6 +374,33 @@ class OvertimeScreen(ctk.CTkFrame):
         else:
             self._batch_bar.pack_forget()
 
+    def _update_other_months(self):
+        """Beri tahu bila keputusan tersimpan di bulan lain — import bisa
+        memindahkan Bulan Aktif otomatis sehingga keputusan lama seolah hilang."""
+        if not self._month:
+            self._other_hint.pack_forget()
+            return
+        with get_connection(DB_PATH) as conn:
+            months = decision_months(conn)
+        others = [m for m in months if m["month"] != self._month]
+        if not others:
+            self._other_hint.pack_forget()
+            return
+        parts = []
+        for m in others[:3]:
+            try:
+                y, mm = m["month"].split("-")
+                label = f"{MONTH_NAMES_ID[int(mm)][:3]} {y}"
+            except (ValueError, KeyError, IndexError):
+                label = m["month"]
+            parts.append(f"{label} ({m['total']})")
+        self._other_hint.configure(
+            text="Keputusan lembur tersimpan di bulan lain: "
+                 + " · ".join(parts)
+                 + " — ubah Bulan Aktif untuk melihat.")
+        if not self._other_hint.winfo_manager():
+            self._other_hint.pack(fill="x", pady=(SPACE_XS, 0))
+
     def _open_detail(self, row):
         OvertimeDetailDialog(self.winfo_toplevel(), row,
                              on_saved=self._on_detail_saved)
@@ -442,6 +484,24 @@ class OvertimeScreen(ctk.CTkFrame):
         else:
             self._badge.pack_forget()
         self._reload()
+
+    def _manual_refresh(self):
+        """Baca ulang database & periksa ulang status — memastikan tidak ada
+        perubahan (edit absensi, import, keputusan dari layar lain) yang
+        terlewat tanpa perlu menutup aplikasi."""
+        with get_connection(DB_PATH) as conn:
+            self._month = _read_month(conn)
+        if self._month:
+            self._badge.set_value(_month_label(self._month))
+            if not self._badge.winfo_manager():
+                self._badge.pack(side="right", padx=(0, SPACE_SM))
+        else:
+            self._badge.pack_forget()
+        self._reload()
+        show_success_toast(
+            self.winfo_toplevel(), title="Data dimuat ulang",
+            message="Daftar dan status lembur sudah dibaca ulang dari "
+                    "database.")
 
 
 def _read_month(conn) -> str:

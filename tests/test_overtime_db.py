@@ -1,6 +1,7 @@
 from src.db.connection import get_connection
 from src.db.employees import upsert_employee
-from src.db.overtime import apply_status, get_decision, set_note_approved
+from src.db.overtime import (apply_status, decision_months, get_decision,
+                             set_note_approved)
 from src.db.schema import init_db
 
 
@@ -95,3 +96,21 @@ def test_unknown_status_rejected(tmp_path):
             pass
         else:
             raise AssertionError("status tidak dikenal harus ditolak")
+
+
+def test_decision_months_grouping(tmp_path):
+    p = tmp_path / "o.db"
+    init_db(p)
+    with get_connection(p) as conn:
+        eid = _emp(conn)
+        apply_status(conn, employee_id=eid, tanggal="2026-06-03",
+                     status="diajukan", detected_minutes=100)
+        apply_status(conn, employee_id=eid, tanggal="2026-06-05",
+                     status="diterima", detected_minutes=100,
+                     approved_minutes=100)
+        apply_status(conn, employee_id=eid, tanggal="2026-07-01",
+                     status="diterima", detected_minutes=100,
+                     approved_minutes=100)
+        months = decision_months(conn)
+    assert months == [{"month": "2026-07", "total": 1},
+                      {"month": "2026-06", "total": 2}]

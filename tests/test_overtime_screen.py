@@ -159,3 +159,53 @@ def test_orphan_decision_visible_in_its_tab(tmp_path, monkeypatch, tk_root):
         assert vals[8] == "Diajukan"
     finally:
         s.destroy()
+
+
+def test_other_month_hint_when_active_month_has_none(tmp_path, monkeypatch,
+                                                     tk_root):
+    """Keputusan di bulan lain diberi penanda agar tidak tampak hilang."""
+    p = tmp_path / "o.db"
+    _seed(p)
+    with get_connection(p) as conn:
+        set_setting(conn, "current_month", "2026-11")
+    s = _screen(monkeypatch, tk_root, p)
+    try:
+        assert s._other_hint.winfo_manager() != ""
+        text = s._other_hint.cget("text")
+        assert "Okt 2026" in text and "(1)" in text
+        # kembali ke bulan yang punya keputusan → penanda hilang
+        with get_connection(p) as conn:
+            set_setting(conn, "current_month", "2026-10")
+        s.on_show()
+        assert s._other_hint.winfo_manager() == ""
+    finally:
+        s.destroy()
+
+
+def test_manual_refresh_rereads_db_and_status(tmp_path, monkeypatch, tk_root):
+    """Tombol Muat Ulang membaca ulang DB + status yang berubah dari luar."""
+    import src.ui.screens.overtime as mod
+    p = tmp_path / "o.db"
+    a, _b = _seed(p)
+    monkeypatch.setattr(mod, "show_success_toast", lambda *a, **k: None)
+    s = _screen(monkeypatch, tk_root, p)
+    try:
+        assert len(s.tree.get_children()) == 2
+        # perubahan dari luar: keputusan baru + bulan aktif pindah
+        with get_connection(p) as conn:
+            apply_status(conn, employee_id=a, tanggal="2026-10-01",
+                         status="diajukan", detected_minutes=150)
+            set_setting(conn, "current_month", "2026-11")
+        s._manual_refresh()
+        assert s._month == "2026-11"
+        assert len(s.tree.get_children()) == 0
+        assert "Okt 2026" in s._other_hint.cget("text")
+        # kembali ke Oktober → status baru terbaca
+        with get_connection(p) as conn:
+            set_setting(conn, "current_month", "2026-10")
+        s._manual_refresh()
+        s._filter = "diajukan"
+        s._render_table()
+        assert len(s.tree.get_children()) == 1
+    finally:
+        s.destroy()

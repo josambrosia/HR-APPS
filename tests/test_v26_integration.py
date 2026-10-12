@@ -197,7 +197,59 @@ def test_legacy_migration_seeds_schedule_and_tolerance(tmp_path):
             "SELECT COUNT(*) FROM tolerance_periods").fetchone()[0] == 1
 
 
-# ── 7. Migrasi pada salinan DB terinstall (data nyata user) ────────────────
+# ── 7. Keputusan × edit heatmap × resolve Issues ───────────────────────────
+
+def test_decisions_survive_heatmap_edit_and_issue_resolve(tmp_path):
+    from src.db.attendance import save_manual_attendance, set_reason
+    p = tmp_path / "i.db"
+    init_db(p)
+    with get_connection(p) as conn:
+        a = upsert_employee(conn, no_staff="1", nama="Agus")
+        b = upsert_employee(conn, no_staff="2", nama="Budi")
+        _att(conn, a, "2026-06-03", "08:10", "18:53")
+        _att(conn, b, "2026-06-05", "08:07", "22:36")
+        apply_status(conn, employee_id=a, tanggal="2026-06-03",
+                     status="tidak_diterima", detected_minutes=173)
+        apply_status(conn, employee_id=b, tanggal="2026-06-05",
+                     status="diterima", detected_minutes=396,
+                     approved_minutes=396)
+        # edit manual dari Heatmap
+        save_manual_attendance(
+            conn, employee_id=a, tanggal="2026-06-03", hari="Rabu",
+            tipe="Hari Kerja", jadwal=None, masuk="08:10", keluar="18:53",
+            kerja_jam=10.7, lembur_jam=2.7, terlambat_menit=0, has_issue=0)
+        # resolve dari Issues
+        rid = conn.execute(
+            "SELECT id FROM attendance_records "
+            "WHERE employee_id=? AND tanggal=?", (b, "2026-06-05")).fetchone()["id"]
+        set_reason(conn, attendance_id=rid, category="tugas_lapangan",
+                   detail="PT X")
+        assert get_decision(conn, a, "2026-06-03")["status"] == "tidak_diterima"
+        assert get_decision(conn, b, "2026-06-05")["status"] == "diterima"
+
+
+# ── 8. Import memindah Bulan Aktif: keputusan tetap ada di bulan lama ──────
+
+def test_import_month_switch_keeps_decisions(tmp_path):
+    from src.db.overtime import decision_months
+    p = tmp_path / "i.db"
+    init_db(p)
+    with get_connection(p) as conn:
+        eid = upsert_employee(conn, no_staff="1", nama="Agus")
+        _att(conn, eid, "2026-06-03", "08:10", "18:53")
+        apply_status(conn, employee_id=eid, tanggal="2026-06-03",
+                     status="diajukan", detected_minutes=173)
+        # efek import file bulan baru (import_screen auto-detect)
+        set_setting(conn, "current_month", "2026-07")
+        assert month_rows(conn, "2026-07") == []
+        assert decision_months(conn) == [{"month": "2026-06", "total": 1}]
+        # kembali ke Juni → keputusan muncul lagi
+        set_setting(conn, "current_month", "2026-06")
+        rows = month_rows(conn, "2026-06")
+        assert [r.status for r in rows] == ["diajukan"]
+
+
+# ── 9. Migrasi pada salinan DB terinstall (data nyata user) ────────────────
 
 INSTALLED_DB = Path.home() / "AppData/Local/Programs/HR-Absensi/data/hr.db"
 
