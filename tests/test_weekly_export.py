@@ -59,7 +59,9 @@ def test_weekly_export_holiday_row_tipe_and_blank_counts(tmp_path):
     generate_weekly_export(conn, "2026-04-06", "2026-04-12", out)
     ws = load_workbook(out).active
     assert ws.cell(row=2, column=6).value == "Hari Libur"      # F Tipe
-    assert ws.cell(row=2, column=7).value == "08.00 - 16.00"   # G Jadwal kept
+    # v26.0.2: G Jadwal = jadwal aplikasi read-time (fallback default
+    # 09.00 - 17.00 karena DB tes ini tanpa periode jadwal tersimpan)
+    assert ws.cell(row=2, column=7).value == "09.00 - 17.00"
     assert ws.cell(row=2, column=8).value in (None, "")        # H Masuk blank
     assert ws.cell(row=2, column=12).value in (None, "")       # L Terlambat blank
 

@@ -328,8 +328,12 @@ def generate_monthly_report(
         total = _init_total()
         for r in emp_records:
             is_holiday = r.get("tipe") == "Hari Libur"
+            sched_start, sched_end = schedule_for(conn, r["tanggal"])
+            # v26.0.2: kolom F "Jadwal" = jadwal APLIKASI yang berlaku pada
+            # tanggal itu (read-time), bukan teks tersimpan dari mesin
+            # fingerprint yang masih memakai basis lama.
+            r = {**r, "jadwal": f"{sched_start} - {sched_end}"}
             if not is_holiday:
-                sched_start, sched_end = schedule_for(conn, r["tanggal"])
                 eff = effective_attendance(
                     r, schedule_start=sched_start, lupa_penalty_min=lupa_penalty)
                 r = {**r, "masuk": eff["masuk"],

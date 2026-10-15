@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "26.0.1"
+APP_VERSION = "26.0.2"
 APP_BUILD_DATE = "2026-10-15"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
@@ -17,6 +17,36 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "26.0.2",
+        "date": "2026-10-15",
+        "changes": [
+            ("fix", "Keterlambatan kini dihitung aplikasi sendiri dari jam "
+                    "masuk + jadwal kantor tanggal itu, bukan dari angka "
+                    "mesin fingerprint. Kedatangan setelah 14 Sep yang "
+                    "masuk sebelum 09.00 tidak lagi tampil telat."),
+            ("change", "Saat pertama kali dibuka setelah update, seluruh "
+                       "data lama dihitung ulang otomatis SEKALI memakai "
+                       "jadwal yang berlaku per tanggal (sebelum 14 Sep "
+                       "tetap 08.00–16.00). Baris yang pernah diedit manual "
+                       "tidak diubah."),
+            ("fix", "Kolom \"Lembur\" di Laporan Bulanan & ekspor Mingguan "
+                    "kini dihitung \"jam keluar − jam pulang jadwal\" tanpa "
+                    "ambang — konsisten dengan menu Lembur."),
+            ("fix", "Kolom \"Jadwal\" di Laporan Bulanan & ekspor Mingguan "
+                    "kini menampilkan jadwal aplikasi yang berlaku pada "
+                    "tanggal itu (mis. 09.00 - 17.00), bukan teks lama dari "
+                    "mesin fingerprint."),
+            ("change", "Import file fingerprint: jam masuk & keluar tetap "
+                       "dari file, tetapi telat dan lembur selalu dihitung "
+                       "ulang oleh aplikasi — data lama yang diimpor ke "
+                       "instalasi baru otomatis memakai jam lama 08.00–"
+                       "16.00 untuk tanggal sebelum 14 Sep."),
+            ("change", "Ekspor Diagnostik kini menyertakan pembanding nilai "
+                       "tersimpan (db) vs hitungan aplikasi (app) untuk "
+                       "telat & lembur tiap baris setelah 14 Sep."),
+        ],
+    },
     {
         "version": "26.0.1",
         "date": "2026-10-15",

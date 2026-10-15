@@ -9,9 +9,11 @@ from src.config import DB_PATH
 from src.db.connection import get_connection
 from src.core.session_state import notify_data_changed
 from src.core.week_utils import MONTH_NAMES_ID
+from src.core.attendance_calc import recompute
 from src.db.employees import upsert_employee, get_employee_by_no_staff
 from src.db.attendance import (upsert_attendance, list_recent_imports,
                                count_overlap, manual_rows_for_import)
+from src.db.schedule import ensure_historical_schedule, schedule_for
 from src.db import backup as backup_mod
 from src.core.import_conflicts import find_conflicts
 from src.db.holidays import restamp_holidays
@@ -146,6 +148,11 @@ def run_import_confirm(db_path, rows: list, resolution=None, progress=None) -> d
     to the old main-thread loop). Module-level so tests can call it
     directly.
 
+    v26.0.2: terlambat_menit & lembur_jam dihitung aplikasi sendiri dari
+    jam absensi + jadwal tanggal baris (kolom file diabaikan); kerja_jam
+    tetap dari file. Jadwal historis dipastikan dulu supaya import tanggal
+    lama ke DB instalasi baru tidak memakai jam baru 09.00.
+
     Args:
         db_path: SQLite path — the screen passes the module-level DB_PATH.
         rows: parsed FingerprintRow list.
@@ -168,6 +175,9 @@ def run_import_confirm(db_path, rows: list, resolution=None, progress=None) -> d
     if progress is not None:
         progress(0, total)
     with get_connection(db_path) as conn:
+        ensure_historical_schedule(
+            conn, extra_dates={r.tanggal for r in rows if r.tanggal})
+        sched_cache: dict[str, tuple[str, str]] = {}
         for i, r in enumerate(rows):
             if resolution.get((r.no_staff, r.tanggal)) == "keep":
                 # conflict resolved as "keep manual" — leave the edited row intact
@@ -177,12 +187,18 @@ def run_import_confirm(db_path, rows: list, resolution=None, progress=None) -> d
             emp_id = upsert_employee(
                 conn, no_staff=r.no_staff, nama=r.nama, dept=r.dept
             )
+            if r.tanggal not in sched_cache:
+                sched_cache[r.tanggal] = schedule_for(conn, r.tanggal)
+            sched_start, sched_end = sched_cache[r.tanggal]
+            calc = recompute(
+                tipe=r.tipe, masuk=r.masuk, keluar=r.keluar,
+                schedule_start=sched_start, schedule_end=sched_end)
             upsert_attendance(
                 conn, employee_id=emp_id, tanggal=r.tanggal,
                 hari=r.hari, tipe=r.tipe, jadwal=r.jadwal,
                 masuk=r.masuk, keluar=r.keluar,
-                kerja_jam=r.kerja_jam, lembur_jam=r.lembur_jam,
-                terlambat_menit=r.terlambat_menit,
+                kerja_jam=r.kerja_jam, lembur_jam=calc["lembur_jam"],
+                terlambat_menit=calc["terlambat_menit"],
                 has_issue=1 if is_issue(r) else 0,
                 imported_from=r.source_file,
             )

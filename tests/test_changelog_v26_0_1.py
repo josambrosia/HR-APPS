@@ -1,13 +1,11 @@
 from src import config
 
 
-def test_versi_naik_ke_26_0_1():
-    assert config.APP_VERSION == "26.0.1"
-
-
-def test_changelog_punya_entri_v26_0_1_paling_atas():
-    entry = config.APP_CHANGELOG[0]
-    assert entry["version"] == "26.0.1"
+def test_changelog_retains_v26_0_1_entry():
+    """v26.0.1 bukan lagi versi terkini, tapi entri changelog-nya tetap ada."""
+    entry = next((e for e in config.APP_CHANGELOG if e["version"] == "26.0.1"),
+                 None)
+    assert entry is not None
     assert entry["date"] == "2026-10-15"
     blob = " ".join(d for _, d in entry["changes"]).lower()
     assert "diagnostik" in blob

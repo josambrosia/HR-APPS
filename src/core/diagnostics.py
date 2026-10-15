@@ -5,8 +5,9 @@ supaya masalah di komputer klien bisa dianalisa tanpa akses langsung:
 
 - ``hr.db``                      salinan penuh database (read-only copy)
 - ``summary.json``               versi aplikasi, jadwal, toleransi, hitungan
-- ``samples_setelah_cutoff.csv`` baris absensi tanggal >= 2026-09-14
-                                 (Masuk vs Terlambat — untuk cek "masih telat")
+- ``samples_setelah_cutoff.csv`` baris absensi tanggal >= 2026-09-14 dengan
+                                 pembanding nilai tersimpan (db) vs hitungan
+                                 aplikasi (app) untuk telat & lembur
 - ``keputusan_lembur.csv``       seluruh keputusan lembur + timestamp
 """
 import csv
@@ -18,6 +19,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from src.config import APP_BUILD_DATE, APP_VERSION, SCHEDULE_CUTOVER_DATE
+from src.core.attendance_calc import recompute
+from src.db.schedule import schedule_for
 
 _SETTING_KEYS = (
     "current_month", "schedule_start", "schedule_end", "overtime_threshold",
@@ -82,12 +85,20 @@ def build_summary(conn: sqlite3.Connection) -> dict:
 
 
 def _samples_rows(conn: sqlite3.Connection) -> list[dict]:
-    return [dict(r) for r in _try_rows(
+    """Baris setelah cutoff + pembanding nilai tersimpan vs hitungan aplikasi.
+
+    ``terlambat_db``/``lembur_db`` = nilai tersimpan di database (hasil
+    import/recompute); ``terlambat_app``/``lembur_app`` = hitungan aplikasi
+    saat ini dari jam absensi + jadwal tanggal (v26.0.2). Keduanya harus
+    sama kecuali baris yang pernah diedit manual.
+    """
+    raw = [dict(r) for r in _try_rows(
         conn,
         """
         SELECT ar.tanggal, e.nama, e.dept, ar.masuk, ar.keluar,
-               ar.terlambat_menit, ar.tipe, ar.reason_category,
-               ar.imported_from
+               ar.tipe, ar.reason_category, ar.imported_from,
+               ar.terlambat_menit AS terlambat_db,
+               ar.lembur_jam AS lembur_db
           FROM attendance_records ar
           JOIN employees e ON e.id = ar.employee_id
          WHERE ar.tanggal >= ?
@@ -95,6 +106,19 @@ def _samples_rows(conn: sqlite3.Connection) -> list[dict]:
          LIMIT 2000
         """,
         (SCHEDULE_CUTOVER_DATE,))]
+    sched_cache: dict[str, tuple[str, str]] = {}
+    out = []
+    for r in raw:
+        tgl = r["tanggal"]
+        if tgl not in sched_cache:
+            sched_cache[tgl] = schedule_for(conn, tgl)
+        sched_start, sched_end = sched_cache[tgl]
+        calc = recompute(tipe=r["tipe"], masuk=r["masuk"], keluar=r["keluar"],
+                         schedule_start=sched_start, schedule_end=sched_end)
+        out.append({**r,
+                    "terlambat_app": calc["terlambat_menit"],
+                    "lembur_app": calc["lembur_jam"]})
+    return out
 
 
 def _decision_rows(conn: sqlite3.Connection) -> list[dict]:

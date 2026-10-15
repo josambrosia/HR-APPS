@@ -77,12 +77,17 @@ def test_schedule_migration_idempotent(temp_db_path):
 
 def test_init_db_idempotent(temp_db_path):
     init_db(temp_db_path)
+    with sqlite3.connect(temp_db_path) as conn:
+        first = conn.execute("SELECT COUNT(*) FROM settings").fetchone()[0]
     init_db(temp_db_path)  # second call must not raise
     with sqlite3.connect(temp_db_path) as conn:
-        cnt = conn.execute("SELECT COUNT(*) FROM settings").fetchone()[0]
-    # Idempotency invariant: a second init_db must not duplicate rows. The count
-    # equals the number of seeded defaults (robust to new keys being added).
-    assert cnt == len(DEFAULT_SETTINGS)  # not duplicated
+        second = conn.execute("SELECT COUNT(*) FROM settings").fetchone()[0]
+    # Idempotency invariant: a second init_db must not duplicate rows (key is
+    # PK, so count must not grow) and every seeded default is present. The
+    # total can exceed len(DEFAULT_SETTINGS) because migrations may add
+    # marker keys (e.g. the v26.0.2 recompute flag).
+    assert first == second
+    assert first >= len(DEFAULT_SETTINGS)
 
 
 def test_outlier_exclusions_table_created(temp_db_path):

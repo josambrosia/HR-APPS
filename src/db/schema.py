@@ -2,6 +2,9 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
+from src.db.recompute import recompute_all_records
+from src.db.schedule import ensure_historical_schedule
+
 DDL = """
 CREATE TABLE IF NOT EXISTS employees (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -248,6 +251,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
                 "VALUES (?,?,?,?)",
                 ("1970-01-01", start, end, now))
 
+    # v26.0.2: instalasi baru yang sudah berisi data historis (mis. hasil
+    # import Juli-September sebelum aplikasi pernah dihitung ulang) hanya
+    # punya 1 periode default 09.00-17.00 sejak 1970 — pecah supaya data
+    # sebelum cutoff tetap memakai jam mesin lama 08.00-16.00.
+    ensure_historical_schedule(conn)
+
     # v26: seed riwayat toleransi dari setelan tunggal. Nilai lama
     # dipertahankan sebagai periode "sejak awal"; perubahan berikutnya
     # ditambahkan ber-tanggal lewat Settings.
@@ -273,6 +282,7 @@ def init_db(db_path: Path) -> None:
     """Create schema if missing and seed default settings (idempotent)."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
     try:
         conn.executescript(DDL)
         _migrate(conn)
@@ -282,6 +292,10 @@ def init_db(db_path: Path) -> None:
                 "ON CONFLICT(key) DO NOTHING",
                 (key, value),
             )
+        # v26.0.2: hitung ulang telat & lembur data lama SEKALI per database
+        # (flag settings). Berjalan setelah _migrate supaya jadwal historis
+        # sudah benar dan sebelum commit supaya atomik dengan sisanya.
+        recompute_all_records(conn)
         conn.commit()
     finally:
         conn.close()

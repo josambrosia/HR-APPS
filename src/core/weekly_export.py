@@ -70,11 +70,14 @@ def generate_weekly_export(
     for r in rows:
         employees.add(r["no_staff"])
         is_holiday = r["tipe"] == "Hari Libur"
+        # v26.0.2: kolom "Jadwal" = jadwal APLIKASI per tanggal (read-time),
+        # bukan teks tersimpan dari mesin fingerprint.
+        sched = schedule_for(conn, r["tanggal"])
         if is_holiday:
             eff_masuk, eff_terlambat = None, None
         else:
             eff = effective_attendance(
-                r, schedule_start=schedule_for(conn, r["tanggal"])[0],
+                r, schedule_start=sched[0],
                 lupa_penalty_min=lupa_penalty)
             eff_masuk = eff["masuk"]
             eff_terlambat = eff["terlambat_menit"]
@@ -85,7 +88,7 @@ def generate_weekly_export(
             r["tanggal"],
             r["hari"] or "",
             r["tipe"] or "",
-            r["jadwal"] or "",
+            f"{sched[0]} - {sched[1]}",
             "" if is_holiday else (eff_masuk or ""),
             "" if is_holiday else (r["keluar"] or ""),
             "" if is_holiday else (
