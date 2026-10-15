@@ -76,6 +76,25 @@ The changelog is also a forcing function for honest release notes —
 if you can't describe a change in user-facing language, you probably
 haven't thought hard enough about its impact.
 
+### 5. Patch releases: vN.0.1, vN.0.2, … (jangan menimpa vN.0.0)
+
+Setiap perbaikan/perubahan setelah sebuah versi dirilis **naik nomor patch**:
+perubahan berikutnya setelah v26.0.0 = **v26.0.1**, lalu v26.0.2, dst selama
+masih perbaikan di versi yang sama (precedent: v16.0.1/v16.0.2, v24.0.1/v24.0.2).
+
+Setiap patch menjalani urutan bundle penuh (rule 1–2):
+1. Bump `APP_VERSION` + `APP_BUILD_DATE` dan prepend entri `APP_CHANGELOG`.
+2. Build `HR-Absensi-Setup-vN.0.x.exe` (jangan menimpa installer versi lama —
+   file lama adalah rollback artifact).
+3. Rotasi produksi 2-level; copy ke `Installers/`; smoke.
+4. Push hanya setelah otorisasi eksplisit; update `memory/version_state.md`.
+
+Branch: buat branch lokal `vN.0.x` dari commit rilis sebelumnya (pola
+`v24.0.1`/`v24.0.2`), kecuali user minta digabung ke branch yang ada.
+
+Why: pemakai installer harus bisa membedakan build; changelog menampilkan
+perubahan per patch; rollback tetap bisa per patch.
+
 ## Where to look for more detail
 
 User-level memory (auto-loaded by Claude Code on this project):
