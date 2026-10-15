@@ -2,8 +2,8 @@ import sys
 from pathlib import Path
 
 APP_NAME = "HR Absensi App"
-APP_VERSION = "26.0.0"
-APP_BUILD_DATE = "2026-10-01"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
+APP_VERSION = "26.0.1"
+APP_BUILD_DATE = "2026-10-15"  # YYYY-MM-DD; bumped manually with APP_VERSION on release
 APP_TAGLINE = "From Concept to Code."
 APP_BRAND_NAME = "Josaphat Tech Solution"
 
@@ -17,6 +17,18 @@ APP_BRAND_NAME = "Josaphat Tech Solution"
 #
 # DISCIPLINE: every new version MUST prepend an entry here. Newest at top.
 APP_CHANGELOG = [
+    {
+        "version": "26.0.1",
+        "date": "2026-10-15",
+        "changes": [
+            ("feat", "Tombol \"Ekspor Diagnostik\" di Settings → Backup & "
+                     "Restore: membuat satu file zip berisi salinan "
+                     "database + ringkasan (versi aplikasi, jadwal, "
+                     "toleransi, keputusan lembur, dan contoh absensi "
+                     "setelah 14 Sep) untuk dikirim ke pengembang saat "
+                     "melaporkan masalah."),
+        ],
+    },
     {
         "version": "26.0.0",
         "date": "2026-10-01",

@@ -439,6 +439,15 @@ class SettingsScreen(ctk.CTkFrame):
             text_color=COLOR_INFO, hover_color=COLOR_SURFACE_HIGH,
             font=FONT_BODY_BOLD, corner_radius=RADIUS_MD, width=130,
         ).pack(side="left", padx=(SPACE_SM, 0))
+        self._diag_btn = ctk.CTkButton(
+            bar, text="🧪 Ekspor Diagnostik…",
+            command=self._do_export_diagnostics,
+            fg_color="transparent", border_width=1,
+            border_color=COLOR_SECONDARY, text_color=COLOR_SECONDARY,
+            hover_color=COLOR_SURFACE_HIGH,
+            font=FONT_BODY_BOLD, corner_radius=RADIUS_MD, width=170,
+        )
+        self._diag_btn.pack(side="left", padx=(SPACE_SM, 0))
         ctk.CTkLabel(
             bar,
             text="Backup otomatis dibuat sebelum tiap import & sebelum hapus baris.",
@@ -539,6 +548,32 @@ class SettingsScreen(ctk.CTkFrame):
             os.startfile(str(d))  # noqa: S606 — Windows Explorer on a known dir
         except Exception as exc:  # noqa: BLE001
             feedback.show_error(self, "Tidak bisa membuka folder", str(exc))
+
+    def _do_export_diagnostics(self):
+        """Paket zip (salinan DB + ringkasan + contoh baris) untuk dukungan."""
+        from tkinter import filedialog
+
+        from src.core.diagnostics import write_diagnostic_zip
+
+        folder = filedialog.askdirectory(
+            title="Pilih folder untuk menyimpan paket diagnostik")
+        if not folder:
+            return
+        guard = BusyGuard(self._diag_btn, busy_text="Menyiapkan")
+        if not guard.acquire():
+            return
+        try:
+            path = write_diagnostic_zip(DB_PATH, folder)
+        except Exception as exc:  # noqa: BLE001
+            guard.release()
+            feedback.show_error(self, "Ekspor diagnostik gagal", str(exc))
+            return
+        guard.release()
+        feedback.show_info(
+            self, "Diagnostik diekspor",
+            "Paket diagnostik dibuat:\n"
+            f"{path}\n\n"
+            "Kirim file zip ini ke pengembang saat melaporkan masalah.")
 
     def _restore(self, path, btn=None):
         if not feedback.ask_yes_no(
